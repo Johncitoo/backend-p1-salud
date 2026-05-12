@@ -23,7 +23,7 @@ export class Usuario {
   @Column({ length: 150 })
   email: string;
 
-  @Column({ length: 30, nullable: true })
+  @Column({ type: 'varchar', length: 30, nullable: true })
   telefono?: string | null;
 
   @Column({ default: true })
