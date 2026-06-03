@@ -1,24 +1,31 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthModule } from './auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { getDatabaseConfig } from './config/database.config';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { PacientesModule } from './pacientes/pacientes.module';
+
+const isTest = process.env.NODE_ENV === 'test';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) =>
-        getDatabaseConfig(configService),
-    }),
-    AuthModule,
+    TypeOrmModule.forRoot(
+      isTest
+        ? {
+            type: 'sqlite',
+            database: ':memory:',
+            autoLoadEntities: true,
+            synchronize: true,
+          }
+        : {
+            type: 'postgres',
+            url: process.env.DATABASE_URL,
+            autoLoadEntities: true,
+            synchronize: true, // temporal: crear tablas automáticamente en dev
+          },
+    ),
     UsuariosModule,
+    PacientesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
