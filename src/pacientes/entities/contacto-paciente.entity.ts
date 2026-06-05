@@ -11,13 +11,13 @@ export class ContactoPaciente {
   @Column({ length: 100 })
   nombre: string;
 
-  @Column({ length: 30, nullable: true })
+  @Column({ type: 'varchar', length: 30, nullable: true })
   telefono?: string | null;
 
-  @Column({ length: 150, nullable: true })
+  @Column({ type: 'varchar', length: 150, nullable: true })
   email?: string | null;
 
-  @Column({ length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   relacion?: string | null;
 
   @Column({ default: false })

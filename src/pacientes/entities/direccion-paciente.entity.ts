@@ -8,22 +8,22 @@ export class DireccionPaciente {
   @Column({ name: 'paciente_id', type: 'uuid' })
   pacienteId: string;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   alias?: string | null;
 
   @Column({ length: 200 })
   calle: string;
 
-  @Column({ length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   numero?: string | null;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   departamento?: string | null;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   comuna?: string | null;
 
-  @Column({ length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 100, nullable: true })
   region?: string | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })

@@ -8,7 +8,7 @@ export class PlanCuidado {
   @Column({ name: 'paciente_id', type: 'uuid' })
   pacienteId: string;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   objetivo?: string | null;
 
   @Column({ type: 'text', nullable: true })
@@ -20,7 +20,7 @@ export class PlanCuidado {
   @Column({ name: 'fecha_fin', type: 'date', nullable: true })
   fechaFin?: Date | null;
 
-  @Column({ length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   estado?: string | null;
 
   @Column({ name: 'created_at', type: 'timestamp', default: () => 'NOW()' })

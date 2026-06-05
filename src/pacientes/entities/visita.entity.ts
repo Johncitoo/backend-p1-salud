@@ -17,7 +17,7 @@ export class Visita {
   @Column({ name: 'fecha_realizada', type: 'timestamp', nullable: true })
   fechaRealizada?: Date | null;
 
-  @Column({ length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   estado?: string | null;
 
   @Column({ type: 'text', nullable: true })

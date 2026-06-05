@@ -5,6 +5,16 @@ import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Usuario } from './entities/usuario.entity';
 
+export interface UsuarioPerfil {
+  id: string;
+  identityUserId: string;
+  nombres: string;
+  apellidos: string;
+  email: string;
+  rol: string;
+  activo: boolean;
+}
+
 @Injectable()
 export class UsuariosService {
   constructor(
@@ -29,6 +39,30 @@ export class UsuariosService {
     }
 
     return usuario;
+  }
+
+  async findProfileByIdentityUserId(
+    identityUserId: string,
+  ): Promise<UsuarioPerfil | null> {
+    const row = await this.usuariosRepository
+      .createQueryBuilder('usuario')
+      .innerJoin('roles', 'rol', 'rol.id = usuario.rol_id')
+      .select([
+        'usuario.id AS "id"',
+        'usuario.identity_user_id AS "identityUserId"',
+        'usuario.nombres AS "nombres"',
+        'usuario.apellidos AS "apellidos"',
+        'usuario.email AS "email"',
+        'rol.nombre AS "rol"',
+        'usuario.activo AS "activo"',
+      ])
+      .where('usuario.identity_user_id = :identityUserId', { identityUserId })
+      .andWhere('usuario.activo = TRUE')
+      .andWhere('usuario.deleted_at IS NULL')
+      .andWhere('rol.deleted_at IS NULL')
+      .getRawOne<UsuarioPerfil>();
+
+    return row ?? null;
   }
 
   async create(dto: CreateUsuarioDto): Promise<Usuario> {
