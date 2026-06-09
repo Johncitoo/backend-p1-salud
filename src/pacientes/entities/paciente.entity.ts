@@ -5,6 +5,9 @@ export class Paciente {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ type: 'varchar', length: 20 })
+  rut: string;
+
   @Column({ length: 100 })
   nombres: string;
 
@@ -23,8 +26,8 @@ export class Paciente {
   @Column({ type: 'varchar', length: 150, nullable: true })
   email?: string | null;
 
-  @Column({ type: 'varchar', length: 20, nullable: true })
-  rut?: string | null;
+  @Column({ type: 'text', nullable: true })
+  direccion?: string | null;
 
   @Column({ name: 'created_at', type: 'timestamp', default: () => 'NOW()' })
   createdAt: Date;

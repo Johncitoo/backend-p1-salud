@@ -2,6 +2,10 @@ import { IsDateString, IsEmail, IsOptional, IsString, Length } from 'class-valid
 
 export class CreatePacienteDto {
   @IsString()
+  @Length(1, 20)
+  rut: string;
+
+  @IsString()
   @Length(1, 100)
   nombres: string;
 
@@ -27,5 +31,5 @@ export class CreatePacienteDto {
 
   @IsOptional()
   @IsString()
-  rut?: string | null;
+  direccion?: string | null;
 }

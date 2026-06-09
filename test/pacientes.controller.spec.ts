@@ -43,7 +43,7 @@ describe('PacientesController (unit)', () => {
   it('POST /pacientes delegates to service', async () => {
     await request(app.getHttpServer())
       .post('/pacientes')
-      .send({ nombres: 'X', apellidos: 'Y' })
+      .send({ rut: '11.111.111-1', nombres: 'X', apellidos: 'Y' })
       .expect(201)
       .expect({ id: '1', nombres: 'X' });
   });

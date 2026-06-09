@@ -12,7 +12,7 @@ async function bootstrap() {
   app.enableCors({
     origin: frontendUrl,
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-identity-user-id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-identity-user-id', 'x-mock-role'],
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 

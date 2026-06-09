@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
+import { AuditoriasService } from '../auditorias/auditorias.service';
 import { CreatePacienteDto } from './dto/create-paciente.dto';
 import { UpdatePacienteDto } from './dto/update-paciente.dto';
 import { Paciente } from './entities/paciente.entity';
@@ -30,6 +31,7 @@ export class PacientesService {
     private readonly planesRepository: Repository<PlanCuidado>,
     @InjectRepository(Visita)
     private readonly visitasRepository: Repository<Visita>,
+    private readonly auditoriasService: AuditoriasService,
   ) {}
 
   async findAll(): Promise<Paciente[]> {
@@ -54,21 +56,45 @@ export class PacientesService {
   async create(dto: CreatePacienteDto): Promise<Paciente> {
     const paciente = this.pacientesRepository.create(dto as any);
     const saved = await this.pacientesRepository.save(paciente);
-    return Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
+    const result = Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
+    this.auditoriasService.registrar({
+      entidad: 'pacientes',
+      entidadId: result.id,
+      accion: 'CREAR',
+      detalle: `Paciente ${result.nombres} ${result.apellidos} creado`,
+    });
+    return result;
   }
 
   async update(id: string, dto: UpdatePacienteDto): Promise<Paciente> {
     const paciente = await this.findOne(id);
+    const oldValues = { nombres: paciente.nombres, apellidos: paciente.apellidos, rut: paciente.rut };
     Object.assign(paciente, dto);
     const saved = await this.pacientesRepository.save(paciente);
-    return Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
+    const result = Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
+    this.auditoriasService.registrar({
+      entidad: 'pacientes',
+      entidadId: result.id,
+      accion: 'ACTUALIZAR',
+      detalle: `Paciente ${result.nombres} ${result.apellidos} actualizado`,
+      oldValues,
+      newValues: { nombres: result.nombres, apellidos: result.apellidos, rut: result.rut },
+    });
+    return result;
   }
 
   async remove(id: string): Promise<Paciente> {
     const paciente = await this.findOne(id);
     paciente.deletedAt = new Date();
     const saved = await this.pacientesRepository.save(paciente);
-    return Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
+    const result = Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
+    this.auditoriasService.registrar({
+      entidad: 'pacientes',
+      entidadId: result.id,
+      accion: 'ELIMINAR',
+      detalle: `Paciente ${result.nombres} ${result.apellidos} eliminado (soft delete)`,
+    });
+    return result;
   }
 
   /* Direcciones */

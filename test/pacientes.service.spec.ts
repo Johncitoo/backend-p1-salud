@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ObjectLiteral, Repository } from 'typeorm';
+import { AuditoriasService } from '../src/auditorias/auditorias.service';
 import { PacientesService } from '../src/pacientes/pacientes.service';
 import { Paciente } from '../src/pacientes/entities/paciente.entity';
 import { DireccionPaciente } from '../src/pacientes/entities/direccion-paciente.entity';
@@ -8,14 +9,22 @@ import { ContactoPaciente } from '../src/pacientes/entities/contacto-paciente.en
 import { PlanCuidado } from '../src/pacientes/entities/plan-cuidado.entity';
 import { Visita } from '../src/pacientes/entities/visita.entity';
 
-type MockRepository<T = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends ObjectLiteral = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
-const createMockRepo = <T = any>(): MockRepository<T> => ({
+const createMockRepo = <T extends ObjectLiteral = any>(): MockRepository<T> => ({
   find: jest.fn(),
   findOne: jest.fn(),
   create: jest.fn(),
   save: jest.fn(),
 });
+
+const createMockAuditoriasService = () =>
+  ({
+    findAll: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    registrar: jest.fn(),
+  }) as unknown as AuditoriasService;
 
 describe('PacientesService', () => {
   let service: PacientesService;
@@ -24,6 +33,7 @@ describe('PacientesService', () => {
   let contactoRepo: MockRepository;
   let planRepo: MockRepository;
   let visitaRepo: MockRepository;
+  let auditoriasService: AuditoriasService;
 
   beforeEach(async () => {
     pacienteRepo = createMockRepo();
@@ -31,6 +41,7 @@ describe('PacientesService', () => {
     contactoRepo = createMockRepo();
     planRepo = createMockRepo();
     visitaRepo = createMockRepo();
+    auditoriasService = createMockAuditoriasService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -40,6 +51,7 @@ describe('PacientesService', () => {
         { provide: getRepositoryToken(ContactoPaciente), useValue: contactoRepo },
         { provide: getRepositoryToken(PlanCuidado), useValue: planRepo },
         { provide: getRepositoryToken(Visita), useValue: visitaRepo },
+        { provide: AuditoriasService, useValue: auditoriasService },
       ],
     }).compile();
 
@@ -52,7 +64,12 @@ describe('PacientesService', () => {
 
   describe('create/findOne/update/remove paciente', () => {
     it('creates a paciente', async () => {
-      const dto = { nombres: 'Ana', apellidos: 'Lopez' };
+      const dto = {
+        rut: '11.111.111-1',
+        nombres: 'Ana',
+        apellidos: 'Lopez',
+        direccion: 'Calle 123',
+      };
       const created = { id: '1', ...dto };
       (pacienteRepo.create as jest.Mock).mockReturnValue(created);
       (pacienteRepo.save as jest.Mock).mockResolvedValue(created);

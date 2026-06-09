@@ -29,5 +29,10 @@ export class UpdatePacienteDto {
 
 	@IsOptional()
 	@IsString()
-	rut?: string | null;
+	@Length(1, 20)
+	rut?: string;
+
+	@IsOptional()
+	@IsString()
+	direccion?: string | null;
 }

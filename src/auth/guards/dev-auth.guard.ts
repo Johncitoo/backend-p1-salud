@@ -1,13 +1,9 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import { UsuariosService, UsuarioPerfil } from '../../usuarios/usuarios.service';
+import type { AppRole } from '../decorators/roles.decorator';
 
 type RequestWithUser = Request & {
   user?: UsuarioPerfil;
@@ -36,24 +32,33 @@ export class DevAuthGuard implements CanActivate {
       return true;
     }
 
-    throw new UnauthorizedException('AUTH_MODE inválido');
+    throw new UnauthorizedException('AUTH_MODE invalido');
   }
 
   private async getMockUser(request: Request): Promise<UsuarioPerfil> {
     const identityUserId = request.header('x-identity-user-id');
+    const mockRole = this.normalizeMockRole(request.header('x-mock-role'));
 
-    if (!identityUserId) {
-      throw new UnauthorizedException('Header x-identity-user-id requerido');
+    if (identityUserId) {
+      const user = await this.usuariosService.findProfileByIdentityUserId(identityUserId);
+      if (user) return user;
     }
 
-    const user =
-      await this.usuariosService.findProfileByIdentityUserId(identityUserId);
-
-    if (!user) {
-      throw new UnauthorizedException('Usuario local no encontrado o inactivo');
+    if (!mockRole) {
+      throw new UnauthorizedException('Header x-identity-user-id o x-mock-role requerido');
     }
 
-    return user;
+    const roleLabel = mockRole.toLowerCase();
+
+    return {
+      id: `mock-${roleLabel}`,
+      identityUserId: identityUserId ?? `mock-${roleLabel}`,
+      nombres: 'Usuario',
+      apellidos: mockRole.charAt(0) + mockRole.slice(1).toLowerCase(),
+      email: `${roleLabel}@mock.local`,
+      rol: mockRole,
+      activo: true,
+    };
   }
 
   private async getKeycloakUser(request: Request): Promise<UsuarioPerfil> {
@@ -64,9 +69,7 @@ export class DevAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token Keycloak sin sub');
     }
 
-    const user = await this.usuariosService.findProfileByIdentityUserId(
-      payload.sub,
-    );
+    const user = await this.usuariosService.findProfileByIdentityUserId(payload.sub);
 
     if (!user) {
       throw new UnauthorizedException('Usuario local no encontrado o inactivo');
@@ -90,11 +93,10 @@ export class DevAuthGuard implements CanActivate {
     const issuer = this.configService.get<string>('KEYCLOAK_ISSUER');
     const jwksUri = this.configService.get<string>('KEYCLOAK_JWKS_URI');
     const audience = this.configService.get<string>('KEYCLOAK_AUDIENCE');
-    const validateAudience =
-      this.configService.get<string>('KEYCLOAK_VALIDATE_AUDIENCE') === 'true';
+    const validateAudience = this.configService.get<string>('KEYCLOAK_VALIDATE_AUDIENCE') === 'true';
 
     if (!issuer || !jwksUri) {
-      throw new UnauthorizedException('Configuración Keycloak incompleta');
+      throw new UnauthorizedException('Configuracion Keycloak incompleta');
     }
 
     try {
@@ -109,7 +111,14 @@ export class DevAuthGuard implements CanActivate {
 
       return payload;
     } catch {
-      throw new UnauthorizedException('Token Keycloak inválido');
+      throw new UnauthorizedException('Token Keycloak invalido');
     }
+  }
+
+  private normalizeMockRole(role?: string): AppRole | null {
+    const normalized = role?.trim().toUpperCase();
+    const allowedRoles: AppRole[] = ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'];
+
+    return allowedRoles.includes(normalized as AppRole) ? (normalized as AppRole) : null;
   }
 }
