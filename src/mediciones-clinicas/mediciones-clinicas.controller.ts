@@ -40,19 +40,19 @@ export class MedicionesClinicasController {
   }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   create(@Body() dto: CreateMedicionClinicaDto, @CurrentUser() user?: UsuarioPerfil) {
     return this.service.create(dto, toUuidOrUndefined(user?.id));
   }
 
   @Patch(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   update(@Param('id') id: string, @Body() dto: UpdateMedicionClinicaDto) {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }

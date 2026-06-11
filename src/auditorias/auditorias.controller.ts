@@ -19,6 +19,6 @@ export class AuditoriasController {
   findOne(@Param('id', ParseUUIDPipe) id: string) { return this.service.findOne(id); }
 
   @Post()
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   create(@Body() dto: CreateAuditoriaDto) { return this.service.create(dto); }
 }

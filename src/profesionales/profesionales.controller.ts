@@ -15,47 +15,47 @@ export class ProfesionalesController {
   constructor(private readonly service: ProfesionalesService) {}
 
   @Get()
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
   findAll() { return this.service.findAll(); }
 
   @Get('especialidades')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
   findEspecialidades() { return this.service.findEspecialidades(); }
 
   @Get('usuarios-disponibles')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   findUsuariosDisponibles() { return this.service.findUsuariosDisponibles(); }
 
   @Post('especialidades')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   createEspecialidad(@Body() dto: CreateEspecialidadDto) { return this.service.createEspecialidad(dto); }
 
   @Patch('especialidades/:id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   updateEspecialidad(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateEspecialidadDto) { return this.service.updateEspecialidad(id, dto); }
 
   @Delete('especialidades/:id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   removeEspecialidad(@Param('id', ParseUUIDPipe) id: string) { return this.service.removeEspecialidad(id); }
 
   @Get(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
   findOne(@Param('id', ParseUUIDPipe) id: string) { return this.service.findOne(id); }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   create(@Body() dto: CreateProfesionalDto) { return this.service.create(dto); }
 
   @Patch(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateProfesionalDto) { return this.service.update(id, dto); }
 
   @Delete(':id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   remove(@Param('id', ParseUUIDPipe) id: string) { return this.service.remove(id); }
 
   @Post(':id/asignaciones')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   asignar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AsignarProfesionalDto) {
     return this.service.asignar(id, dto.zonaId, dto.especialidadId);
   }

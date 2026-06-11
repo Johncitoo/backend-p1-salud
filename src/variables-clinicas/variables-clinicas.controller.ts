@@ -33,19 +33,19 @@ export class VariablesClinicasController {
   }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   create(@Body() dto: CreateVariableClinicaDto) {
     return this.service.create(dto);
   }
 
   @Patch(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   update(@Param('id') id: string, @Body() dto: UpdateVariableClinicaDto) {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
