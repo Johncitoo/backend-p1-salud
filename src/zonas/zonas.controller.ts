@@ -12,31 +12,31 @@ export class ZonasController {
   constructor(private readonly zonasService: ZonasService) {}
 
   @Get()
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
   findAll() {
     return this.zonasService.findAll();
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.zonasService.findOne(id);
   }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   create(@Body() dto: CreateZonaDto) {
     return this.zonasService.create(dto);
   }
 
   @Patch(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateZonaDto) {
     return this.zonasService.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.zonasService.remove(id);
   }
