@@ -23,13 +23,21 @@ describe('CreateUsuarioDto', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('accepts a user without identity id for first-login linking by email', async () => {
+    const { identityUserId, ...payloadWithoutIdentity } = validPayload;
+
+    const errors = await validateDto(payloadWithoutIdentity);
+
+    expect(errors).toHaveLength(0);
+    expect(identityUserId).toBeDefined();
+  });
+
   it('rejects payload without required fields', async () => {
     const errors = await validateDto({});
     const properties = errors.map(error => error.property);
 
     expect(properties).toEqual(
       expect.arrayContaining([
-        'identityUserId',
         'rolId',
         'rut',
         'nombres',

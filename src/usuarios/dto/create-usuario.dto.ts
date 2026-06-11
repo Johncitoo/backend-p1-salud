@@ -9,9 +9,10 @@ import {
 } from 'class-validator';
 
 export class CreateUsuarioDto {
+  @IsOptional()
   @IsString()
   @Length(1, 100)
-  identityUserId: string;
+  identityUserId?: string;
 
   @IsUUID()
   rolId: string;

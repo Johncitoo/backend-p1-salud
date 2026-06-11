@@ -27,6 +27,7 @@ const createConfigService = (values: Record<string, string>) =>
 const createUsuariosService = (user: UsuarioPerfil | null = usuarioPerfil) =>
   ({
     findProfileByIdentityUserId: jest.fn().mockResolvedValue(user),
+    linkIdentityUserIdByEmail: jest.fn().mockResolvedValue(user),
   }) as unknown as UsuariosService;
 
 const createContext = (headers: Record<string, string | undefined> = {}) => {
@@ -156,6 +157,43 @@ describe('DevAuthGuard', () => {
       audience: undefined,
     });
     expect(usuariosService.findProfileByIdentityUserId).toHaveBeenCalledWith(
+      usuarioPerfil.identityUserId,
+    );
+    expect(request.user).toEqual(usuarioPerfil);
+  });
+
+  it('links a local user by email when JWT sub is not stored yet', async () => {
+    jest.mocked(jwtVerify).mockResolvedValue({
+      payload: {
+        sub: usuarioPerfil.identityUserId,
+        email: usuarioPerfil.email,
+      },
+      protectedHeader: { alg: 'RS256' },
+      key: new Uint8Array(),
+    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+
+    const usuariosService = createUsuariosService(null);
+    jest
+      .mocked(usuariosService.linkIdentityUserIdByEmail)
+      .mockResolvedValue(usuarioPerfil);
+
+    const guard = new DevAuthGuard(
+      createConfigService({
+        AUTH_MODE: 'keycloak',
+        KEYCLOAK_ISSUER: 'http://localhost/realms/sistema-centralizado',
+        KEYCLOAK_JWKS_URI:
+          'http://localhost/realms/sistema-centralizado/protocol/openid-connect/certs',
+      }),
+      usuariosService,
+    );
+    const { context, request } = createContext({
+      authorization: 'Bearer access-token',
+    });
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+
+    expect(usuariosService.linkIdentityUserIdByEmail).toHaveBeenCalledWith(
+      usuarioPerfil.email,
       usuarioPerfil.identityUserId,
     );
     expect(request.user).toEqual(usuarioPerfil);

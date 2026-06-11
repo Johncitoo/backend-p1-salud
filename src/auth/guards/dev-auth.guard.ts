@@ -71,11 +71,18 @@ export class DevAuthGuard implements CanActivate {
 
     const user = await this.usuariosService.findProfileByIdentityUserId(payload.sub);
 
-    if (!user) {
+    if (user) return user;
+
+    const email = typeof payload.email === 'string' ? payload.email : null;
+    const linkedUser = email
+      ? await this.usuariosService.linkIdentityUserIdByEmail(email, payload.sub)
+      : null;
+
+    if (!linkedUser) {
       throw new UnauthorizedException('Usuario local no encontrado o inactivo');
     }
 
-    return user;
+    return linkedUser;
   }
 
   private extractBearerToken(request: Request): string {

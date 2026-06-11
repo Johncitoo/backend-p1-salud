@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, VersionColumn } from 'typeorm';
 
 @Entity({ name: 'visitas' })
 export class Visita {
@@ -22,6 +22,9 @@ export class Visita {
 
   @Column({ type: 'text', nullable: true })
   observacion?: string | null;
+
+  @VersionColumn()
+  version: number;
 
   @Column({ name: 'created_at', type: 'timestamp', default: () => 'NOW()' })
   createdAt: Date;

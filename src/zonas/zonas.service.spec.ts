@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { IsNull, Repository } from 'typeorm';
 import { Zona } from './entities/zona.entity';
 import { ZonasService } from './zonas.service';
+import { AuditoriasService } from '../auditorias/auditorias.service';
 
 type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
@@ -29,9 +30,11 @@ const zona: Zona = {
 describe('ZonasService', () => {
   let service: ZonasService;
   let repository: MockRepository<Zona>;
+  let auditoriasService: { registrar: jest.Mock };
 
   beforeEach(async () => {
     repository = createRepositoryMock();
+    auditoriasService = { registrar: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -39,6 +42,10 @@ describe('ZonasService', () => {
         {
           provide: getRepositoryToken(Zona),
           useValue: repository,
+        },
+        {
+          provide: AuditoriasService,
+          useValue: auditoriasService,
         },
       ],
     }).compile();

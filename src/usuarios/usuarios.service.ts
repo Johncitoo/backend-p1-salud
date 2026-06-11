@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -19,7 +19,7 @@ export interface UsuarioPerfil {
 
 export interface UsuarioResponse {
   id: string;
-  identityUserId: string;
+  identityUserId: string | null;
   rolId: string;
   rol: string | null;
   rut: string;
@@ -91,6 +91,63 @@ export class UsuariosService {
     return row ?? null;
   }
 
+  async findProfileByEmail(email: string): Promise<UsuarioPerfil | null> {
+    const row = await this.usuariosRepository
+      .createQueryBuilder('usuario')
+      .innerJoin('roles', 'rol', 'rol.id = usuario.rol_id')
+      .select([
+        'usuario.id AS "id"',
+        'usuario.identity_user_id AS "identityUserId"',
+        'usuario.nombres AS "nombres"',
+        'usuario.apellidos AS "apellidos"',
+        'usuario.email AS "email"',
+        'rol.nombre AS "rol"',
+        'usuario.activo AS "activo"',
+      ])
+      .where('LOWER(usuario.email) = LOWER(:email)', { email })
+      .andWhere('usuario.activo = TRUE')
+      .andWhere('usuario.deleted_at IS NULL')
+      .andWhere('rol.deleted_at IS NULL')
+      .getRawOne<UsuarioPerfil>();
+
+    return row ?? null;
+  }
+
+  async linkIdentityUserIdByEmail(
+    email: string,
+    identityUserId: string,
+  ): Promise<UsuarioPerfil | null> {
+    const existingIdentity = await this.findProfileByIdentityUserId(identityUserId);
+    if (existingIdentity) return existingIdentity;
+
+    const userByEmail = await this.usuariosRepository.findOne({
+      where: { email, deletedAt: IsNull() },
+    });
+
+    if (!userByEmail || !userByEmail.activo) return null;
+
+    if (
+      userByEmail.identityUserId &&
+      userByEmail.identityUserId !== identityUserId
+    ) {
+      throw new ConflictException(
+        'El correo ya esta vinculado a otra identidad externa',
+      );
+    }
+
+    userByEmail.identityUserId = identityUserId;
+    await this.usuariosRepository.save(userByEmail);
+
+    this.auditoriasService.registrar({
+      entidad: 'usuarios',
+      entidadId: userByEmail.id,
+      accion: 'VINCULAR_IDENTIDAD',
+      detalle: `Usuario ${userByEmail.email} vinculado con identidad externa ${identityUserId}`,
+    });
+
+    return this.findProfileByIdentityUserId(identityUserId);
+  }
+
   async create(dto: CreateUsuarioDto): Promise<UsuarioResponse> {
     await this.ensureRoleExists(dto.rolId);
 
@@ -147,7 +204,7 @@ export class UsuariosService {
 
     return {
       id: usuario.id,
-      identityUserId: usuario.identityUserId,
+      identityUserId: usuario.identityUserId ?? null,
       rolId: usuario.rolId,
       rol: null,
       rut: usuario.rut,
