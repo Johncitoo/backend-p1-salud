@@ -1,8 +1,13 @@
 import { IsDateString, IsEmail, IsOptional, IsString, Length } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { formatearRut } from '../../lib/rut.util';
+import { IsRutValido } from '../../lib/rut-validator.decorator';
 
 export class CreatePacienteDto {
+  @Transform(({ value }) => formatearRut(value ?? ''))
+  @IsRutValido()
   @IsString()
-  @Length(1, 20)
+  @Length(9, 12)
   rut: string;
 
   @IsString()

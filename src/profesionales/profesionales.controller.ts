@@ -22,6 +22,10 @@ export class ProfesionalesController {
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
   findEspecialidades() { return this.service.findEspecialidades(); }
 
+  @Get('usuarios-disponibles')
+  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  findUsuariosDisponibles() { return this.service.findUsuariosDisponibles(); }
+
   @Post('especialidades')
   @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
   createEspecialidad(@Body() dto: CreateEspecialidadDto) { return this.service.createEspecialidad(dto); }

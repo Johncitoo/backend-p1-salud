@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
@@ -156,7 +156,23 @@ export class UsuariosService {
       activo: dto.activo ?? true,
     });
 
-    const saved = await this.usuariosRepository.save(usuario);
+    let saved: Usuario;
+    try {
+      saved = await this.usuariosRepository.save(usuario);
+    } catch (error) {
+      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+        const detail = (error as any).detail ?? '';
+        if (detail.includes('uq_usuarios_rut')) {
+          throw new ConflictException(`El RUT ${dto.rut} ya está registrado.`);
+        }
+        if (detail.includes('uq_usuarios_email')) {
+          throw new ConflictException(`El email ${dto.email} ya está registrado.`);
+        }
+        throw new ConflictException('Ya existe un registro con esos datos.');
+      }
+      throw error;
+    }
+
     const result = await this.findOne(saved.id);
 
     this.auditoriasService.registrar({
@@ -173,9 +189,26 @@ export class UsuariosService {
     if (dto.rolId) await this.ensureRoleExists(dto.rolId);
 
     const usuario = await this.findUsuarioEntity(id);
-    const oldValues = { nombres: usuario.nombres, apellidos: usuario.apellidos, email: usuario.email, rolId: usuario.rolId };
+    const oldValues = { nombres: usuario.nombres, apellidos: usuario.apellidos, email: usuario.email, rolId: usuario.rolId, rut: usuario.rut };
     Object.assign(usuario, dto);
-    const saved = await this.usuariosRepository.save(usuario);
+
+    let saved: Usuario;
+    try {
+      saved = await this.usuariosRepository.save(usuario);
+    } catch (error) {
+      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+        const detail = (error as any).detail ?? '';
+        if (detail.includes('uq_usuarios_rut')) {
+          throw new ConflictException(`El RUT ${dto.rut} ya está registrado por otro usuario.`);
+        }
+        if (detail.includes('uq_usuarios_email')) {
+          throw new ConflictException(`El email ${dto.email} ya está registrado por otro usuario.`);
+        }
+        throw new ConflictException('Ya existe un registro con esos datos.');
+      }
+      throw error;
+    }
+
     const result = await this.findOne(saved.id);
 
     this.auditoriasService.registrar({

@@ -7,6 +7,9 @@ import {
   IsUUID,
   Length,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { formatearRut } from '../../lib/rut.util';
+import { IsRutValido } from '../../lib/rut-validator.decorator';
 
 export class UpdateUsuarioDto {
   @IsOptional()
@@ -19,8 +22,10 @@ export class UpdateUsuarioDto {
   rolId?: string;
 
   @IsOptional()
+  @Transform(({ value }) => (value ? formatearRut(value) : undefined))
+  @IsRutValido()
   @IsString()
-  @Length(1, 20)
+  @Length(9, 12)
   rut?: string;
 
   @IsOptional()
