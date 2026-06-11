@@ -5,8 +5,8 @@ export class Usuario {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'identity_user_id', length: 100 })
-  identityUserId: string;
+  @Column({ name: 'identity_user_id', type: 'varchar', length: 100, nullable: true })
+  identityUserId?: string | null;
 
   @Column({ name: 'rol_id', type: 'uuid' })
   rolId: string;
@@ -23,7 +23,7 @@ export class Usuario {
   @Column({ length: 150 })
   email: string;
 
-  @Column({ length: 30, nullable: true })
+  @Column({ type: 'varchar', length: 30, nullable: true })
   telefono?: string | null;
 
   @Column({ default: true })
