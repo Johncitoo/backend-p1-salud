@@ -15,6 +15,8 @@ import { VariablesClinicasModule } from './variables-clinicas/variables-clinicas
 import { getDatabaseConfig } from './config/database.config';
 import { authConfig } from './config/auth.config';
 import { AuthModule } from './auth/auth.module';
+import { VisitasModule } from './visitas/visitas.module';
+import { PrestacionesModule } from './prestaciones/prestaciones.module';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -49,6 +51,8 @@ const isTest = process.env.NODE_ENV === 'test';
     PlantillasFichaModule,
     FichasClinicasModule,
     MedicionesClinicasModule,
+    VisitasModule,
+    PrestacionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
