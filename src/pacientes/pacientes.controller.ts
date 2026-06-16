@@ -9,9 +9,12 @@ import {
   ParseUUIDPipe,
   UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { UsuarioPerfil } from '../usuarios/usuarios.service';
+import { VisitasService } from '../visitas/visitas.service';
 import { CreatePacienteDto } from './dto/create-paciente.dto';
 import { UpdatePacienteDto } from './dto/update-paciente.dto';
 import { PacientesService } from './pacientes.service';
@@ -27,7 +30,10 @@ import { UpdateVisitaDto } from './dto/update-visita.dto';
 @Controller('pacientes')
 @UseGuards(DevAuthGuard, RolesGuard)
 export class PacientesController {
-  constructor(private readonly pacientesService: PacientesService) {}
+  constructor(
+    private readonly pacientesService: PacientesService,
+    private readonly visitasService: VisitasService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
@@ -144,25 +150,38 @@ export class PacientesController {
   @Get(':pacienteId/visitas')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
   findVisitas(@Param('pacienteId', ParseUUIDPipe) pacienteId: string) {
-    return this.pacientesService.findVisitas(pacienteId);
+    return this.visitasService.findByPaciente(pacienteId);
   }
 
   @Post(':pacienteId/visitas')
   @Roles('ADMIN', 'COORDINADOR')
-  createVisita(@Param('pacienteId', ParseUUIDPipe) pacienteId: string, @Body() dto: CreateVisitaDto) {
+  createVisita(
+    @Param('pacienteId', ParseUUIDPipe) pacienteId: string,
+    @Body() dto: CreateVisitaDto,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     dto.pacienteId = pacienteId;
-    return this.pacientesService.createVisita(dto);
+    return this.visitasService.create(dto, toUuidOrUndefined(user?.id));
   }
 
   @Patch('visitas/:id')
   @Roles('ADMIN', 'COORDINADOR')
-  updateVisita(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateVisitaDto) {
-    return this.pacientesService.updateVisita(id, dto);
+  updateVisita(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateVisitaDto,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
+    return this.visitasService.update(id, dto, toUuidOrUndefined(user?.id));
   }
 
   @Delete('visitas/:id')
   @Roles('ADMIN')
-  removeVisita(@Param('id', ParseUUIDPipe) id: string) {
-    return this.pacientesService.removeVisita(id);
+  removeVisita(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.visitasService.remove(id, toUuidOrUndefined(user?.id));
   }
 }
+
+const toUuidOrUndefined = (value?: string) =>
+  value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : undefined;

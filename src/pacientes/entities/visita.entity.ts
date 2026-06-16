@@ -8,20 +8,59 @@ export class Visita {
   @Column({ name: 'paciente_id', type: 'uuid' })
   pacienteId: string;
 
+  @Column({ name: 'profesional_salud_id', type: 'uuid' })
+  profesionalSaludId: string;
+
+  @Column({ name: 'zona_id', type: 'uuid', nullable: true })
+  zonaId?: string | null;
+
   @Column({ name: 'plan_cuidado_id', type: 'uuid', nullable: true })
   planCuidadoId?: string | null;
 
-  @Column({ name: 'fecha_programada', type: 'timestamp', nullable: true })
-  fechaProgramada?: Date | null;
+  @Column({ name: 'direccion_paciente_id', type: 'uuid', nullable: true })
+  direccionPacienteId?: string | null;
 
-  @Column({ name: 'fecha_realizada', type: 'timestamp', nullable: true })
-  fechaRealizada?: Date | null;
+  @Column({ name: 'fecha_programada', type: 'date' })
+  fechaProgramada: string;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  estado?: string | null;
+  @Column({ name: 'hora_programada', type: 'time' })
+  horaProgramada: string;
 
-  @Column({ type: 'text', nullable: true })
-  observacion?: string | null;
+  @Column({ name: 'duracion_estimada_min', type: 'integer', nullable: true })
+  duracionEstimadaMin?: number | null;
+
+  @Column({ name: 'fecha_hora_inicio_real', type: 'timestamp', nullable: true })
+  fechaHoraInicioReal?: Date | null;
+
+  @Column({ name: 'fecha_hora_fin_real', type: 'timestamp', nullable: true })
+  fechaHoraFinReal?: Date | null;
+
+  @Column({ name: 'check_in_at', type: 'timestamp', nullable: true })
+  checkInAt?: Date | null;
+
+  @Column({ name: 'check_out_at', type: 'timestamp', nullable: true })
+  checkOutAt?: Date | null;
+
+  @Column({ type: 'varchar', length: 30, default: 'PROGRAMADA' })
+  estado: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'NORMAL' })
+  prioridad: string;
+
+  @Column({ name: 'creada_por_usuario_id', type: 'uuid' })
+  creadaPorUsuarioId: string;
+
+  @Column({ name: 'motivo_cancelacion_id', type: 'uuid', nullable: true })
+  motivoCancelacionId?: string | null;
+
+  @Column({ name: 'cancelada_at', type: 'timestamp', nullable: true })
+  canceladaAt?: Date | null;
+
+  @Column({ name: 'cancelada_por_usuario_id', type: 'uuid', nullable: true })
+  canceladaPorUsuarioId?: string | null;
+
+  @Column({ name: 'observacion_cancelacion', type: 'text', nullable: true })
+  observacionCancelacion?: string | null;
 
   @VersionColumn()
   version: number;

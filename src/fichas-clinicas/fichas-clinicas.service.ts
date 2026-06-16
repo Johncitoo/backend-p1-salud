@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { OptimisticLockVersionMismatchError } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { PlantillasFichaService } from '../plantillas-ficha/plantillas-ficha.service';
@@ -49,7 +49,19 @@ export class FichasClinicasService {
       creadaPorUsuarioId: usuarioId ?? null,
     });
 
-    const saved = await this.fichasRepo.save(ficha);
+    let saved: FichaClinica;
+    try {
+      saved = await this.fichasRepo.save(ficha);
+    } catch (error) {
+      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+        const detail = (error as any).detail ?? '';
+        if (detail.includes('visita_id')) {
+          throw new ConflictException('La visita seleccionada ya tiene una ficha clínica asociada.');
+        }
+      }
+      throw error;
+    }
+
     this.auditoriasService.registrar({ entidad: 'fichas_clinicas', entidadId: saved.id, accion: 'CREAR', detalle: 'Ficha clínica creada' });
 
     // Extraer mediciones si hay plantilla asociada

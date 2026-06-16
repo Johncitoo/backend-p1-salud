@@ -12,13 +12,13 @@ export class ZonasController {
   constructor(private readonly zonasService: ZonasService) {}
 
   @Get()
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
   findAll() {
     return this.zonasService.findAll();
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.zonasService.findOne(id);
   }
