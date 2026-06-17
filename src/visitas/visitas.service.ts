@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { CreateVisitaDto } from '../pacientes/dto/create-visita.dto';
 import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
@@ -12,6 +13,7 @@ import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.en
 import { Zona } from '../zonas/entities/zona.entity';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
 import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
+import { CompletarVisitaDto } from './dto/completar-visita.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
 import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 
@@ -33,6 +35,7 @@ export class VisitasService {
     @InjectRepository(DireccionPaciente)
     private readonly direccionesRepository: Repository<DireccionPaciente>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   async findAll(filtros: FindVisitasQueryDto = {}): Promise<Visita[]> {
@@ -99,6 +102,8 @@ export class VisitasService {
       detalle: `Visita programada para ${saved.fechaProgramada} ${saved.horaProgramada}`,
     });
 
+    await this.analyticsService.sendVisitUpsertEvent(saved);
+
     return saved;
   }
 
@@ -116,6 +121,8 @@ export class VisitasService {
       accion: 'ACTUALIZAR',
       detalle: 'Visita actualizada',
     });
+
+    await this.analyticsService.sendVisitUpsertEvent(saved);
 
     return saved;
   }
@@ -141,6 +148,32 @@ export class VisitasService {
       detalle: `Visita cambió de ${estadoAnterior} a ${saved.estado}`,
     });
 
+    await this.analyticsService.sendVisitUpsertEvent(saved, { puntual: dto.puntual });
+
+    return saved;
+  }
+
+  async completar(id: string, dto: CompletarVisitaDto, usuarioId?: string): Promise<Visita> {
+    const visita = await this.findOne(id);
+    const estadoAnterior = visita.estado;
+
+    if (visita.estado === 'CANCELADA') throw new BadRequestException('No se puede completar una visita cancelada');
+    if (!visita.fechaHoraInicioReal) visita.fechaHoraInicioReal = new Date();
+
+    visita.estado = 'REALIZADA';
+    visita.fechaHoraFinReal = visita.fechaHoraFinReal ?? new Date();
+
+    const saved = await this.visitasRepository.save(visita);
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'visitas',
+      entidadId: saved.id,
+      accion: 'COMPLETAR',
+      detalle: `Visita completada desde ${estadoAnterior}`,
+    });
+
+    await this.analyticsService.sendVisitUpsertEvent(saved, { puntual: dto.puntual });
+
     return saved;
   }
 
@@ -163,6 +196,8 @@ export class VisitasService {
       accion: 'CANCELAR',
       detalle: dto.observacionCancelacion ?? 'Visita cancelada',
     });
+
+    await this.analyticsService.sendVisitUpsertEvent(saved);
 
     return saved;
   }

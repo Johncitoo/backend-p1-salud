@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditoriasModule } from '../auditorias/auditorias.module';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AnalyticsModule } from '../integrations/analytics/analytics.module';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
 import { Paciente } from '../pacientes/entities/paciente.entity';
 import { PlanCuidado } from '../pacientes/entities/plan-cuidado.entity';
@@ -17,6 +18,7 @@ import { VisitasService } from './visitas.service';
   imports: [
     UsuariosModule,
     AuditoriasModule,
+    AnalyticsModule,
     TypeOrmModule.forFeature([Visita, Paciente, ProfesionalSalud, Zona, PlanCuidado, DireccionPaciente]),
   ],
   controllers: [VisitasController],
