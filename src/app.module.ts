@@ -17,6 +17,7 @@ import { authConfig } from './config/auth.config';
 import { AuthModule } from './auth/auth.module';
 import { VisitasModule } from './visitas/visitas.module';
 import { PrestacionesModule } from './prestaciones/prestaciones.module';
+import { DocumentosAdjuntosModule } from './documentos-adjuntos/documentos-adjuntos.module';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -53,6 +54,7 @@ const isTest = process.env.NODE_ENV === 'test';
     MedicionesClinicasModule,
     VisitasModule,
     PrestacionesModule,
+    DocumentosAdjuntosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

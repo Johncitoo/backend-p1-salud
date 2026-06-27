@@ -59,7 +59,7 @@ export class FichasClinicasController {
 
   @Delete(':id')
   @Roles('ADMIN')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.service.remove(id, toUuidOrUndefined(user?.id));
   }
 }
