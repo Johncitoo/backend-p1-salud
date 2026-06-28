@@ -12,8 +12,10 @@ import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.en
 import { Zona } from '../zonas/entities/zona.entity';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
 import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
+import { FindCalendarioQueryDto } from './dto/find-calendario-query.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
 import type { UsuarioPerfil } from '../usuarios/usuarios.service';
+import { GoogleCalendarSyncService } from '../google-calendar/services/google-calendar-sync.service';
 
 const ESTADOS_VISITA = ['PROGRAMADA', 'EN_CAMINO', 'EN_ATENCION', 'REALIZADA', 'CANCELADA', 'REPROGRAMADA', 'NO_REALIZADA'];
 
@@ -33,6 +35,7 @@ export class VisitasService {
     @InjectRepository(DireccionPaciente)
     private readonly direccionesRepository: Repository<DireccionPaciente>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly googleCalendarSyncService: GoogleCalendarSyncService,
   ) {}
 
   async findAll(filtros: FindVisitasQueryDto = {}): Promise<Visita[]> {
@@ -99,11 +102,72 @@ export class VisitasService {
       detalle: `Visita programada para ${saved.fechaProgramada} ${saved.horaProgramada}`,
     });
 
+    await this.googleCalendarSyncService.syncCreatedVisit(saved);
+
     return saved;
+  }
+
+  async findCalendarForUser(filtros: FindCalendarioQueryDto, user?: UsuarioPerfil) {
+    const profesionalId = user?.rol === 'PROFESIONAL'
+      ? (await this.profesionalesRepository.findOne({ where: { usuarioId: user.id, deletedAt: IsNull() } }))?.id
+      : filtros.profesionalSaludId;
+
+    if (user?.rol === 'PROFESIONAL' && !profesionalId) return [];
+
+    const qb = this.visitasRepository
+      .createQueryBuilder('visita')
+      .leftJoin('pacientes', 'paciente', 'paciente.id = visita.paciente_id')
+      .leftJoin('profesionales_salud', 'profesional', 'profesional.id = visita.profesional_salud_id')
+      .leftJoin('usuarios', 'usuarioProfesional', 'usuarioProfesional.id = profesional.usuario_id')
+      .leftJoin('zonas', 'zona', 'zona.id = visita.zona_id')
+      .leftJoin('fichas_clinicas', 'ficha', 'ficha.visita_id = visita.id AND ficha.deleted_at IS NULL')
+      .select([
+        'visita.id AS "id"',
+        'visita.estado AS "estado"',
+        'visita.prioridad AS "prioridad"',
+        'visita.fecha_programada AS "fechaProgramada"',
+        'visita.hora_programada AS "horaProgramada"',
+        'visita.duracion_estimada_min AS "duracionEstimadaMin"',
+        'visita.paciente_id AS "pacienteId"',
+        'paciente.nombres AS "pacienteNombres"',
+        'paciente.apellidos AS "pacienteApellidos"',
+        'visita.profesional_salud_id AS "profesionalSaludId"',
+        'usuarioProfesional.nombres AS "profesionalNombres"',
+        'usuarioProfesional.apellidos AS "profesionalApellidos"',
+        'visita.zona_id AS "zonaId"',
+        'zona.nombre AS "zonaNombre"',
+        'ficha.id AS "fichaClinicaId"',
+        'visita.google_calendar_sync_status AS "googleCalendarSyncStatus"',
+        'visita.google_calendar_html_link AS "googleCalendarHtmlLink"',
+        'visita.google_calendar_last_error AS "googleCalendarLastError"',
+      ])
+      .where('visita.deleted_at IS NULL')
+      .andWhere('visita.fecha_programada BETWEEN :desde AND :hasta', { desde: filtros.desde, hasta: filtros.hasta });
+
+    if (profesionalId) qb.andWhere('visita.profesional_salud_id = :profesionalId', { profesionalId });
+    if (filtros.zonaId) qb.andWhere('visita.zona_id = :zonaId', { zonaId: filtros.zonaId });
+    if (filtros.estado) qb.andWhere('visita.estado = :estado', { estado: filtros.estado });
+
+    const rows = await qb
+      .orderBy('visita.fecha_programada', 'ASC')
+      .addOrderBy('visita.hora_programada', 'ASC')
+      .getRawMany();
+
+    return rows.map((row) => {
+      const startTime = normalizeVisitaTime(row.horaProgramada);
+      const end = addMinutesToDateTime(row.fechaProgramada, startTime, Number(row.duracionEstimadaMin ?? 60));
+
+      return {
+        ...row,
+        startsAt: `${row.fechaProgramada}T${startTime}`,
+        endsAt: `${end.date}T${end.time}`,
+      };
+    });
   }
 
   async update(id: string, dto: UpdateVisitaDto, usuarioId?: string): Promise<Visita> {
     const visita = await this.findOne(id);
+    const previousProfesionalSaludId = visita.profesionalSaludId;
     await this.ensureReferences(dto);
 
     Object.assign(visita, dto);
@@ -115,6 +179,23 @@ export class VisitasService {
       entidadId: saved.id,
       accion: 'ACTUALIZAR',
       detalle: 'Visita actualizada',
+    });
+
+    await this.googleCalendarSyncService.syncUpdatedVisit(saved, previousProfesionalSaludId);
+
+    return saved;
+  }
+
+  async resyncGoogleCalendar(id: string, usuarioId?: string): Promise<Visita> {
+    const visita = await this.findOne(id);
+    const saved = await this.googleCalendarSyncService.syncVisitNow(visita);
+
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'visitas',
+      entidadId: saved.id,
+      accion: 'REENVIAR_GOOGLE_CALENDAR',
+      detalle: `Reintento de sincronizacion Google Calendar: ${saved.googleCalendarSyncStatus ?? 'SIN_CAMBIOS'}`,
     });
 
     return saved;
@@ -164,6 +245,8 @@ export class VisitasService {
       detalle: dto.observacionCancelacion ?? 'Visita cancelada',
     });
 
+    await this.googleCalendarSyncService.syncCanceledVisit(saved);
+
     return saved;
   }
 
@@ -179,6 +262,8 @@ export class VisitasService {
       accion: 'ELIMINAR',
       detalle: 'Visita eliminada (soft delete)',
     });
+
+    await this.googleCalendarSyncService.syncCanceledVisit(saved);
 
     return saved;
   }
@@ -209,4 +294,19 @@ export class VisitasService {
       if (!exists) throw new NotFoundException('Dirección de paciente no encontrada');
     }
   }
+}
+
+function normalizeVisitaTime(value: string): string {
+  return value.length === 5 ? `${value}:00` : value;
+}
+
+function addMinutesToDateTime(date: string, time: string, minutes: number): { date: string; time: string } {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hours, mins, seconds] = time.split(':').map(Number);
+  const start = new Date(Date.UTC(year, month - 1, day, hours, mins, seconds ?? 0));
+  start.setUTCMinutes(start.getUTCMinutes() + minutes);
+  return {
+    date: start.toISOString().slice(0, 10),
+    time: start.toISOString().slice(11, 19),
+  };
 }

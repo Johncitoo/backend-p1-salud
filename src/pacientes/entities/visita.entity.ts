@@ -62,6 +62,33 @@ export class Visita {
   @Column({ name: 'observacion_cancelacion', type: 'text', nullable: true })
   observacionCancelacion?: string | null;
 
+  @Column({ name: 'google_calendar_connection_id', type: 'uuid', nullable: true })
+  googleCalendarConnectionId?: string | null;
+
+  @Column({ name: 'google_calendar_id', type: 'varchar', length: 255, nullable: true })
+  googleCalendarId?: string | null;
+
+  @Column({ name: 'google_calendar_event_id', type: 'varchar', length: 255, nullable: true })
+  googleCalendarEventId?: string | null;
+
+  @Column({ name: 'google_calendar_event_etag', type: 'varchar', length: 255, nullable: true })
+  googleCalendarEventEtag?: string | null;
+
+  @Column({ name: 'google_calendar_html_link', type: 'text', nullable: true })
+  googleCalendarHtmlLink?: string | null;
+
+  @Column({ name: 'google_calendar_sync_status', type: 'varchar', length: 30, default: 'PENDING' })
+  googleCalendarSyncStatus: string;
+
+  @Column({ name: 'google_calendar_last_sync_at', type: 'timestamp', nullable: true })
+  googleCalendarLastSyncAt?: Date | null;
+
+  @Column({ name: 'google_calendar_last_error', type: 'text', nullable: true })
+  googleCalendarLastError?: string | null;
+
+  @Column({ name: 'google_calendar_sync_attempts', type: 'integer', default: 0 })
+  googleCalendarSyncAttempts: number;
+
   @VersionColumn()
   version: number;
 

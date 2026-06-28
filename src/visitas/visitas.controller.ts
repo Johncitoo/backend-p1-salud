@@ -8,6 +8,7 @@ import { CreateVisitaDto } from '../pacientes/dto/create-visita.dto';
 import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
 import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
+import { FindCalendarioQueryDto } from './dto/find-calendario-query.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
 import { VisitasService } from './visitas.service';
 
@@ -27,6 +28,12 @@ export class VisitasController {
     return this.visitasService.findAllForUser(query, user);
   }
 
+  @Get('calendario')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  calendario(@Query() query: FindCalendarioQueryDto, @CurrentUser() user?: UsuarioPerfil) {
+    return this.visitasService.findCalendarForUser(query, user);
+  }
+
   @Get(':id')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
@@ -34,19 +41,25 @@ export class VisitasController {
   }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR')
+  @Roles('COORDINADOR')
   create(@Body() dto: CreateVisitaDto, @CurrentUser() user?: UsuarioPerfil) {
     return this.visitasService.create(dto, uuidOrUndefined(user?.id));
   }
 
   @Patch(':id')
-  @Roles('ADMIN', 'COORDINADOR')
+  @Roles('COORDINADOR')
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateVisitaDto,
     @CurrentUser() user?: UsuarioPerfil,
   ) {
     return this.visitasService.update(id, dto, uuidOrUndefined(user?.id));
+  }
+
+  @Post(':id/google-calendar/sync')
+  @Roles('COORDINADOR')
+  resyncGoogleCalendar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.visitasService.resyncGoogleCalendar(id, uuidOrUndefined(user?.id));
   }
 
   @Patch(':id/estado')
@@ -60,7 +73,7 @@ export class VisitasController {
   }
 
   @Patch(':id/cancelar')
-  @Roles('ADMIN', 'COORDINADOR')
+  @Roles('COORDINADOR')
   cancelar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelarVisitaDto,
@@ -70,7 +83,7 @@ export class VisitasController {
   }
 
   @Delete(':id')
-  @Roles('ADMIN')
+  @Roles('COORDINADOR')
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
     return this.visitasService.remove(id, uuidOrUndefined(user?.id));
   }

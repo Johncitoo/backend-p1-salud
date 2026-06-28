@@ -12,11 +12,13 @@ import { UsuariosModule } from '../usuarios/usuarios.module';
 import { Zona } from '../zonas/entities/zona.entity';
 import { VisitasController } from './visitas.controller';
 import { VisitasService } from './visitas.service';
+import { GoogleCalendarModule } from '../google-calendar/google-calendar.module';
 
 @Module({
   imports: [
     UsuariosModule,
     AuditoriasModule,
+    GoogleCalendarModule,
     TypeOrmModule.forFeature([Visita, Paciente, ProfesionalSalud, Zona, PlanCuidado, DireccionPaciente]),
   ],
   controllers: [VisitasController],
