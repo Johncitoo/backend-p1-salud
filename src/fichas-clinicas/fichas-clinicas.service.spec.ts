@@ -77,9 +77,18 @@ describe('FichasClinicasService', () => {
       (fichasRepo.create as jest.Mock).mockReturnValue({ id: 'f1', ...dto, estado: 'BORRADOR' });
       (fichasRepo.save as jest.Mock).mockResolvedValue({ id: 'f1', visitaId: 'visita-1', contenido: dto.contenido, estado: 'BORRADOR', plantillaFichaId: null });
 
-      const result = await service.create(dto);
+      const result = await service.create(dto, 'user-1');
       expect(result.estado).toBe('BORRADOR');
-      expect(auditorias.registrar).toHaveBeenCalled();
+      expect(auditorias.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usuarioId: 'user-1',
+          accion: 'CREAR',
+          newValues: expect.objectContaining({
+            visitaId: 'visita-1',
+            estado: 'BORRADOR',
+          }),
+        }),
+      );
     });
 
     it('validates plantillaFichaId exists when provided', async () => {
@@ -96,9 +105,16 @@ describe('FichasClinicasService', () => {
       (fichasRepo.findOne as jest.Mock).mockResolvedValue(existing);
       (fichasRepo.save as jest.Mock).mockResolvedValue({ ...existing, contenido: { temp: 37 }, estado: 'BORRADOR' });
 
-      const result = await service.update('f1', { contenido: { temp: 37 } });
+      const result = await service.update('f1', { contenido: { temp: 37 } }, 'user-1');
       expect(result.contenido.temp).toBe(37);
-      expect(auditorias.registrar).toHaveBeenCalled();
+      expect(auditorias.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usuarioId: 'user-1',
+          accion: 'ACTUALIZAR',
+          oldValues: expect.objectContaining({ estado: 'BORRADOR' }),
+          newValues: expect.objectContaining({ estado: 'BORRADOR' }),
+        }),
+      );
     });
   });
 
@@ -110,7 +126,12 @@ describe('FichasClinicasService', () => {
       const result = await service.cerrar('f1', 'user-1');
       expect(result.estado).toBe('CERRADA');
       expect(auditorias.registrar).toHaveBeenCalledWith(
-        expect.objectContaining({ accion: 'CERRAR' }),
+        expect.objectContaining({
+          usuarioId: 'user-1',
+          accion: 'CERRAR',
+          oldValues: expect.objectContaining({ estado: 'BORRADOR' }),
+          newValues: expect.objectContaining({ estado: 'CERRADA' }),
+        }),
       );
     });
 
@@ -211,8 +232,16 @@ describe('FichasClinicasService', () => {
       (fichasRepo.findOne as jest.Mock).mockResolvedValue({ id: 'f1', deletedAt: null });
       (fichasRepo.save as jest.Mock).mockResolvedValue({ id: 'f1', deletedAt: new Date() });
 
-      const result = await service.remove('f1');
+      const result = await service.remove('f1', 'admin-1');
       expect(result.deletedAt).toBeDefined();
+      expect(auditorias.registrar).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usuarioId: 'admin-1',
+          accion: 'ELIMINAR',
+          oldValues: expect.objectContaining({ deletedAt: null }),
+          newValues: expect.objectContaining({ deletedAt: expect.any(Date) }),
+        }),
+      );
     });
   });
 });
