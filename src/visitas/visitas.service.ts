@@ -201,6 +201,26 @@ export class VisitasService {
     return saved;
   }
 
+  async findGoogleCalendarLogs(id: string) {
+    await this.findOne(id);
+    return this.googleCalendarSyncService.findLogsForVisit(id);
+  }
+
+  async retryPendingGoogleCalendarSync(usuarioId?: string) {
+    const result = await this.googleCalendarSyncService.retryPendingVisits();
+
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'visitas',
+      entidadId: '00000000-0000-4000-8000-000000000000',
+      accion: 'REENVIAR_GOOGLE_CALENDAR_PENDIENTES',
+      detalle: `Reintento automatico/manual de Google Calendar: ${result.attempted} intentos, ${result.synced} ok, ${result.failed} fallidos`,
+      newValues: result,
+    });
+
+    return result;
+  }
+
   async cambiarEstado(id: string, dto: CambiarEstadoVisitaDto, usuarioId?: string): Promise<Visita> {
     const visita = await this.findOne(id);
     const estadoAnterior = visita.estado;

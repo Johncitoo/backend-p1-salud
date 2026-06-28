@@ -56,10 +56,22 @@ export class VisitasController {
     return this.visitasService.update(id, dto, uuidOrUndefined(user?.id));
   }
 
+  @Post('google-calendar/sync-pending')
+  @Roles('COORDINADOR')
+  retryPendingGoogleCalendarSync(@CurrentUser() user?: UsuarioPerfil) {
+    return this.visitasService.retryPendingGoogleCalendarSync(uuidOrUndefined(user?.id));
+  }
+
   @Post(':id/google-calendar/sync')
   @Roles('COORDINADOR')
   resyncGoogleCalendar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
     return this.visitasService.resyncGoogleCalendar(id, uuidOrUndefined(user?.id));
+  }
+
+  @Get(':id/google-calendar/logs')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  googleCalendarLogs(@Param('id', ParseUUIDPipe) id: string) {
+    return this.visitasService.findGoogleCalendarLogs(id);
   }
 
   @Patch(':id/estado')

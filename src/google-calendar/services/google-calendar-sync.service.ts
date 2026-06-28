@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Visita } from '../../pacientes/entities/visita.entity';
@@ -8,9 +9,19 @@ import { GoogleCalendarClientService, GoogleCalendarEventPayload, GoogleTokenRes
 import { GoogleTokenEncryptionService } from './google-token-encryption.service';
 
 type SyncAction = 'CREATE' | 'UPDATE' | 'DELETE';
+type VisitCalendarContext = {
+  pacienteNombre?: string | null;
+  pacienteTelefono?: string | null;
+  direccion?: string | null;
+  zonaNombre?: string | null;
+  profesionalNombre?: string | null;
+};
 
 @Injectable()
-export class GoogleCalendarSyncService {
+export class GoogleCalendarSyncService implements OnModuleInit, OnModuleDestroy {
+  private retryTimer?: NodeJS.Timeout;
+  private retryRunning = false;
+
   constructor(
     @InjectRepository(ProfesionalGoogleCalendarConnection)
     private readonly connectionsRepo: Repository<ProfesionalGoogleCalendarConnection>,
@@ -20,7 +31,21 @@ export class GoogleCalendarSyncService {
     private readonly visitasRepo: Repository<Visita>,
     private readonly googleClient: GoogleCalendarClientService,
     private readonly tokenEncryption: GoogleTokenEncryptionService,
+    private readonly configService: ConfigService,
   ) {}
+
+  onModuleInit() {
+    if (this.configService.get<string>('GOOGLE_CALENDAR_AUTO_RETRY_ENABLED') !== 'true') return;
+
+    const intervalMs = Number(this.configService.get<string>('GOOGLE_CALENDAR_AUTO_RETRY_INTERVAL_MS') ?? 300000);
+    this.retryTimer = setInterval(() => {
+      void this.retryPendingVisits().catch(() => undefined);
+    }, Math.max(intervalMs, 60000));
+  }
+
+  onModuleDestroy() {
+    if (this.retryTimer) clearInterval(this.retryTimer);
+  }
 
   async syncCreatedVisit(visita: Visita): Promise<void> {
     await this.syncVisit(visita, 'CREATE');
@@ -50,19 +75,63 @@ export class GoogleCalendarSyncService {
     return this.syncVisit(visita, visita.googleCalendarEventId ? 'UPDATE' : 'CREATE');
   }
 
-  buildEventPayload(visita: Visita): GoogleCalendarEventPayload {
-    const timeZone = process.env.GOOGLE_CALENDAR_DEFAULT_TIMEZONE || 'America/Santiago';
+  async findLogsForVisit(visitaId: string): Promise<GoogleCalendarSyncLog[]> {
+    return this.logsRepo.find({
+      where: { visitaId },
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+  }
+
+  async retryPendingVisits(limit = 20): Promise<{ attempted: number; synced: number; failed: number }> {
+    if (this.retryRunning) return { attempted: 0, synced: 0, failed: 0 };
+    this.retryRunning = true;
+
+    try {
+      const visits = await this.visitasRepo
+        .createQueryBuilder('visita')
+        .where('visita.deleted_at IS NULL')
+        .andWhere('visita.google_calendar_sync_status IN (:...statuses)', { statuses: ['FAILED', 'PENDING'] })
+        .orderBy('visita.google_calendar_last_sync_at', 'ASC', 'NULLS FIRST')
+        .take(limit)
+        .getMany();
+
+      let synced = 0;
+      let failed = 0;
+
+      for (const visit of visits) {
+        const result = await this.syncVisitNow(visit);
+        if (result.googleCalendarSyncStatus === 'SYNCED' || result.googleCalendarSyncStatus === 'DELETED') synced += 1;
+        if (result.googleCalendarSyncStatus === 'FAILED') failed += 1;
+      }
+
+      return { attempted: visits.length, synced, failed };
+    } finally {
+      this.retryRunning = false;
+    }
+  }
+
+  buildEventPayload(visita: Visita, context: VisitCalendarContext = {}): GoogleCalendarEventPayload {
+    const timeZone = this.configService.get<string>('GOOGLE_CALENDAR_DEFAULT_TIMEZONE') || 'America/Santiago';
     const startTime = normalizeTime(visita.horaProgramada);
     const end = addMinutes(visita.fechaProgramada, startTime, visita.duracionEstimadaMin ?? 60);
+    const paciente = context.pacienteNombre ?? `Paciente ${visita.pacienteId}`;
+    const profesional = context.profesionalNombre ?? null;
+    const zona = context.zonaNombre ?? null;
+    const direccion = context.direccion ?? null;
 
     return {
-      summary: 'Visita domiciliaria',
+      summary: `Visita domiciliaria - ${paciente}`,
       description: [
-        `ID visita: ${visita.id}`,
-        `ID paciente: ${visita.pacienteId}`,
-        visita.zonaId ? `ID zona: ${visita.zonaId}` : null,
+        profesional ? `Profesional: ${profesional}` : null,
+        zona ? `Zona: ${zona}` : null,
+        direccion ? `Direccion: ${direccion}` : null,
+        context.pacienteTelefono ? `Telefono paciente: ${context.pacienteTelefono}` : null,
         `Estado: ${visita.estado}`,
+        `Prioridad: ${visita.prioridad}`,
+        `ID visita: ${visita.id}`,
       ].filter(Boolean).join('\n'),
+      location: direccion ?? undefined,
       start: { dateTime: `${visita.fechaProgramada}T${startTime}`, timeZone },
       end: { dateTime: `${end.date}T${end.time}`, timeZone },
     };
@@ -72,7 +141,7 @@ export class GoogleCalendarSyncService {
     const connection = await this.findActiveConnection(visita.profesionalSaludId);
     if (!connection) return visita;
 
-    const payload = action === 'DELETE' ? null : this.buildEventPayload(visita);
+    const payload = action === 'DELETE' ? null : this.buildEventPayload(visita, await this.getVisitContext(visita));
 
     try {
       const accessToken = await this.getFreshAccessToken(connection);
@@ -136,6 +205,47 @@ export class GoogleCalendarSyncService {
       where: { profesionalSaludId, syncEnabled: true, deletedAt: IsNull() },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  private async getVisitContext(visita: Visita): Promise<VisitCalendarContext> {
+    const row = await this.visitasRepo.manager
+      .createQueryBuilder()
+      .select([
+        `CONCAT_WS(' ', paciente.nombres, paciente.apellidos) AS "pacienteNombre"`,
+        'paciente.telefono AS "pacienteTelefono"',
+        `NULLIF(CONCAT_WS(', ',
+          NULLIF(CONCAT_WS(' ', direccion.calle, direccion.numero), ''),
+          direccion.departamento,
+          direccion.comuna,
+          direccion.region
+        ), '') AS "direccionDetallada"`,
+        'paciente.direccion AS "direccionPaciente"',
+        'zona.nombre AS "zonaNombre"',
+        `CONCAT_WS(' ', usuarioProfesional.nombres, usuarioProfesional.apellidos) AS "profesionalNombre"`,
+      ])
+      .from('visitas', 'visita')
+      .leftJoin('pacientes', 'paciente', 'paciente.id = visita.paciente_id')
+      .leftJoin('direcciones_paciente', 'direccion', 'direccion.id = visita.direccion_paciente_id AND direccion.deleted_at IS NULL')
+      .leftJoin('zonas', 'zona', 'zona.id = visita.zona_id')
+      .leftJoin('profesionales_salud', 'profesional', 'profesional.id = visita.profesional_salud_id')
+      .leftJoin('usuarios', 'usuarioProfesional', 'usuarioProfesional.id = profesional.usuario_id')
+      .where('visita.id = :id', { id: visita.id })
+      .getRawOne<{
+        pacienteNombre?: string | null;
+        pacienteTelefono?: string | null;
+        direccionDetallada?: string | null;
+        direccionPaciente?: string | null;
+        zonaNombre?: string | null;
+        profesionalNombre?: string | null;
+      }>();
+
+    return {
+      pacienteNombre: row?.pacienteNombre,
+      pacienteTelefono: row?.pacienteTelefono,
+      direccion: row?.direccionDetallada ?? row?.direccionPaciente ?? null,
+      zonaNombre: row?.zonaNombre,
+      profesionalNombre: row?.profesionalNombre,
+    };
   }
 
   private async getFreshAccessToken(connection: ProfesionalGoogleCalendarConnection): Promise<string> {

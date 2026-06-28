@@ -17,6 +17,7 @@ export type GoogleUserInfo = {
 export type GoogleCalendarEventPayload = {
   summary: string;
   description?: string;
+  location?: string;
   start: { dateTime: string; timeZone: string };
   end: { dateTime: string; timeZone: string };
 };

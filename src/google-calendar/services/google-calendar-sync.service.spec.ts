@@ -60,6 +60,9 @@ describe('GoogleCalendarSyncService', () => {
       decrypt: jest.fn().mockReturnValue(JSON.stringify({ accessToken: 'access-token', refreshToken: 'refresh-token' })),
       encrypt: jest.fn(),
     };
+    const configService = {
+      get: jest.fn((name: string) => (name === 'GOOGLE_CALENDAR_DEFAULT_TIMEZONE' ? 'America/Santiago' : undefined)),
+    };
 
     connectionsRepo.findOne.mockResolvedValue(connection);
     service = new GoogleCalendarSyncService(
@@ -68,13 +71,21 @@ describe('GoogleCalendarSyncService', () => {
       visitasRepo as any,
       googleClient as any,
       tokenEncryption as any,
+      configService as any,
     );
+    jest.spyOn(service as any, 'getVisitContext').mockResolvedValue({
+      pacienteNombre: 'Paciente Uno',
+      pacienteTelefono: '+56911112222',
+      direccion: 'Calle 123, Illapel',
+      zonaNombre: 'Zona Centro',
+      profesionalNombre: 'Profesional Uno',
+    });
   });
 
   it('builds a Google Calendar payload with start and end', () => {
     const payload = service.buildEventPayload(visita);
 
-    expect(payload.summary).toBe('Visita domiciliaria');
+    expect(payload.summary).toBe('Visita domiciliaria - Paciente pac-1');
     expect(payload.start).toEqual({ dateTime: '2026-07-01T09:30:00', timeZone: 'America/Santiago' });
     expect(payload.end).toEqual({ dateTime: '2026-07-01T10:15:00', timeZone: 'America/Santiago' });
   });
@@ -82,7 +93,10 @@ describe('GoogleCalendarSyncService', () => {
   it('creates an event for a newly created visit', async () => {
     await service.syncCreatedVisit({ ...visita });
 
-    expect(googleClient.createEvent).toHaveBeenCalledWith('primary', 'access-token', expect.objectContaining({ summary: 'Visita domiciliaria' }));
+    expect(googleClient.createEvent).toHaveBeenCalledWith('primary', 'access-token', expect.objectContaining({
+      summary: 'Visita domiciliaria - Paciente Uno',
+      location: 'Calle 123, Illapel',
+    }));
     expect(visitasRepo.save).toHaveBeenCalledWith(expect.objectContaining({
       googleCalendarEventId: 'g-event-1',
       googleCalendarSyncStatus: 'SYNCED',

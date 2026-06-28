@@ -42,6 +42,8 @@ describe('Google Calendar and calendar routes (e2e)', () => {
   const visitasService = {
     findAllForUser: jest.fn(async () => []),
     findCalendarForUser: jest.fn(async () => []),
+    findGoogleCalendarLogs: jest.fn(async () => []),
+    retryPendingGoogleCalendarSync: jest.fn(async () => ({ attempted: 1, synced: 1, failed: 0 })),
     findOne: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -148,6 +150,29 @@ describe('Google Calendar and calendar routes (e2e)', () => {
       });
 
     expect(visitasService.resyncGoogleCalendar).toHaveBeenCalledWith(visitaId, expect.any(String));
+  });
+
+  it('allows coordinators to inspect Google Calendar sync logs', async () => {
+    const visitaId = randomUUID();
+
+    await request(app.getHttpServer())
+      .get(`/visitas/${visitaId}/google-calendar/logs`)
+      .set('x-mock-role', 'COORDINADOR')
+      .expect(200);
+
+    expect(visitasService.findGoogleCalendarLogs).toHaveBeenCalledWith(visitaId);
+  });
+
+  it('allows coordinators to retry pending Google Calendar syncs', async () => {
+    await request(app.getHttpServer())
+      .post('/visitas/google-calendar/sync-pending')
+      .set('x-mock-role', 'COORDINADOR')
+      .expect(201)
+      .expect(response => {
+        expect(response.body).toEqual({ attempted: 1, synced: 1, failed: 0 });
+      });
+
+    expect(visitasService.retryPendingGoogleCalendarSync).toHaveBeenCalledWith(expect.any(String));
   });
 
   it('blocks supervisors from retrying Google Calendar sync', async () => {
