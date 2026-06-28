@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Rol } from './entities/rol.entity';
@@ -42,6 +43,7 @@ export class UsuariosService {
     @InjectRepository(Rol)
     private readonly rolesRepository: Repository<Rol>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   async findRoles(): Promise<Rol[]> {
@@ -182,6 +184,8 @@ export class UsuariosService {
       detalle: `Usuario ${result.nombres} ${result.apellidos} (${result.email}) creado con rol ${result.rol}`,
     });
 
+    await this.analyticsService.sendUsuarioUpsertEvent(result);
+
     return result;
   }
 
@@ -219,6 +223,8 @@ export class UsuariosService {
       oldValues,
       newValues: { nombres: result.nombres, apellidos: result.apellidos, email: result.email, rolId: result.rolId },
     });
+
+    await this.analyticsService.sendUsuarioUpsertEvent(result);
 
     return result;
   }

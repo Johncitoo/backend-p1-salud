@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { OptimisticLockVersionMismatchError } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { PlantillasFichaService } from '../plantillas-ficha/plantillas-ficha.service';
 import { VariablesClinicasService } from '../variables-clinicas/variables-clinicas.service';
 import { CreateFichaClinicaDto, UpdateFichaClinicaDto } from './dto/create-ficha-clinica.dto';
@@ -19,7 +20,23 @@ export class FichasClinicasService {
     private readonly plantillasService: PlantillasFichaService,
     private readonly variablesService: VariablesClinicasService,
     private readonly auditoriasService: AuditoriasService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
+
+  // Cuenta adjuntos activos de la ficha y emite el evento ficha_upsert a Analítica.
+  // Usa query nativo sobre documentos_adjuntos para no acoplar al módulo de adjuntos.
+  private async emitirFichaUpsert(ficha: FichaClinica): Promise<void> {
+    const result = await this.fichasRepo.manager
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from('documentos_adjuntos', 'da')
+      .where('da.ficha_clinica_id = :fichaId', { fichaId: ficha.id })
+      .andWhere('da.deleted_at IS NULL')
+      .getRawOne<{ count: string }>();
+
+    const adjuntosCount = Number(result?.count ?? 0);
+    await this.analyticsService.sendFichaUpsertEvent(ficha, adjuntosCount);
+  }
 
   async findAll(filtros?: { visitaId?: string; pacienteId?: string; estado?: string }) {
     const qb = this.fichasRepo.createQueryBuilder('fc').where('fc.deleted_at IS NULL');
@@ -76,6 +93,8 @@ export class FichasClinicasService {
       await this.syncMediciones(saved);
     }
 
+    await this.emitirFichaUpsert(saved);
+
     return saved;
   }
 
@@ -114,6 +133,8 @@ export class FichasClinicasService {
         await this.syncMediciones(saved);
       }
 
+      await this.emitirFichaUpsert(saved);
+
       return saved;
     } catch (error) {
       if (error instanceof OptimisticLockVersionMismatchError) {
@@ -141,6 +162,9 @@ export class FichasClinicasService {
       oldValues,
       newValues: this.auditFichaValues(saved),
     });
+
+    await this.emitirFichaUpsert(saved);
+
     return saved;
   }
 

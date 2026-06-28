@@ -150,6 +150,14 @@ export class VisitasService {
 
     await this.analyticsService.sendVisitUpsertEvent(saved, { puntual: dto.puntual });
 
+    // Eventos de ciclo de vida complementarios al upsert
+    if (dto.estado === 'EN_ATENCION') {
+      await this.analyticsService.sendVisitaInicioEvent(saved);
+    }
+    if (dto.estado === 'REALIZADA') {
+      await this.analyticsService.sendVisitaFinEvent(saved, { puntual: dto.puntual });
+    }
+
     return saved;
   }
 
@@ -173,6 +181,7 @@ export class VisitasService {
     });
 
     await this.analyticsService.sendVisitUpsertEvent(saved, { puntual: dto.puntual });
+    await this.analyticsService.sendVisitaFinEvent(saved, { puntual: dto.puntual });
 
     return saved;
   }
