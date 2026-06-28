@@ -7,29 +7,30 @@ import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { GoogleCalendarService } from './google-calendar.service';
 
 @Controller('google-calendar')
-@UseGuards(DevAuthGuard, RolesGuard)
 export class GoogleCalendarController {
   constructor(private readonly googleCalendarService: GoogleCalendarService) {}
 
   @Get('connect')
+  @UseGuards(DevAuthGuard, RolesGuard)
   @Roles('PROFESIONAL')
   connect(@CurrentUser() user: UsuarioPerfil) {
     return this.googleCalendarService.getConnectUrl(user);
   }
 
   @Get('callback')
-  @Roles('PROFESIONAL')
-  callback(@Query('code') code: string, @Query('state') state: string, @CurrentUser() user?: UsuarioPerfil) {
-    return this.googleCalendarService.handleCallback(code, state, user);
+  callback(@Query('code') code: string, @Query('state') state: string) {
+    return this.googleCalendarService.handleCallback(code, state);
   }
 
   @Get('status')
+  @UseGuards(DevAuthGuard, RolesGuard)
   @Roles('PROFESIONAL')
   status(@CurrentUser() user: UsuarioPerfil) {
     return this.googleCalendarService.getStatus(user);
   }
 
   @Delete('disconnect')
+  @UseGuards(DevAuthGuard, RolesGuard)
   @Roles('PROFESIONAL')
   disconnect(@CurrentUser() user: UsuarioPerfil) {
     return this.googleCalendarService.disconnect(user);

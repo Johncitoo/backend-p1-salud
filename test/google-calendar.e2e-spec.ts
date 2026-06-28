@@ -95,16 +95,14 @@ describe('Google Calendar and calendar routes (e2e)', () => {
     expect(googleCalendarService.getConnectUrl).not.toHaveBeenCalled();
   });
 
-  it('passes callback code and state only for professionals', async () => {
+  it('accepts the OAuth callback without an authenticated session', async () => {
     await request(app.getHttpServer())
       .get('/google-calendar/callback?code=code-123&state=signed-state')
-      .set('x-mock-role', 'PROFESIONAL')
       .expect(200);
 
     expect(googleCalendarService.handleCallback).toHaveBeenCalledWith(
       'code-123',
       'signed-state',
-      expect.objectContaining({ rol: 'PROFESIONAL' }),
     );
   });
 
