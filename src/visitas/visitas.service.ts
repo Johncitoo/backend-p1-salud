@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { AnalyticsService } from '../integrations/analytics/analytics.service';
+import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
 import { CreateVisitaDto } from '../pacientes/dto/create-visita.dto';
 import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
@@ -10,6 +11,7 @@ import { Paciente } from '../pacientes/entities/paciente.entity';
 import { PlanCuidado } from '../pacientes/entities/plan-cuidado.entity';
 import { Visita } from '../pacientes/entities/visita.entity';
 import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Zona } from '../zonas/entities/zona.entity';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
 import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
@@ -34,9 +36,23 @@ export class VisitasService {
     private readonly planesRepository: Repository<PlanCuidado>,
     @InjectRepository(DireccionPaciente)
     private readonly direccionesRepository: Repository<DireccionPaciente>,
+    @InjectRepository(Usuario)
+    private readonly usuariosRepository: Repository<Usuario>,
     private readonly auditoriasService: AuditoriasService,
     private readonly analyticsService: AnalyticsService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
+
+  // Obtiene el paciente y el usuario del profesional de una visita, para enviar notificaciones.
+  // Tolerante a fallos: si algo no se encuentra, retorna null en ese campo.
+  private async obtenerContactosVisita(visita: Visita): Promise<{ paciente: Paciente | null; profesionalUsuario: Usuario | null }> {
+    const paciente = await this.pacientesRepository.findOne({ where: { id: visita.pacienteId } });
+    const profesional = await this.profesionalesRepository.findOne({ where: { id: visita.profesionalSaludId } });
+    const profesionalUsuario = profesional
+      ? await this.usuariosRepository.findOne({ where: { id: profesional.usuarioId } })
+      : null;
+    return { paciente, profesionalUsuario };
+  }
 
   async findAll(filtros: FindVisitasQueryDto = {}): Promise<Visita[]> {
     const qb = this.visitasRepository
@@ -104,6 +120,9 @@ export class VisitasService {
 
     await this.analyticsService.sendVisitUpsertEvent(saved);
 
+    const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
+    await this.notificacionesService.notificarVisitaAgendada(saved, paciente, profesionalUsuario);
+
     return saved;
   }
 
@@ -158,6 +177,12 @@ export class VisitasService {
       await this.analyticsService.sendVisitaFinEvent(saved, { puntual: dto.puntual });
     }
 
+    // Notificar reprogramación a paciente y profesional
+    if (dto.estado === 'REPROGRAMADA') {
+      const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
+      await this.notificacionesService.notificarVisitaReprogramada(saved, paciente, profesionalUsuario);
+    }
+
     return saved;
   }
 
@@ -207,6 +232,9 @@ export class VisitasService {
     });
 
     await this.analyticsService.sendVisitUpsertEvent(saved);
+
+    const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
+    await this.notificacionesService.notificarVisitaCancelada(saved, paciente, profesionalUsuario);
 
     return saved;
   }
