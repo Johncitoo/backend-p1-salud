@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Alerta } from '../../alertas/entities/alerta.entity';
 import { FichaClinica } from '../../fichas-clinicas/entities/ficha-clinica.entity';
 import { Paciente } from '../../pacientes/entities/paciente.entity';
 import { Visita } from '../../pacientes/entities/visita.entity';
@@ -106,6 +107,17 @@ type FichaUpsertPayload = {
   usuario_actualizador_id?: string | null;
   tiene_adjuntos?: string;
   cantidad_adjuntos?: string;
+};
+
+type AlertaUpsertPayload = {
+  alerta_id: string;
+  paciente_id: string;
+  visita_id?: string;
+  tipo: string;
+  mensaje?: string;
+  prioridad?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  estado?: 'OPEN' | 'IN_PROGRESS' | 'CLOSED';
+  dias_abierta?: number;
 };
 
 // =========================================================
@@ -310,6 +322,30 @@ export class AnalyticsService {
     await this.sendEvent({ source: 'salud', event_type: 'ficha_upsert', payload });
   }
 
+  async sendAlertaUpsertEvent(alerta: Alerta): Promise<void> {
+    const payload: AlertaUpsertPayload = {
+      alerta_id: alerta.id,
+      paciente_id: alerta.pacienteId,
+      visita_id: alerta.visitaId,
+      tipo: alerta.tipo,
+      mensaje: alerta.mensaje,
+      prioridad: this.normalizeAlertaPrioridad(alerta.prioridad),
+      estado: this.normalizeAlertaEstado(alerta.estado),
+      dias_abierta: Math.max(
+        0,
+        Math.floor(
+          (Date.now() - new Date(alerta.createdAt).getTime()) / 86_400_000,
+        ),
+      ),
+    };
+
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'alerta_upsert',
+      payload,
+    });
+  }
+
   // =========================================================
   // Helpers de normalización de estados
   // =========================================================
@@ -324,7 +360,6 @@ export class AnalyticsService {
     return 'programada';
   }
 
-  // Estados de ficha del sistema (BORRADOR/CERRADA/ANULADA) -> los que espera el Grupo 9
   private normalizeFichaEstado(estado?: string): FichaUpsertPayload['estado'] {
     const normalized = estado?.trim().toUpperCase();
 
@@ -332,6 +367,31 @@ export class AnalyticsService {
     if (normalized === 'ANULADA') return 'ARCHIVED';
 
     return 'DRAFT';
+  }
+
+  private normalizeAlertaPrioridad(
+    prioridad?: string,
+  ): AlertaUpsertPayload['prioridad'] {
+    const normalized = prioridad?.trim().toUpperCase();
+
+    if (normalized === 'BAJA') return 'LOW';
+    if (normalized === 'MEDIA') return 'MEDIUM';
+    if (normalized === 'ALTA') return 'HIGH';
+    if (normalized === 'CRITICA') return 'CRITICAL';
+
+    return 'MEDIUM';
+  }
+
+  private normalizeAlertaEstado(
+    estado?: string,
+  ): AlertaUpsertPayload['estado'] {
+    const normalized = estado?.trim().toUpperCase();
+
+    if (normalized === 'EN_REVISION') return 'IN_PROGRESS';
+    if (['RESUELTA', 'CERRADA', 'CANCELADA'].includes(normalized ?? ''))
+      return 'CLOSED';
+
+    return 'OPEN';
   }
 
   // =========================================================
