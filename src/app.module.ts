@@ -18,6 +18,7 @@ import { AuthModule } from './auth/auth.module';
 import { VisitasModule } from './visitas/visitas.module';
 import { PrestacionesModule } from './prestaciones/prestaciones.module';
 import { DocumentosAdjuntosModule } from './documentos-adjuntos/documentos-adjuntos.module';
+import { IoTModule } from './integrations/iot/iot.module';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -55,6 +56,7 @@ const isTest = process.env.NODE_ENV === 'test';
     VisitasModule,
     PrestacionesModule,
     DocumentosAdjuntosModule,
+    IoTModule,
   ],
   controllers: [AppController],
   providers: [AppService],
