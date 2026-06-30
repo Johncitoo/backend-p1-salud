@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
-import { AnalyticsService } from '../integrations/analytics/analytics.service';
+import { AnalyticsService, VisitAnalyticsOptions } from '../integrations/analytics/analytics.service';
 import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
 import { CreateVisitaDto } from '../pacientes/dto/create-visita.dto';
 import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
@@ -52,6 +52,48 @@ export class VisitasService {
       ? await this.usuariosRepository.findOne({ where: { id: profesional.usuarioId } })
       : null;
     return { paciente, profesionalUsuario };
+  }
+
+  // El sistema no tiene un concepto propio de "tipo de visita"; usamos la profesión
+  // del profesional asignado como equivalente, ya que es lo que Grupo 9 (Analítica)
+  // requiere como campo obligatorio (visit_type) para construir la agenda del dashboard.
+  private async obtenerVisitType(visita: Visita): Promise<string | null> {
+    const profesional = await this.profesionalesRepository.findOne({ where: { id: visita.profesionalSaludId } });
+    return profesional?.profesion ?? null;
+  }
+
+  // Antes de enviar el visita_upsert al Grupo 9 (Analítica), reenvía las dimensiones
+  // que la visita referencia (usuario creador, paciente, profesional y zona). Su ETL
+  // hace un INNER JOIN con sus tablas de dimensión y descarta la visita si alguna no
+  // existe; eso ocurre cuando la entidad ya existía y nunca se envió en su creación
+  // (p.ej. una zona o usuario creados antes de habilitar la integración). Los upsert
+  // son idempotentes, así que reenviarlos no duplica nada en su dimensión.
+  private async sincronizarVisitaAnalytics(visita: Visita, options: VisitAnalyticsOptions = {}): Promise<void> {
+    const [paciente, profesional, zona] = await Promise.all([
+      this.pacientesRepository.findOne({ where: { id: visita.pacienteId } }),
+      this.profesionalesRepository.findOne({ where: { id: visita.profesionalSaludId } }),
+      visita.zonaId
+        ? this.zonasRepository.findOne({ where: { id: visita.zonaId } })
+        : Promise.resolve(null),
+    ]);
+    const creador = visita.creadaPorUsuarioId
+      ? await this.usuariosRepository.findOne({ where: { id: visita.creadaPorUsuarioId } })
+      : null;
+
+    if (creador) await this.analyticsService.sendUsuarioUpsertEvent(creador);
+    if (paciente) await this.analyticsService.sendPacienteUpsertEvent(paciente);
+    if (profesional) {
+      const usuarioProfesional = await this.usuariosRepository.findOne({
+        where: { id: profesional.usuarioId },
+      });
+      await this.analyticsService.sendProfesionalUpsertEvent(profesional, {
+        nombres: usuarioProfesional?.nombres ?? '',
+        apellidos: usuarioProfesional?.apellidos ?? '',
+      });
+    }
+    if (zona) await this.analyticsService.sendZonaUpsertEvent(zona);
+
+    await this.analyticsService.sendVisitUpsertEvent(visita, options);
   }
 
   async findAll(filtros: FindVisitasQueryDto = {}): Promise<Visita[]> {
@@ -118,7 +160,7 @@ export class VisitasService {
       detalle: `Visita programada para ${saved.fechaProgramada} ${saved.horaProgramada}`,
     });
 
-    await this.analyticsService.sendVisitUpsertEvent(saved);
+    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
 
     const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
     await this.notificacionesService.notificarVisitaAgendada(saved, paciente, profesionalUsuario);
@@ -141,7 +183,7 @@ export class VisitasService {
       detalle: 'Visita actualizada',
     });
 
-    await this.analyticsService.sendVisitUpsertEvent(saved);
+    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
 
     return saved;
   }
@@ -167,7 +209,7 @@ export class VisitasService {
       detalle: `Visita cambió de ${estadoAnterior} a ${saved.estado}`,
     });
 
-    await this.analyticsService.sendVisitUpsertEvent(saved, { puntual: dto.puntual });
+    await this.sincronizarVisitaAnalytics(saved, { puntual: dto.puntual, visitType: await this.obtenerVisitType(saved) });
 
     // Eventos de ciclo de vida complementarios al upsert
     if (dto.estado === 'EN_ATENCION') {
@@ -205,7 +247,7 @@ export class VisitasService {
       detalle: `Visita completada desde ${estadoAnterior}`,
     });
 
-    await this.analyticsService.sendVisitUpsertEvent(saved, { puntual: dto.puntual });
+    await this.sincronizarVisitaAnalytics(saved, { puntual: dto.puntual, visitType: await this.obtenerVisitType(saved) });
     await this.analyticsService.sendVisitaFinEvent(saved, { puntual: dto.puntual });
 
     return saved;
@@ -231,7 +273,7 @@ export class VisitasService {
       detalle: dto.observacionCancelacion ?? 'Visita cancelada',
     });
 
-    await this.analyticsService.sendVisitUpsertEvent(saved);
+    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
 
     const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
     await this.notificacionesService.notificarVisitaCancelada(saved, paciente, profesionalUsuario);

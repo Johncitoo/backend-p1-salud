@@ -36,6 +36,7 @@ type VisitaUpsertPayload = {
   fecha_fin_real: string | null;
   completada: 0 | 1;
   puntual: 0 | 1;
+  visit_type: string;
 };
 
 type UsuarioUpsertPayload = {
@@ -124,8 +125,9 @@ type AlertaUpsertPayload = {
 // Opciones / formas de datos auxiliares
 // =========================================================
 
-type VisitAnalyticsOptions = {
+export type VisitAnalyticsOptions = {
   puntual?: boolean | null;
+  visitType?: string | null;
 };
 
 // Forma estructural mínima para usuario (UsuariosService retorna UsuarioResponse,
@@ -152,6 +154,13 @@ export class AnalyticsService {
   // Es no-bloqueante: cualquier error se loguea, nunca se lanza.
   // =========================================================
 
+  // Reintentos con backoff: Render free tier puede tardar ~30-50s en "despertar"
+  // (cold start) y antes el primer fallo descartaba el evento para siempre,
+  // sin dejar ningún rastro recuperable más allá de un log de error.
+  private static readonly MAX_ATTEMPTS = 3;
+  private static readonly ATTEMPT_TIMEOUT_MS = 20_000;
+  private static readonly RETRY_BACKOFF_MS = [3_000, 8_000];
+
   private async sendEvent(event: AnalyticsEvent): Promise<void> {
     const enabled = this.configService.get<string>('ANALYTICS_ENABLED') === 'true';
     const baseUrl = (this.configService.get<string>('ANALYTICS_URL') ?? '').trim();
@@ -169,20 +178,55 @@ export class AnalyticsService {
 
     const endpoint = `${baseUrl}${this.normalizeEventsPath(eventsPath)}`;
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event),
-      });
+    this.logger.log(
+      `[Analytics outgoing] Evento ${event.event_type}:\n${JSON.stringify(event, null, 2)}`,
+    );
 
-      if (!response.ok) {
-        this.logger.error(`No se pudo enviar evento ${event.event_type} a Analítica: HTTP ${response.status}`);
+    for (let attempt = 1; attempt <= AnalyticsService.MAX_ATTEMPTS; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(),
+        AnalyticsService.ATTEMPT_TIMEOUT_MS,
+      );
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(event),
+          signal: controller.signal,
+        });
+
+        const responseText = await response.text().catch(() => '');
+        this.logger.log(
+          `[Analytics response] Evento ${event.event_type} (intento ${attempt}/${AnalyticsService.MAX_ATTEMPTS}): HTTP ${response.status} - ${responseText}`,
+        );
+
+        if (response.ok) return;
+
+        this.logger.error(
+          `No se pudo enviar evento ${event.event_type} a Analítica (intento ${attempt}/${AnalyticsService.MAX_ATTEMPTS}): HTTP ${response.status}`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `No se pudo enviar evento ${event.event_type} a Analítica (intento ${attempt}/${AnalyticsService.MAX_ATTEMPTS}): ${message}`,
+        );
+      } finally {
+        clearTimeout(timeout);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`No se pudo enviar evento ${event.event_type} a Analítica: ${message}`);
+
+      const backoff = AnalyticsService.RETRY_BACKOFF_MS[attempt - 1];
+      if (backoff) await this.delay(backoff);
     }
+
+    this.logger.error(
+      `Evento ${event.event_type} descartado tras ${AnalyticsService.MAX_ATTEMPTS} intentos fallidos: ${JSON.stringify(event)}`,
+    );
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // =========================================================
@@ -204,6 +248,7 @@ export class AnalyticsService {
       fecha_fin_real: this.formatDateTime(visita.fechaHoraFinReal),
       completada: estado === 'completada' ? 1 : 0,
       puntual: options.puntual === true ? 1 : 0,
+      visit_type: options.visitType ?? 'General',
     };
 
     await this.sendEvent({ source: 'salud', event_type: 'visita_upsert', payload });
@@ -214,9 +259,7 @@ export class AnalyticsService {
       usuario_id: usuario.id,
       nombres: usuario.nombres,
       apellidos: usuario.apellidos,
-      rut: usuario.rut,
       email: usuario.email,
-      telefono: usuario.telefono,
       activo: usuario.activo,
     };
 
@@ -228,12 +271,7 @@ export class AnalyticsService {
       paciente_id: paciente.id,
       nombres: paciente.nombres,
       apellidos: paciente.apellidos,
-      rut: paciente.rut,
-      fecha_nacimiento: this.formatDateOnly(paciente.fechaNacimiento),
-      sexo: paciente.sexo ?? null,
-      telefono: paciente.telefono ?? null,
       email: paciente.email ?? null,
-      direccion: paciente.direccion ?? null,
     };
 
     await this.sendEvent({ source: 'salud', event_type: 'paciente_upsert', payload });
@@ -249,7 +287,6 @@ export class AnalyticsService {
       nombres: usuario.nombres,
       apellidos: usuario.apellidos,
       profesion: profesional.profesion,
-      numero_registro: profesional.numeroRegistro ?? null,
       activo: profesional.activo,
     };
 
