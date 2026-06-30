@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Rol } from './entities/rol.entity';
@@ -42,6 +43,7 @@ export class UsuariosService {
     @InjectRepository(Rol)
     private readonly rolesRepository: Repository<Rol>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   async findRoles(): Promise<Rol[]> {
@@ -148,6 +150,86 @@ export class UsuariosService {
     return this.findProfileByIdentityUserId(identityUserId);
   }
 
+  async findOrCreateFromKeycloak(data: {
+    sub: string;
+    email: string | null;
+    preferredUsername: string | null;
+    rol: string | null;
+  }): Promise<UsuarioPerfil | null> {
+    // 1. Buscar por identity_user_id (sub del JWT)
+    const byIdentity = await this.findProfileByIdentityUserId(data.sub);
+    if (byIdentity) return byIdentity;
+
+    // 2. Buscar por email y linkear
+    if (data.email) {
+      try {
+        const linked = await this.linkIdentityUserIdByEmail(data.email, data.sub);
+        if (linked) return linked;
+      } catch {
+        // ConflictException si el email ya está vinculado a otra identidad
+      }
+    }
+
+    // 3. Auto-crear usuario con datos del token
+    if (!data.email) return null;
+
+    const rolNombre = data.rol ?? 'PROFESIONAL';
+    const rol = await this.rolesRepository.findOne({
+      where: { nombre: rolNombre, deletedAt: IsNull() },
+    });
+
+    if (!rol) return null;
+
+    const nombres = this.extractNombresFromUsername(data.preferredUsername ?? data.email);
+    const usuario = this.usuariosRepository.create({
+      identityUserId: data.sub,
+      rolId: rol.id,
+      rut: `KC-${data.sub.slice(0, 8)}`,
+      nombres: nombres.nombres,
+      apellidos: nombres.apellidos,
+      email: data.email,
+      activo: true,
+    });
+
+    const saved = await this.usuariosRepository.save(usuario);
+
+    this.auditoriasService.registrar({
+      entidad: 'usuarios',
+      entidadId: saved.id,
+      accion: 'AUTO_CREAR_KEYCLOAK',
+      detalle: `Usuario ${saved.email} creado automáticamente desde Keycloak (rol: ${rolNombre})`,
+    });
+
+    await this.analyticsService.sendUsuarioUpsertEvent({
+      id: saved.id,
+      nombres: saved.nombres,
+      apellidos: saved.apellidos,
+      rut: saved.rut,
+      email: saved.email,
+      telefono: saved.telefono,
+      activo: saved.activo,
+    });
+
+    return {
+      id: saved.id,
+      identityUserId: data.sub,
+      nombres: saved.nombres,
+      apellidos: saved.apellidos,
+      email: saved.email,
+      rol: rolNombre,
+      activo: true,
+    };
+  }
+
+  private extractNombresFromUsername(username: string): { nombres: string; apellidos: string } {
+    // p1.admin.01@test.local → "Admin 01"
+    const localPart = username.split('@')[0] ?? username;
+    const parts = localPart.replace(/^p1\./, '').split('.');
+    const nombres = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'Usuario';
+    const apellidos = parts.slice(1).join(' ') || 'Keycloak';
+    return { nombres, apellidos };
+  }
+
   async create(dto: CreateUsuarioDto): Promise<UsuarioResponse> {
     await this.ensureRoleExists(dto.rolId);
 
@@ -181,6 +263,8 @@ export class UsuariosService {
       accion: 'CREAR',
       detalle: `Usuario ${result.nombres} ${result.apellidos} (${result.email}) creado con rol ${result.rol}`,
     });
+
+    await this.analyticsService.sendUsuarioUpsertEvent(result);
 
     return result;
   }
@@ -219,6 +303,8 @@ export class UsuariosService {
       oldValues,
       newValues: { nombres: result.nombres, apellidos: result.apellidos, email: result.email, rolId: result.rolId },
     });
+
+    await this.analyticsService.sendUsuarioUpsertEvent(result);
 
     return result;
   }

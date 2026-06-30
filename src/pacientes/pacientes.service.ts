@@ -2,6 +2,8 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
+import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
 import { CreatePacienteDto } from './dto/create-paciente.dto';
 import { UpdatePacienteDto } from './dto/update-paciente.dto';
 import { Paciente } from './entities/paciente.entity';
@@ -32,6 +34,8 @@ export class PacientesService {
     @InjectRepository(Visita)
     private readonly visitasRepository: Repository<Visita>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly analyticsService: AnalyticsService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
 
   async findAll(): Promise<Paciente[]> {
@@ -72,6 +76,10 @@ export class PacientesService {
       accion: 'CREAR',
       detalle: `Paciente ${result.nombres} ${result.apellidos} creado`,
     });
+
+    await this.analyticsService.sendPacienteUpsertEvent(result);
+    await this.notificacionesService.notificarPacienteCreado(result);
+
     return result;
   }
 
@@ -98,6 +106,9 @@ export class PacientesService {
       oldValues,
       newValues: { nombres: result.nombres, apellidos: result.apellidos, rut: result.rut },
     });
+
+    await this.analyticsService.sendPacienteUpsertEvent(result);
+
     return result;
   }
 

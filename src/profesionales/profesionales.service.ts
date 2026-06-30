@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
+import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
 import { Rol } from '../usuarios/entities/rol.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CreateEspecialidadDto } from './dto/create-especialidad.dto';
@@ -22,7 +24,23 @@ export class ProfesionalesService {
     @InjectRepository(ProfesionalEspecialidad) private readonly profesionalEspecialidades: Repository<ProfesionalEspecialidad>,
     @InjectRepository(Usuario) private readonly usuarios: Repository<Usuario>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly analyticsService: AnalyticsService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
+
+  // Obtiene nombres/apellidos del usuario asociado para enriquecer el evento de profesional.
+  // Si notificarCreacion=true, además envía la notificación de profesional creado al Grupo 6.
+  private async emitirProfesionalUpsert(profesional: ProfesionalSalud, notificarCreacion = false): Promise<void> {
+    const usuario = await this.usuarios.findOne({ where: { id: profesional.usuarioId } });
+    if (!usuario) return;
+    await this.analyticsService.sendProfesionalUpsertEvent(profesional, {
+      nombres: usuario.nombres,
+      apellidos: usuario.apellidos,
+    });
+    if (notificarCreacion) {
+      await this.notificacionesService.notificarProfesionalCreado(usuario);
+    }
+  }
 
   findAll() {
     return this.profesionales.find({ where: { deletedAt: IsNull() }, order: { createdAt: 'DESC' } });
@@ -84,6 +102,9 @@ export class ProfesionalesService {
       accion: 'CREAR',
       detalle: `Profesional ${result.profesion} creado (usuarioId: ${result.usuarioId})`,
     });
+
+    await this.emitirProfesionalUpsert(result, true);
+
     return result;
   }
 
@@ -100,6 +121,9 @@ export class ProfesionalesService {
       oldValues,
       newValues: { profesion: result.profesion, activo: result.activo },
     });
+
+    await this.emitirProfesionalUpsert(result);
+
     return result;
   }
 
@@ -134,6 +158,9 @@ export class ProfesionalesService {
       accion: 'CREAR',
       detalle: `Especialidad ${result.nombre} creada`,
     });
+
+    await this.analyticsService.sendEspecialidadUpsertEvent(result);
+
     return result;
   }
 
@@ -150,6 +177,9 @@ export class ProfesionalesService {
       oldValues,
       newValues: { nombre: result.nombre },
     });
+
+    await this.analyticsService.sendEspecialidadUpsertEvent(result);
+
     return result;
   }
 

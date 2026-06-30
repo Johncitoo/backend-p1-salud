@@ -5,6 +5,7 @@ import { IsNull, Repository } from 'typeorm';
 import { Zona } from './entities/zona.entity';
 import { ZonasService } from './zonas.service';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
 
 type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
@@ -46,6 +47,10 @@ describe('ZonasService', () => {
         {
           provide: AuditoriasService,
           useValue: auditoriasService,
+        },
+        {
+          provide: AnalyticsService,
+          useValue: { sendZonaUpsertEvent: jest.fn() },
         },
       ],
     }).compile();

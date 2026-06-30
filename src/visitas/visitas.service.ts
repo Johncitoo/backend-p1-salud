@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService, VisitAnalyticsOptions } from '../integrations/analytics/analytics.service';
+import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
 import { CreateVisitaDto } from '../pacientes/dto/create-visita.dto';
 import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
@@ -9,10 +11,12 @@ import { Paciente } from '../pacientes/entities/paciente.entity';
 import { PlanCuidado } from '../pacientes/entities/plan-cuidado.entity';
 import { Visita } from '../pacientes/entities/visita.entity';
 import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Zona } from '../zonas/entities/zona.entity';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
 import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
 import { FindCalendarioQueryDto } from './dto/find-calendario-query.dto';
+import { CompletarVisitaDto } from './dto/completar-visita.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
 import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { GoogleCalendarSyncService } from '../google-calendar/services/google-calendar-sync.service';
@@ -34,9 +38,66 @@ export class VisitasService {
     private readonly planesRepository: Repository<PlanCuidado>,
     @InjectRepository(DireccionPaciente)
     private readonly direccionesRepository: Repository<DireccionPaciente>,
+    @InjectRepository(Usuario)
+    private readonly usuariosRepository: Repository<Usuario>,
     private readonly auditoriasService: AuditoriasService,
     private readonly googleCalendarSyncService: GoogleCalendarSyncService,
+    private readonly analyticsService: AnalyticsService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
+
+  // Obtiene el paciente y el usuario del profesional de una visita, para enviar notificaciones.
+  // Tolerante a fallos: si algo no se encuentra, retorna null en ese campo.
+  private async obtenerContactosVisita(visita: Visita): Promise<{ paciente: Paciente | null; profesionalUsuario: Usuario | null }> {
+    const paciente = await this.pacientesRepository.findOne({ where: { id: visita.pacienteId } });
+    const profesional = await this.profesionalesRepository.findOne({ where: { id: visita.profesionalSaludId } });
+    const profesionalUsuario = profesional
+      ? await this.usuariosRepository.findOne({ where: { id: profesional.usuarioId } })
+      : null;
+    return { paciente, profesionalUsuario };
+  }
+
+  // El sistema no tiene un concepto propio de "tipo de visita"; usamos la profesión
+  // del profesional asignado como equivalente, ya que es lo que Grupo 9 (Analítica)
+  // requiere como campo obligatorio (visit_type) para construir la agenda del dashboard.
+  private async obtenerVisitType(visita: Visita): Promise<string | null> {
+    const profesional = await this.profesionalesRepository.findOne({ where: { id: visita.profesionalSaludId } });
+    return profesional?.profesion ?? null;
+  }
+
+  // Antes de enviar el visita_upsert al Grupo 9 (Analítica), reenvía las dimensiones
+  // que la visita referencia (usuario creador, paciente, profesional y zona). Su ETL
+  // hace un INNER JOIN con sus tablas de dimensión y descarta la visita si alguna no
+  // existe; eso ocurre cuando la entidad ya existía y nunca se envió en su creación
+  // (p.ej. una zona o usuario creados antes de habilitar la integración). Los upsert
+  // son idempotentes, así que reenviarlos no duplica nada en su dimensión.
+  private async sincronizarVisitaAnalytics(visita: Visita, options: VisitAnalyticsOptions = {}): Promise<void> {
+    const [paciente, profesional, zona] = await Promise.all([
+      this.pacientesRepository.findOne({ where: { id: visita.pacienteId } }),
+      this.profesionalesRepository.findOne({ where: { id: visita.profesionalSaludId } }),
+      visita.zonaId
+        ? this.zonasRepository.findOne({ where: { id: visita.zonaId } })
+        : Promise.resolve(null),
+    ]);
+    const creador = visita.creadaPorUsuarioId
+      ? await this.usuariosRepository.findOne({ where: { id: visita.creadaPorUsuarioId } })
+      : null;
+
+    if (creador) await this.analyticsService.sendUsuarioUpsertEvent(creador);
+    if (paciente) await this.analyticsService.sendPacienteUpsertEvent(paciente);
+    if (profesional) {
+      const usuarioProfesional = await this.usuariosRepository.findOne({
+        where: { id: profesional.usuarioId },
+      });
+      await this.analyticsService.sendProfesionalUpsertEvent(profesional, {
+        nombres: usuarioProfesional?.nombres ?? '',
+        apellidos: usuarioProfesional?.apellidos ?? '',
+      });
+    }
+    if (zona) await this.analyticsService.sendZonaUpsertEvent(zona);
+
+    await this.analyticsService.sendVisitUpsertEvent(visita, options);
+  }
 
   async findAll(filtros: FindVisitasQueryDto = {}): Promise<Visita[]> {
     const qb = this.visitasRepository
@@ -103,6 +164,10 @@ export class VisitasService {
     });
 
     await this.googleCalendarSyncService.syncCreatedVisit(saved);
+    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
+
+    const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
+    await this.notificacionesService.notificarVisitaAgendada(saved, paciente, profesionalUsuario);
 
     return saved;
   }
@@ -182,6 +247,7 @@ export class VisitasService {
     });
 
     await this.googleCalendarSyncService.syncUpdatedVisit(saved, previousProfesionalSaludId);
+    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
 
     return saved;
   }
@@ -242,6 +308,47 @@ export class VisitasService {
       detalle: `Visita cambió de ${estadoAnterior} a ${saved.estado}`,
     });
 
+    await this.sincronizarVisitaAnalytics(saved, { puntual: dto.puntual, visitType: await this.obtenerVisitType(saved) });
+
+    // Eventos de ciclo de vida complementarios al upsert
+    if (dto.estado === 'EN_ATENCION') {
+      await this.analyticsService.sendVisitaInicioEvent(saved);
+    }
+    if (dto.estado === 'REALIZADA') {
+      await this.analyticsService.sendVisitaFinEvent(saved, { puntual: dto.puntual });
+    }
+
+    // Notificar reprogramación a paciente y profesional
+    if (dto.estado === 'REPROGRAMADA') {
+      const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
+      await this.notificacionesService.notificarVisitaReprogramada(saved, paciente, profesionalUsuario);
+    }
+
+    return saved;
+  }
+
+  async completar(id: string, dto: CompletarVisitaDto, usuarioId?: string): Promise<Visita> {
+    const visita = await this.findOne(id);
+    const estadoAnterior = visita.estado;
+
+    if (visita.estado === 'CANCELADA') throw new BadRequestException('No se puede completar una visita cancelada');
+    if (!visita.fechaHoraInicioReal) visita.fechaHoraInicioReal = new Date();
+
+    visita.estado = 'REALIZADA';
+    visita.fechaHoraFinReal = visita.fechaHoraFinReal ?? new Date();
+
+    const saved = await this.visitasRepository.save(visita);
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'visitas',
+      entidadId: saved.id,
+      accion: 'COMPLETAR',
+      detalle: `Visita completada desde ${estadoAnterior}`,
+    });
+
+    await this.sincronizarVisitaAnalytics(saved, { puntual: dto.puntual, visitType: await this.obtenerVisitType(saved) });
+    await this.analyticsService.sendVisitaFinEvent(saved, { puntual: dto.puntual });
+
     return saved;
   }
 
@@ -266,6 +373,10 @@ export class VisitasService {
     });
 
     await this.googleCalendarSyncService.syncCanceledVisit(saved);
+    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
+
+    const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
+    await this.notificacionesService.notificarVisitaCancelada(saved, paciente, profesionalUsuario);
 
     return saved;
   }

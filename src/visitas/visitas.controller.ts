@@ -9,6 +9,7 @@ import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
 import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
 import { FindCalendarioQueryDto } from './dto/find-calendario-query.dto';
+import { CompletarVisitaDto } from './dto/completar-visita.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
 import { VisitasService } from './visitas.service';
 
@@ -82,6 +83,16 @@ export class VisitasController {
     @CurrentUser() user?: UsuarioPerfil,
   ) {
     return this.visitasService.cambiarEstado(id, dto, uuidOrUndefined(user?.id));
+  }
+
+  @Patch(':id/completar')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
+  completar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CompletarVisitaDto,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
+    return this.visitasService.completar(id, dto, uuidOrUndefined(user?.id));
   }
 
   @Patch(':id/cancelar')
