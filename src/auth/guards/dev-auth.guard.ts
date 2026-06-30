@@ -69,20 +69,54 @@ export class DevAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token Keycloak sin sub');
     }
 
-    const user = await this.usuariosService.findProfileByIdentityUserId(payload.sub);
-
-    if (user) return user;
-
+    const jwtRole = this.extractAppRoleFromPayload(payload);
     const email = typeof payload.email === 'string' ? payload.email : null;
-    const linkedUser = email
-      ? await this.usuariosService.linkIdentityUserIdByEmail(email, payload.sub)
-      : null;
+    const preferredUsername = typeof payload.preferred_username === 'string'
+      ? payload.preferred_username : null;
 
-    if (!linkedUser) {
-      throw new UnauthorizedException('Usuario local no encontrado o inactivo');
+    const user = await this.usuariosService.findOrCreateFromKeycloak({
+      sub: payload.sub,
+      email,
+      preferredUsername,
+      rol: jwtRole,
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('No se pudo autenticar al usuario');
     }
 
-    return linkedUser;
+    // El rol del JWT tiene prioridad sobre el de la BD
+    if (jwtRole) {
+      user.rol = jwtRole;
+    }
+
+    return user;
+  }
+
+  // Extrae el rol de aplicación desde resource_access.p1.roles del JWT
+  // y lo mapea a nuestro sistema (admin → ADMIN, coordinator → COORDINADOR, etc.)
+  private extractAppRoleFromPayload(payload: JWTPayload): AppRole | null {
+    const clientId = this.configService.get<string>('KEYCLOAK_AUDIENCE') ?? 'p1';
+    const resourceAccess = payload.resource_access as
+      | Record<string, { roles?: string[] }>
+      | undefined;
+    const roles = resourceAccess?.[clientId]?.roles ?? [];
+    const firstRole = roles[0];
+
+    if (!firstRole) return null;
+
+    return this.mapKeycloakRoleToAppRole(firstRole);
+  }
+
+  private mapKeycloakRoleToAppRole(keycloakRole: string): AppRole {
+    const map: Record<string, AppRole> = {
+      admin: 'ADMIN',
+      coordinator: 'COORDINADOR',
+      professional: 'PROFESIONAL',
+      supervisor: 'SUPERVISOR',
+    };
+
+    return map[keycloakRole.toLowerCase()] ?? 'PROFESIONAL';
   }
 
   private extractBearerToken(request: Request): string {

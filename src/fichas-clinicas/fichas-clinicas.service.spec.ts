@@ -7,11 +7,26 @@ import { VariablesClinicasService } from '../variables-clinicas/variables-clinic
 import { MedicionClinica } from '../mediciones-clinicas/entities/medicion-clinica.entity';
 import { FichaClinica } from './entities/ficha-clinica.entity';
 import { CreateFichaClinicaDto, UpdateFichaClinicaDto } from './dto/create-ficha-clinica.dto';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { FichasClinicasService } from './fichas-clinicas.service';
+
+const _mockQb = () => {
+  const qb: any = {};
+  qb.select = jest.fn().mockReturnValue(qb);
+  qb.from = jest.fn().mockReturnValue(qb);
+  qb.where = jest.fn().mockReturnValue(qb);
+  qb.andWhere = jest.fn().mockReturnValue(qb);
+  qb.getRawOne = jest.fn().mockResolvedValue({ pacienteId: 'p-mock', count: '0' });
+  qb.update = jest.fn().mockReturnValue(qb);
+  qb.set = jest.fn().mockReturnValue(qb);
+  qb.execute = jest.fn().mockResolvedValue({});
+  return qb;
+};
 
 const _createRepo = () => ({
   find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(),
-  createQueryBuilder: jest.fn(), manager: { createQueryBuilder: jest.fn() },
+  createQueryBuilder: jest.fn().mockReturnValue(_mockQb()),
+  manager: { createQueryBuilder: jest.fn().mockReturnValue(_mockQb()) },
 });
 
 const mockAuditorias = () =>
@@ -54,6 +69,7 @@ describe('FichasClinicasService', () => {
         { provide: AuditoriasService, useValue: auditorias },
         { provide: PlantillasFichaService, useValue: plantillas },
         { provide: VariablesClinicasService, useValue: variables },
+        { provide: AnalyticsService, useValue: { sendFichaUpsertEvent: jest.fn() } },
       ],
     }).compile();
 
