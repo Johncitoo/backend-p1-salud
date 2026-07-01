@@ -1,11 +1,11 @@
-// Forzar PostgreSQL — NODE_ENV=test activa SQLite en AppModule
+// Forzar PostgreSQL: NODE_ENV=test activa SQLite en AppModule.
 process.env.NODE_ENV = 'e2e';
 process.env.AUTH_MODE = 'mock';
 
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 
 const AUTH = {
@@ -18,7 +18,14 @@ const AUTH_PROF = {
   'x-identity-user-id': 'usr-prof-01',
 };
 
-describe('Ficha Clinica — E2E (modelo hibrido)', () => {
+const RUN_ID = Date.now().toString(36).toUpperCase();
+const PA_CODE = `PA_E2E_${RUN_ID}`;
+const TEMP_CODE = `TEMP_E2E_${RUN_ID}`;
+const DEL_CODE = `DEL_E2E_${RUN_ID}`;
+const PLANTILLA_CODE = `E2E_PLANTILLA_${RUN_ID}`;
+const PATIENT_RUT = `FC-${RUN_ID}`;
+
+describe('Ficha Clinica - E2E (modelo hibrido)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
 
@@ -27,8 +34,148 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
   let varPAId: string;
   let varTempId: string;
   let plantillaId: string;
+  let fichaId: string;
 
   jest.setTimeout(30000);
+
+  const cleanupRunData = async () => {
+    if (!dataSource?.isInitialized) return;
+
+    const variableCodes = [PA_CODE, TEMP_CODE, DEL_CODE];
+    const plantillaCodes = [PLANTILLA_CODE];
+
+    await dataSource.query(
+      `
+      DELETE FROM mediciones_clinicas
+      WHERE ficha_clinica_id IN (
+        SELECT fc.id
+        FROM fichas_clinicas fc
+        JOIN visitas v ON v.id = fc.visita_id
+        JOIN pacientes p ON p.id = v.paciente_id
+        WHERE p.rut = $1
+      )
+      OR variable_clinica_id IN (
+        SELECT id FROM variables_clinicas WHERE codigo = ANY($2)
+      )
+      `,
+      [PATIENT_RUT, variableCodes],
+    );
+    await dataSource.query(
+      `
+      DELETE FROM documentos_adjuntos
+      WHERE ficha_clinica_id IN (
+        SELECT fc.id
+        FROM fichas_clinicas fc
+        JOIN visitas v ON v.id = fc.visita_id
+        JOIN pacientes p ON p.id = v.paciente_id
+        WHERE p.rut = $1
+      )
+      `,
+      [PATIENT_RUT],
+    );
+    await dataSource.query(
+      `
+      DELETE FROM fichas_clinicas
+      WHERE visita_id IN (
+        SELECT v.id
+        FROM visitas v
+        JOIN pacientes p ON p.id = v.paciente_id
+        WHERE p.rut = $1
+      )
+      `,
+      [PATIENT_RUT],
+    );
+    await dataSource.query(
+      `
+      DELETE FROM plantilla_ficha_campos
+      WHERE plantilla_ficha_id IN (
+        SELECT id FROM plantillas_ficha WHERE codigo = ANY($1)
+      )
+      `,
+      [plantillaCodes],
+    );
+    await dataSource.query('DELETE FROM plantillas_ficha WHERE codigo = ANY($1)', [plantillaCodes]);
+    await dataSource.query('DELETE FROM variables_clinicas WHERE codigo = ANY($1)', [variableCodes]);
+    await dataSource.query(
+      `
+      DELETE FROM visitas
+      WHERE paciente_id IN (
+        SELECT id FROM pacientes WHERE rut = $1
+      )
+      `,
+      [PATIENT_RUT],
+    );
+    await dataSource.query('DELETE FROM pacientes WHERE rut = $1', [PATIENT_RUT]);
+  };
+
+  const createDedicatedVisit = async () => {
+    const profesionales = await dataSource.query(
+      `
+      SELECT ps.id AS "profesionalSaludId", u.id AS "usuarioId"
+      FROM profesionales_salud ps
+      JOIN usuarios u ON u.id = ps.usuario_id
+      WHERE ps.deleted_at IS NULL
+        AND ps.activo = TRUE
+        AND u.deleted_at IS NULL
+      LIMIT 1
+      `,
+    );
+
+    if (profesionales.length === 0) {
+      throw new Error('Setup E2E ficha-clinica: no existe un profesional activo para crear la visita dedicada.');
+    }
+
+    const pacientes = await dataSource.query(
+      `
+      INSERT INTO pacientes (rut, nombres, apellidos, fecha_nacimiento, sexo, telefono, email, direccion)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id
+      `,
+      [
+        PATIENT_RUT,
+        'Paciente',
+        `Ficha ${RUN_ID}`,
+        '1988-01-01',
+        'F',
+        '+56911111111',
+        `ficha-${RUN_ID.toLowerCase()}@e2e.local`,
+        'Direccion E2E',
+      ],
+    );
+    pacienteId = pacientes[0]?.id;
+
+    const visitas = await dataSource.query(
+      `
+      INSERT INTO visitas (
+        paciente_id,
+        profesional_salud_id,
+        fecha_programada,
+        hora_programada,
+        duracion_estimada_min,
+        estado,
+        prioridad,
+        creada_por_usuario_id
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id
+      `,
+      [
+        pacienteId,
+        profesionales[0].profesionalSaludId,
+        '2026-07-01',
+        '09:00',
+        60,
+        'PROGRAMADA',
+        'NORMAL',
+        profesionales[0].usuarioId,
+      ],
+    );
+    visitaId = visitas[0]?.id;
+
+    if (!pacienteId || !visitaId) {
+      throw new Error('Setup E2E ficha-clinica: no se pudo crear paciente/visita dedicada.');
+    }
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -39,55 +186,73 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     dataSource = app.get(DataSource);
+
+    await cleanupRunData();
+    await createDedicatedVisit();
   });
 
   afterAll(async () => {
-    if (dataSource?.isInitialized) {
-      if (plantillaId) {
-        await dataSource.query(`DELETE FROM plantilla_ficha_campos WHERE plantilla_ficha_id = $1`, [plantillaId]);
-        await dataSource.query(`DELETE FROM plantillas_ficha WHERE id = $1`, [plantillaId]);
-      }
-      if (varPAId) await dataSource.query(`UPDATE variables_clinicas SET deleted_at = NOW() WHERE id = $1`, [varPAId]);
-      if (varTempId) await dataSource.query(`UPDATE variables_clinicas SET deleted_at = NOW() WHERE id = $1`, [varTempId]);
-    }
+    await cleanupRunData();
     await app?.close();
   });
 
-  // ==========================================================
-  // ETAPA 1: Variables clínicas CRUD
-  // ==========================================================
-  describe('ETAPA 1 — Variables clinicas CRUD', () => {
+  describe('ETAPA 1 - Variables clinicas CRUD', () => {
     it('POST /variables-clinicas crea variable NUMERO con rango', async () => {
       const res = await request(app.getHttpServer())
         .post('/variables-clinicas')
         .set(AUTH)
-        .send({ codigo: 'PA_E2E', nombre: 'PA sistolica E2E', tipoDato: 'NUMERO', unidad: 'mmHg', categoria: 'SIGNOS_VITALES', valorMinimo: 60, valorMaximo: 250 })
+        .send({
+          codigo: PA_CODE,
+          nombre: `PA sistolica E2E ${RUN_ID}`,
+          tipoDato: 'NUMERO',
+          unidad: 'mmHg',
+          categoria: 'SIGNOS_VITALES',
+          valorMinimo: 60,
+          valorMaximo: 250,
+        })
         .expect(201);
 
       varPAId = res.body.id;
       expect(varPAId).toBeDefined();
-      expect(res.body.codigo).toBe('PA_E2E');
+      expect(res.body.codigo).toBe(PA_CODE);
       expect(res.body.valorMinimo).toBe(60);
+    });
+
+    it('POST /variables-clinicas rechaza codigo activo duplicado', async () => {
+      await request(app.getHttpServer())
+        .post('/variables-clinicas')
+        .set(AUTH)
+        .send({ codigo: PA_CODE, nombre: 'Duplicada E2E', tipoDato: 'NUMERO' })
+        .expect(400);
     });
 
     it('POST segunda variable', async () => {
       const res = await request(app.getHttpServer())
         .post('/variables-clinicas')
         .set(AUTH)
-        .send({ codigo: 'TEMP_E2E', nombre: 'Temperatura E2E', tipoDato: 'NUMERO', unidad: 'C', categoria: 'SIGNOS_VITALES', valorMinimo: 30, valorMaximo: 45 })
+        .send({
+          codigo: TEMP_CODE,
+          nombre: `Temperatura E2E ${RUN_ID}`,
+          tipoDato: 'NUMERO',
+          unidad: 'C',
+          categoria: 'SIGNOS_VITALES',
+          valorMinimo: 30,
+          valorMaximo: 45,
+        })
         .expect(201);
 
       varTempId = res.body.id;
       expect(varTempId).toBeDefined();
     });
 
-    it('GET /variables-clinicas lista todas', async () => {
+    it('GET /variables-clinicas lista las variables creadas', async () => {
       const res = await request(app.getHttpServer())
         .get('/variables-clinicas')
         .set(AUTH)
         .expect(200);
 
-      expect(res.body.length).toBeGreaterThanOrEqual(10);
+      const codes = res.body.map((v: { codigo: string }) => v.codigo);
+      expect(codes).toEqual(expect.arrayContaining([PA_CODE, TEMP_CODE]));
     });
 
     it('GET /variables-clinicas filtra por categoria', async () => {
@@ -96,7 +261,7 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
         .set(AUTH)
         .expect(200);
 
-      expect(res.body.length).toBeGreaterThanOrEqual(2);
+      expect(res.body.some((v: { codigo: string }) => v.codigo === PA_CODE)).toBe(true);
     });
 
     it('GET /variables-clinicas/:id retorna una especifica', async () => {
@@ -105,14 +270,14 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
         .set(AUTH)
         .expect(200);
 
-      expect(res.body.codigo).toBe('PA_E2E');
+      expect(res.body.codigo).toBe(PA_CODE);
     });
 
     it('PATCH /variables-clinicas/:id actualiza nombre', async () => {
       const res = await request(app.getHttpServer())
         .patch(`/variables-clinicas/${varPAId}`)
         .set(AUTH)
-        .send({ nombre: 'PA sistolica E2E actualizada' })
+        .send({ nombre: `PA sistolica E2E actualizada ${RUN_ID}` })
         .expect(200);
 
       expect(res.body.nombre).toContain('actualizada');
@@ -122,24 +287,29 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
       await request(app.getHttpServer())
         .post('/variables-clinicas')
         .set(AUTH)
-        .send({ codigo: 'BAD', nombre: 'Bad' })
+        .send({ codigo: `BAD_${RUN_ID}`, nombre: 'Bad' })
         .expect(400);
     });
   });
 
-  // ==========================================================
-  // ETAPA 2: Plantillas y campos
-  // ==========================================================
-  describe('ETAPA 2 — Plantillas de ficha', () => {
+  describe('ETAPA 2 - Plantillas de ficha', () => {
     it('POST /plantillas-ficha crea plantilla', async () => {
       const res = await request(app.getHttpServer())
         .post('/plantillas-ficha')
         .set(AUTH)
-        .send({ codigo: 'E2E_PLANTILLA', nombre: 'Plantilla E2E', tipoAtencion: 'CONTROL' })
+        .send({ codigo: PLANTILLA_CODE, nombre: `Plantilla E2E ${RUN_ID}`, tipoAtencion: 'CONTROL' })
         .expect(201);
 
       plantillaId = res.body.id;
       expect(plantillaId).toBeDefined();
+    });
+
+    it('POST /plantillas-ficha rechaza codigo activo duplicado', async () => {
+      await request(app.getHttpServer())
+        .post('/plantillas-ficha')
+        .set(AUTH)
+        .send({ codigo: PLANTILLA_CODE, nombre: 'Plantilla duplicada E2E', tipoAtencion: 'CONTROL' })
+        .expect(400);
     });
 
     it('POST /plantillas-ficha/:id/campos crea campo TEXTO_LIBRE', async () => {
@@ -185,23 +355,8 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
     });
   });
 
-  // ==========================================================
-  // ETAPA 3: Ficha clínica + extracción automática a mediciones
-  // ==========================================================
-  describe('ETAPA 3 — Ficha clinica + extraccion a mediciones', () => {
-    let fichaId: string;
-
-    beforeAll(async () => {
-      if (dataSource?.isInitialized) {
-        const visitas = await dataSource.query(`SELECT v.id, v.paciente_id FROM visitas v WHERE v.deleted_at IS NULL LIMIT 1`);
-        if (visitas.length > 0) {
-          visitaId = visitas[0].id;
-          pacienteId = visitas[0].paciente_id;
-        }
-      }
-    });
-
-    it('existe visita/paciente en la BD', () => {
+  describe('ETAPA 3 - Ficha clinica + extraccion a mediciones', () => {
+    it('existe visita/paciente dedicado en la BD', () => {
       expect(visitaId).toBeDefined();
       expect(pacienteId).toBeDefined();
     });
@@ -223,6 +378,18 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
       expect(res.body.contenido.PA_SIST).toBe(120);
     });
 
+    it('POST /fichas-clinicas rechaza crear segunda ficha activa para la misma visita', async () => {
+      await request(app.getHttpServer())
+        .post('/fichas-clinicas')
+        .set(AUTH)
+        .send({
+          visitaId,
+          plantillaFichaId: plantillaId,
+          contenido: { motivo: 'Duplicada', PA_SIST: 125 },
+        })
+        .expect(409);
+    });
+
     it('mediciones se crearon automaticamente desde el contenido', async () => {
       const res = await request(app.getHttpServer())
         .get(`/mediciones-clinicas?fichaClinicaId=${fichaId}`)
@@ -241,19 +408,17 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
         .set(AUTH)
         .expect(200);
 
-      // motivo es TEXTO_LIBRE = no debe existir como variableClinicaId
-      const motivoMediciones = res.body.find((m: { variableClinicaId: string }) =>
-        m.variableClinicaId === 'motivo',
-      );
+      const motivoMediciones = res.body.find((m: { variableClinicaId: string }) => m.variableClinicaId === 'motivo');
       expect(motivoMediciones).toBeUndefined();
     });
 
     it('PATCH /fichas-clinicas actualiza y re-sincroniza mediciones', async () => {
-      await request(app.getHttpServer())
+      const patchRes = await request(app.getHttpServer())
         .patch(`/fichas-clinicas/${fichaId}`)
         .set(AUTH)
         .send({ contenido: { motivo: 'Actualizado', PA_SIST: 130 } })
         .expect(200);
+      expect(patchRes.body.contenido.PA_SIST).toBe(130);
 
       const res = await request(app.getHttpServer())
         .get(`/mediciones-clinicas?fichaClinicaId=${fichaId}`)
@@ -264,7 +429,20 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
         m.variableClinicaId === varPAId && m.deletedAt === null,
       );
       expect(activas.length).toBeGreaterThanOrEqual(1);
-      expect(Number(activas[0].valorNumero)).toBe(130);
+
+      const activeRows = await dataSource.query(
+        `
+        SELECT valor_numero
+        FROM mediciones_clinicas
+        WHERE ficha_clinica_id = $1
+          AND variable_clinica_id = $2
+          AND origen = 'FICHA'
+          AND deleted_at IS NULL
+        `,
+        [fichaId, varPAId],
+      );
+      expect(activeRows).toHaveLength(1);
+      expect(Number(activeRows[0].valor_numero)).toBe(130);
     });
 
     it('PATCH /fichas-clinicas/:id/cerrar cierra la ficha', async () => {
@@ -284,10 +462,7 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
     });
   });
 
-  // ==========================================================
-  // ETAPA 4: Mediciones manuales
-  // ==========================================================
-  describe('ETAPA 4 — Mediciones manuales', () => {
+  describe('ETAPA 4 - Mediciones manuales', () => {
     it('POST /mediciones-clinicas crea medicion manual', async () => {
       const res = await request(app.getHttpServer())
         .post('/mediciones-clinicas')
@@ -309,15 +484,13 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
     });
   });
 
-  // ==========================================================
-  // ETAPA 5: Soft delete
-  // ==========================================================
-  describe('ETAPA 5 — Soft delete en variables', () => {
-    it('DELETE soft-deletea y luego da 404', async () => {
+  describe('ETAPA 5 - Soft delete en variables', () => {
+    it('DELETE soft-deletea y permite reutilizar el codigo', async () => {
       const tempV = await request(app.getHttpServer())
         .post('/variables-clinicas')
         .set(AUTH)
-        .send({ codigo: 'DEL_E2E', nombre: 'To delete E2E', tipoDato: 'TEXTO' });
+        .send({ codigo: DEL_CODE, nombre: `To delete E2E ${RUN_ID}`, tipoDato: 'TEXTO' })
+        .expect(201);
 
       const id = tempV.body.id;
 
@@ -330,13 +503,18 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
         .get(`/variables-clinicas/${id}`)
         .set(AUTH)
         .expect(404);
+
+      const recreated = await request(app.getHttpServer())
+        .post('/variables-clinicas')
+        .set(AUTH)
+        .send({ codigo: DEL_CODE, nombre: `Recreated E2E ${RUN_ID}`, tipoDato: 'TEXTO' })
+        .expect(201);
+
+      expect(recreated.body.codigo).toBe(DEL_CODE);
     });
   });
 
-  // ==========================================================
-  // ETAPA 6: RBAC
-  // ==========================================================
-  describe('ETAPA 6 — RBAC', () => {
+  describe('ETAPA 6 - RBAC', () => {
     it('PROFESIONAL no puede DELETE variables (403)', async () => {
       await request(app.getHttpServer())
         .delete(`/variables-clinicas/${varPAId}`)
@@ -351,4 +529,3 @@ describe('Ficha Clinica — E2E (modelo hibrido)', () => {
     });
   });
 });
-
