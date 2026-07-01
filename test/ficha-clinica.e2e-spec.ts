@@ -1,5 +1,6 @@
 // Forzar PostgreSQL — NODE_ENV=test activa SQLite en AppModule
 process.env.NODE_ENV = 'e2e';
+process.env.AUTH_MODE = 'mock';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';

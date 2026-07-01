@@ -45,12 +45,13 @@ describe('Google Calendar and calendar routes (e2e)', () => {
     findGoogleCalendarLogs: jest.fn(async () => []),
     retryPendingGoogleCalendarSync: jest.fn(async () => ({ attempted: 1, synced: 1, failed: 0 })),
     findOne: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
+    create: jest.fn(async (dto: Record<string, unknown>) => ({ id: randomUUID(), ...dto, estado: 'PROGRAMADA' })),
+    update: jest.fn(async (id: string, dto: Record<string, unknown>) => ({ id, ...dto })),
     resyncGoogleCalendar: jest.fn(async (id: string) => ({ id, googleCalendarSyncStatus: 'SYNCED' })),
-    cambiarEstado: jest.fn(),
-    cancelar: jest.fn(),
-    remove: jest.fn(),
+    cambiarEstado: jest.fn(async (id: string, dto: Record<string, unknown>) => ({ id, ...dto })),
+    completar: jest.fn(async (id: string, dto: Record<string, unknown>) => ({ id, estado: 'REALIZADA', ...dto })),
+    cancelar: jest.fn(async (id: string, dto: Record<string, unknown>) => ({ id, estado: 'CANCELADA', ...dto })),
+    remove: jest.fn(async (id: string) => ({ id, deletedAt: new Date().toISOString() })),
   };
 
   beforeEach(async () => {
@@ -136,6 +137,85 @@ describe('Google Calendar and calendar routes (e2e)', () => {
       expect.objectContaining({ desde: '2026-07-01', hasta: '2026-07-31' }),
       expect.objectContaining({ rol: 'PROFESIONAL' }),
     );
+  });
+
+  it('allows coordinators to create visits and passes the authenticated user id', async () => {
+    const payload = {
+      pacienteId: randomUUID(),
+      profesionalSaludId: randomUUID(),
+      zonaId: randomUUID(),
+      fechaProgramada: '2026-07-01',
+      horaProgramada: '09:00',
+      duracionEstimadaMin: 60,
+      prioridad: 'NORMAL',
+    };
+
+    await request(app.getHttpServer())
+      .post('/visitas')
+      .set('x-mock-role', 'COORDINADOR')
+      .send(payload)
+      .expect(201)
+      .expect(response => {
+        expect(response.body).toEqual(expect.objectContaining(payload));
+      });
+
+    expect(visitasService.create).toHaveBeenCalledWith(payload, expect.any(String));
+  });
+
+  it('blocks professionals from creating visits', async () => {
+    await request(app.getHttpServer())
+      .post('/visitas')
+      .set('x-mock-role', 'PROFESIONAL')
+      .send({
+        pacienteId: randomUUID(),
+        profesionalSaludId: randomUUID(),
+        fechaProgramada: '2026-07-01',
+        horaProgramada: '09:00',
+      })
+      .expect(403);
+
+    expect(visitasService.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed visit creation payload before reaching service', async () => {
+    await request(app.getHttpServer())
+      .post('/visitas')
+      .set('x-mock-role', 'COORDINADOR')
+      .send({
+        pacienteId: 'not-a-uuid',
+        profesionalSaludId: randomUUID(),
+        fechaProgramada: '2026-07-01',
+        horaProgramada: '25:99',
+      })
+      .expect(400);
+
+    expect(visitasService.create).not.toHaveBeenCalled();
+  });
+
+  it('allows coordinators to reschedule visits through PATCH', async () => {
+    const visitaId = randomUUID();
+    const dto = { fechaProgramada: '2026-07-02', horaProgramada: '11:30' };
+
+    await request(app.getHttpServer())
+      .patch(`/visitas/${visitaId}`)
+      .set('x-mock-role', 'COORDINADOR')
+      .send(dto)
+      .expect(200)
+      .expect(response => {
+        expect(response.body).toEqual(expect.objectContaining({ id: visitaId, ...dto }));
+      });
+
+    expect(visitasService.update).toHaveBeenCalledWith(visitaId, dto, expect.any(String));
+  });
+
+  it('blocks supervisors from canceling visits', async () => {
+    await request(app.getHttpServer())
+      .patch(`/visitas/${randomUUID()}/cancelar`)
+      .set('x-mock-role', 'SUPERVISOR')
+      .send({ observacionCancelacion: 'No corresponde' })
+      .expect(403);
+
+    expect(visitasService.cancelar).not.toHaveBeenCalled();
   });
 
   it('allows coordinators to retry Google Calendar sync for a visit', async () => {
