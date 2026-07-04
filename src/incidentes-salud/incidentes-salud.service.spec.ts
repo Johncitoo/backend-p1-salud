@@ -5,6 +5,8 @@ import { IsNull, Repository } from 'typeorm';
 import { IncidenteSalud } from './entities/incidente-salud.entity';
 import { IncidentesSaludService } from './incidentes-salud.service';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { CrmService } from '../integrations/crm/crm.service';
+import { PacientesService } from '../pacientes/pacientes.service';
 
 type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
 
@@ -28,6 +30,19 @@ describe('IncidentesSaludService', () => {
         IncidentesSaludService,
         { provide: getRepositoryToken(IncidenteSalud), useValue: repository },
         { provide: AuditoriasService, useValue: { registrar: jest.fn() } },
+        { 
+          provide: CrmService, 
+          useValue: { 
+            buildPayloadFromIncidente: jest.fn().mockReturnValue({}), 
+            crearTicket: jest.fn().mockResolvedValue({}) 
+          } 
+        },
+        { 
+          provide: PacientesService, 
+          useValue: { 
+            findOne: jest.fn().mockResolvedValue({ id: 'p-2222', nombres: 'Test' }) 
+          } 
+        },
       ],
     }).compile();
     service = module.get<IncidentesSaludService>(IncidentesSaludService);
