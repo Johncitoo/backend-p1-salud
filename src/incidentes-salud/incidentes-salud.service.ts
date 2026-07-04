@@ -1,17 +1,23 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { CrmService } from '../integrations/crm/crm.service';
+import { PacientesService } from '../pacientes/pacientes.service';
 import { CreateIncidenteSaludDto } from './dto/create-incidente-salud.dto';
 import { UpdateIncidenteSaludDto } from './dto/update-incidente-salud.dto';
 import { IncidenteSalud } from './entities/incidente-salud.entity';
 
 @Injectable()
 export class IncidentesSaludService {
+  private readonly logger = new Logger(IncidentesSaludService.name);
+
   constructor(
     @InjectRepository(IncidenteSalud)
     private readonly repository: Repository<IncidenteSalud>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly crmService: CrmService,
+    private readonly pacientesService: PacientesService,
   ) {}
 
   async findAll(filtros?: {
@@ -66,6 +72,20 @@ export class IncidentesSaludService {
       accion: 'CREAR',
       detalle: `Incidente ${saved.tipo} - ${saved.titulo} creado (severidad: ${saved.severidad})`,
     });
+
+    // Crear ticket en CRM de forma asíncrona (fire and forget)
+    try {
+      let paciente = null;
+      if (saved.pacienteId) {
+        paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
+      }
+      const crmPayload = this.crmService.buildPayloadFromIncidente(saved, paciente);
+      this.crmService.crearTicket(crmPayload).catch(err => {
+        this.logger.error(`Error en promesa de CRM: ${err.message}`);
+      });
+    } catch (err: any) {
+      this.logger.error(`Error preparando ticket CRM: ${err.message}`);
+    }
 
     return saved;
   }
