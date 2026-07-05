@@ -240,5 +240,44 @@ export class IoTService {
       this.logger.error(`Error procesando alerta webhook: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  // =========================================================
+  // Gestión local de dispositivos
+  // =========================================================
+
+  async getSensorsByPatient(pacienteId: string): Promise<PacienteSensor[]> {
+    return this.pacienteSensorRepo.find({
+      where: { pacienteId, isActive: true },
+      order: { createdAt: 'DESC' }
+    });
+  }
+
+  async assignSensorToPatient(
+    pacienteId: string,
+    assetId: string,
+    sensorId: string,
+    sensorType: SensorType
+  ): Promise<PacienteSensor> {
+    // Buscar si ya existe la vinculación exacta inactiva y reactivarla, o crear nueva
+    let sensor = await this.pacienteSensorRepo.findOne({
+      where: { assetId, sensorId }
+    });
+
+    if (sensor) {
+      sensor.pacienteId = pacienteId;
+      sensor.sensorType = sensorType;
+      sensor.isActive = true;
+    } else {
+      sensor = this.pacienteSensorRepo.create({
+        pacienteId,
+        assetId,
+        sensorId,
+        sensorType,
+        isActive: true,
+      });
+    }
+
+    return this.pacienteSensorRepo.save(sensor);
+  }
 }
 
