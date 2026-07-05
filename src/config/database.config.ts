@@ -15,7 +15,7 @@ export const getDatabaseConfig = (
     type: 'postgres',
     url: databaseUrl,
     autoLoadEntities: true,
-    synchronize: false,
+    synchronize: true, // Habilitado temporalmente para sincronizar las nuevas columnas del CRM y Calendar
     ssl: sslEnabled ? { rejectUnauthorized: false } : undefined,
   };
 };
