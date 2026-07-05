@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { DevAuthGuard } from '../../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -43,5 +43,26 @@ export class IoTController {
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
   getAlertsBySensor(@Param('sensorId') sensorId: string) {
     return this.iotService.getAlertsBySensor(sensorId);
+  }
+
+  // =========================================================
+  // Gestión de Dispositivos Locales
+  // =========================================================
+
+  @Get('paciente-sensores/:pacienteId')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  getSensorsByPatient(@Param('pacienteId') pacienteId: string) {
+    return this.iotService.getSensorsByPatient(pacienteId);
+  }
+
+  @Post('paciente-sensores')
+  @Roles('ADMIN', 'COORDINADOR')
+  assignSensorToPatient(
+    @Body('pacienteId') pacienteId: string,
+    @Body('assetId') assetId: string,
+    @Body('sensorId') sensorId: string,
+    @Body('sensorType') sensorType: any
+  ) {
+    return this.iotService.assignSensorToPatient(pacienteId, assetId, sensorId, sensorType);
   }
 }
