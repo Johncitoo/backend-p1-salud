@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
 
 export class CreateProfesionalDto {
   @IsUUID()
@@ -16,4 +16,14 @@ export class CreateProfesionalDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  especialidadIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  zonaIds?: string[];
 }

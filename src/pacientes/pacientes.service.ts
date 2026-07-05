@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
+import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
 import { CreatePacienteDto } from './dto/create-paciente.dto';
 import { UpdatePacienteDto } from './dto/update-paciente.dto';
 import { Paciente } from './entities/paciente.entity';
@@ -32,6 +34,8 @@ export class PacientesService {
     @InjectRepository(Visita)
     private readonly visitasRepository: Repository<Visita>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly analyticsService: AnalyticsService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
 
   async findAll(): Promise<Paciente[]> {
@@ -55,7 +59,16 @@ export class PacientesService {
 
   async create(dto: CreatePacienteDto): Promise<Paciente> {
     const paciente = this.pacientesRepository.create(dto as any);
-    const saved = await this.pacientesRepository.save(paciente);
+
+    let saved: Paciente | Paciente[];
+    try {
+      saved = await this.pacientesRepository.save(paciente);
+    } catch (error) {
+      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+        throw new ConflictException(`El RUT ${dto.rut} ya está registrado.`);
+      }
+      throw error;
+    }
     const result = Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
     this.auditoriasService.registrar({
       entidad: 'pacientes',
@@ -63,6 +76,10 @@ export class PacientesService {
       accion: 'CREAR',
       detalle: `Paciente ${result.nombres} ${result.apellidos} creado`,
     });
+
+    await this.analyticsService.sendPacienteUpsertEvent(result);
+    await this.notificacionesService.notificarPacienteCreado(result);
+
     return result;
   }
 
@@ -70,7 +87,16 @@ export class PacientesService {
     const paciente = await this.findOne(id);
     const oldValues = { nombres: paciente.nombres, apellidos: paciente.apellidos, rut: paciente.rut };
     Object.assign(paciente, dto);
-    const saved = await this.pacientesRepository.save(paciente);
+
+    let saved: Paciente | Paciente[];
+    try {
+      saved = await this.pacientesRepository.save(paciente);
+    } catch (error) {
+      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+        throw new ConflictException(`El RUT ${dto.rut || paciente.rut} ya está registrado por otro paciente.`);
+      }
+      throw error;
+    }
     const result = Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
     this.auditoriasService.registrar({
       entidad: 'pacientes',
@@ -80,6 +106,9 @@ export class PacientesService {
       oldValues,
       newValues: { nombres: result.nombres, apellidos: result.apellidos, rut: result.rut },
     });
+
+    await this.analyticsService.sendPacienteUpsertEvent(result);
+
     return result;
   }
 

@@ -26,19 +26,19 @@ export class PlantillasFichaController {
   }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   create(@Body() dto: CreatePlantillaFichaDto) {
     return this.service.create(dto);
   }
 
   @Patch(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   update(@Param('id') id: string, @Body() dto: UpdatePlantillaFichaDto) {
     return this.service.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
   }
@@ -52,19 +52,19 @@ export class PlantillasFichaController {
   }
 
   @Post(':id/campos')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   createCampo(@Param('id') id: string, @Body() dto: CreatePlantillaFichaCampoDto) {
     return this.service.createCampo({ ...dto, plantillaFichaId: id });
   }
 
   @Patch('campos/:id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   updateCampo(@Param('id') id: string, @Body() dto: UpdatePlantillaFichaCampoDto) {
     return this.service.updateCampo(id, dto);
   }
 
   @Delete('campos/:id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   removeCampo(@Param('id') id: string) {
     return this.service.removeCampo(id);
   }

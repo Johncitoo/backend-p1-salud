@@ -12,6 +12,7 @@ import { DireccionPaciente } from '../src/pacientes/entities/direccion-paciente.
 import { ContactoPaciente } from '../src/pacientes/entities/contacto-paciente.entity';
 import { PlanCuidado } from '../src/pacientes/entities/plan-cuidado.entity';
 import { Visita } from '../src/pacientes/entities/visita.entity';
+import { Auditoria } from '../src/auditorias/entities/auditoria.entity';
 
 describe('Pacientes (e2e)', () => {
   let app: INestApplication;
@@ -32,7 +33,7 @@ describe('Pacientes (e2e)', () => {
           username: process.env.TEST_DB_USER ?? 'admin',
           password: process.env.TEST_DB_PASSWORD ?? 'admin123',
           database: process.env.TEST_DB_NAME ?? 'salud_db',
-          entities: [Paciente, DireccionPaciente, ContactoPaciente, PlanCuidado, Visita, Usuario, Rol],
+          entities: [Paciente, DireccionPaciente, ContactoPaciente, PlanCuidado, Visita, Usuario, Rol, Auditoria],
           synchronize: false,
         }),
         PacientesModule,

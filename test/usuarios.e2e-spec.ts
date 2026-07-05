@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { Rol } from '../src/usuarios/entities/rol.entity';
 import { Usuario } from '../src/usuarios/entities/usuario.entity';
 import { UsuariosModule } from '../src/usuarios/usuarios.module';
+import { Auditoria } from '../src/auditorias/entities/auditoria.entity';
 
 describe('Usuarios (e2e)', () => {
   let app: INestApplication;
@@ -32,7 +33,7 @@ describe('Usuarios (e2e)', () => {
           username: process.env.TEST_DB_USER ?? 'admin',
           password: process.env.TEST_DB_PASSWORD ?? 'admin123',
           database: process.env.TEST_DB_NAME ?? 'salud_db',
-          entities: [Usuario, Rol],
+          entities: [Usuario, Rol, Auditoria],
           synchronize: false,
         }),
         UsuariosModule,

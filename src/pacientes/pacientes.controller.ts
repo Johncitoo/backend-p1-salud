@@ -9,9 +9,12 @@ import {
   ParseUUIDPipe,
   UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import type { UsuarioPerfil } from '../usuarios/usuarios.service';
+import { VisitasService } from '../visitas/visitas.service';
 import { CreatePacienteDto } from './dto/create-paciente.dto';
 import { UpdatePacienteDto } from './dto/update-paciente.dto';
 import { PacientesService } from './pacientes.service';
@@ -27,7 +30,10 @@ import { UpdateVisitaDto } from './dto/update-visita.dto';
 @Controller('pacientes')
 @UseGuards(DevAuthGuard, RolesGuard)
 export class PacientesController {
-  constructor(private readonly pacientesService: PacientesService) {}
+  constructor(
+    private readonly pacientesService: PacientesService,
+    private readonly visitasService: VisitasService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
@@ -42,19 +48,19 @@ export class PacientesController {
   }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   create(@Body() dto: CreatePacienteDto) {
     return this.pacientesService.create(dto);
   }
 
   @Patch(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   update(@Param('id') id: string, @Body() dto: UpdatePacienteDto) {
     return this.pacientesService.update(id, dto);
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   remove(@Param('id') id: string) {
     return this.pacientesService.remove(id);
   }
@@ -67,7 +73,7 @@ export class PacientesController {
   }
 
   @Post(':pacienteId/direcciones')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   createDireccion(
     @Param('pacienteId', ParseUUIDPipe) pacienteId: string,
     @Body() dto: CreateDireccionDto,
@@ -77,13 +83,13 @@ export class PacientesController {
   }
 
   @Patch('direcciones/:id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   updateDireccion(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateDireccionDto) {
     return this.pacientesService.updateDireccion(id, dto);
   }
 
   @Delete('direcciones/:id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   removeDireccion(@Param('id', ParseUUIDPipe) id: string) {
     return this.pacientesService.removeDireccion(id);
   }
@@ -96,20 +102,20 @@ export class PacientesController {
   }
 
   @Post(':pacienteId/contactos')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   createContacto(@Param('pacienteId', ParseUUIDPipe) pacienteId: string, @Body() dto: CreateContactoDto) {
     dto.pacienteId = pacienteId;
     return this.pacientesService.createContacto(dto);
   }
 
   @Patch('contactos/:id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   updateContacto(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateContactoDto) {
     return this.pacientesService.updateContacto(id, dto);
   }
 
   @Delete('contactos/:id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   removeContacto(@Param('id', ParseUUIDPipe) id: string) {
     return this.pacientesService.removeContacto(id);
   }
@@ -122,20 +128,20 @@ export class PacientesController {
   }
 
   @Post(':pacienteId/planes')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   createPlan(@Param('pacienteId', ParseUUIDPipe) pacienteId: string, @Body() dto: CreatePlanDto) {
     dto.pacienteId = pacienteId;
     return this.pacientesService.createPlan(dto);
   }
 
   @Patch('planes/:id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR')
   updatePlan(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePlanDto) {
     return this.pacientesService.updatePlan(id, dto);
   }
 
   @Delete('planes/:id')
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN')
   removePlan(@Param('id', ParseUUIDPipe) id: string) {
     return this.pacientesService.removePlan(id);
   }
@@ -144,25 +150,38 @@ export class PacientesController {
   @Get(':pacienteId/visitas')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
   findVisitas(@Param('pacienteId', ParseUUIDPipe) pacienteId: string) {
-    return this.pacientesService.findVisitas(pacienteId);
+    return this.visitasService.findByPaciente(pacienteId);
   }
 
   @Post(':pacienteId/visitas')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
-  createVisita(@Param('pacienteId', ParseUUIDPipe) pacienteId: string, @Body() dto: CreateVisitaDto) {
+  @Roles('ADMIN', 'COORDINADOR')
+  createVisita(
+    @Param('pacienteId', ParseUUIDPipe) pacienteId: string,
+    @Body() dto: CreateVisitaDto,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     dto.pacienteId = pacienteId;
-    return this.pacientesService.createVisita(dto);
+    return this.visitasService.create(dto, toUuidOrUndefined(user?.id));
   }
 
   @Patch('visitas/:id')
-  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
-  updateVisita(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateVisitaDto) {
-    return this.pacientesService.updateVisita(id, dto);
+  @Roles('ADMIN', 'COORDINADOR')
+  updateVisita(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateVisitaDto,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
+    return this.visitasService.update(id, dto, toUuidOrUndefined(user?.id));
   }
 
   @Delete('visitas/:id')
-  @Roles('ADMIN', 'SUPERVISOR')
-  removeVisita(@Param('id', ParseUUIDPipe) id: string) {
-    return this.pacientesService.removeVisita(id);
+  @Roles('ADMIN')
+  removeVisita(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.visitasService.remove(id, toUuidOrUndefined(user?.id));
   }
 }
+
+const toUuidOrUndefined = (value?: string) =>
+  value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : undefined;

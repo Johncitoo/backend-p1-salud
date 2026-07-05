@@ -19,6 +19,20 @@ export class PlantillasFichaService {
     private readonly auditoriasService: AuditoriasService,
   ) {}
 
+  private isSelectableField(tipoCampo: string) {
+    return tipoCampo === 'SELECT' || tipoCampo === 'MULTISELECT';
+  }
+
+  private hasValidOptions(opciones?: Record<string, unknown> | null) {
+    return Object.values(opciones ?? {}).some(option => String(option ?? '').trim().length > 0);
+  }
+
+  private validateSelectableOptions(tipoCampo: string, opciones?: Record<string, unknown> | null) {
+    if (this.isSelectableField(tipoCampo) && !this.hasValidOptions(opciones)) {
+      throw new BadRequestException('Los campos SELECT y MULTISELECT deben tener al menos una opcion');
+    }
+  }
+
   // ---- plantillas ----
 
   async findAll() {
@@ -38,6 +52,13 @@ export class PlantillasFichaService {
   }
 
   async create(dto: CreatePlantillaFichaDto) {
+    const existente = await this.plantillasRepo.findOne({
+      where: { codigo: dto.codigo, deletedAt: IsNull() },
+    });
+    if (existente) {
+      throw new BadRequestException(`Ya existe una plantilla con el codigo ${dto.codigo}`);
+    }
+
     const plantilla = this.plantillasRepo.create({
       codigo: dto.codigo,
       nombre: dto.nombre,
@@ -91,6 +112,7 @@ export class PlantillasFichaService {
       if (!dto.variableClinicaId) throw new BadRequestException('variableClinicaId es obligatorio cuando tipoCampo = VARIABLE_CLINICA');
       await this.variablesClinicasService.findOne(dto.variableClinicaId);
     }
+    this.validateSelectableOptions(dto.tipoCampo, dto.opciones);
 
     // no duplicados en la misma plantilla
     const existente = await this.camposRepo.findOne({
@@ -115,15 +137,17 @@ export class PlantillasFichaService {
 
   async updateCampo(id: string, dto: UpdatePlantillaFichaCampoDto) {
     const campo = await this.findCampo(id);
+    const tipoEfectivo = dto.tipoCampo ?? campo.tipoCampo;
+    const opcionesEfectivas = dto.opciones !== undefined ? dto.opciones : campo.opciones;
 
     if (dto.tipoCampo) {
-      const tipoEfectivo = dto.tipoCampo;
       const variableId = dto.variableClinicaId !== undefined ? dto.variableClinicaId : campo.variableClinicaId;
       if (tipoEfectivo === 'VARIABLE_CLINICA' && !variableId) {
         throw new BadRequestException('variableClinicaId es obligatorio cuando tipoCampo = VARIABLE_CLINICA');
       }
       if (variableId) await this.variablesClinicasService.findOne(variableId);
     }
+    this.validateSelectableOptions(tipoEfectivo, opcionesEfectivas);
 
     if (dto.codigoCampo && dto.codigoCampo !== campo.codigoCampo) {
       const existente = await this.camposRepo.findOne({

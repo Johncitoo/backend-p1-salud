@@ -28,6 +28,7 @@ const createUsuariosService = (user: UsuarioPerfil | null = usuarioPerfil) =>
   ({
     findProfileByIdentityUserId: jest.fn().mockResolvedValue(user),
     linkIdentityUserIdByEmail: jest.fn().mockResolvedValue(user),
+    findOrCreateFromKeycloak: jest.fn().mockResolvedValue(user),
   }) as unknown as UsuariosService;
 
 const createContext = (headers: Record<string, string | undefined> = {}) => {
@@ -120,10 +121,12 @@ describe('DevAuthGuard', () => {
     );
   });
 
-  it('validates a Keycloak token and resolves the local profile by JWT sub', async () => {
+  it('validates a Keycloak token and resolves user via findOrCreateFromKeycloak', async () => {
     jest.mocked(jwtVerify).mockResolvedValue({
       payload: {
         sub: usuarioPerfil.identityUserId,
+        email: usuarioPerfil.email,
+        resource_access: { p1: { roles: ['professional'] } },
       },
       protectedHeader: { alg: 'RS256' },
       key: new Uint8Array(),
@@ -136,7 +139,7 @@ describe('DevAuthGuard', () => {
         KEYCLOAK_ISSUER: 'http://localhost/realms/sistema-centralizado',
         KEYCLOAK_JWKS_URI:
           'http://localhost/realms/sistema-centralizado/protocol/openid-connect/certs',
-        KEYCLOAK_AUDIENCE: 'salud-domiciliaria-api',
+        KEYCLOAK_AUDIENCE: 'p1',
         KEYCLOAK_VALIDATE_AUDIENCE: 'false',
       }),
       usuariosService,
@@ -147,42 +150,37 @@ describe('DevAuthGuard', () => {
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
 
-    expect(createRemoteJWKSet).toHaveBeenCalledWith(
-      new URL(
-        'http://localhost/realms/sistema-centralizado/protocol/openid-connect/certs',
-      ),
+    expect(usuariosService.findOrCreateFromKeycloak).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: usuarioPerfil.identityUserId,
+        email: usuarioPerfil.email,
+        rol: 'PROFESIONAL',
+      }),
     );
-    expect(jwtVerify).toHaveBeenCalledWith('access-token', 'remote-jwks', {
-      issuer: 'http://localhost/realms/sistema-centralizado',
-      audience: undefined,
-    });
-    expect(usuariosService.findProfileByIdentityUserId).toHaveBeenCalledWith(
-      usuarioPerfil.identityUserId,
+    expect(request.user).toEqual(
+      expect.objectContaining({ rol: 'PROFESIONAL' }),
     );
-    expect(request.user).toEqual(usuarioPerfil);
   });
 
-  it('links a local user by email when JWT sub is not stored yet', async () => {
+  it('maps coordinator JWT role to COORDINADOR', async () => {
     jest.mocked(jwtVerify).mockResolvedValue({
       payload: {
         sub: usuarioPerfil.identityUserId,
         email: usuarioPerfil.email,
+        resource_access: { p1: { roles: ['coordinator'] } },
       },
       protectedHeader: { alg: 'RS256' },
       key: new Uint8Array(),
     } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
 
-    const usuariosService = createUsuariosService(null);
-    jest
-      .mocked(usuariosService.linkIdentityUserIdByEmail)
-      .mockResolvedValue(usuarioPerfil);
-
+    const usuariosService = createUsuariosService();
     const guard = new DevAuthGuard(
       createConfigService({
         AUTH_MODE: 'keycloak',
         KEYCLOAK_ISSUER: 'http://localhost/realms/sistema-centralizado',
         KEYCLOAK_JWKS_URI:
           'http://localhost/realms/sistema-centralizado/protocol/openid-connect/certs',
+        KEYCLOAK_AUDIENCE: 'p1',
       }),
       usuariosService,
     );
@@ -191,12 +189,9 @@ describe('DevAuthGuard', () => {
     });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
-
-    expect(usuariosService.linkIdentityUserIdByEmail).toHaveBeenCalledWith(
-      usuarioPerfil.email,
-      usuarioPerfil.identityUserId,
+    expect(request.user).toEqual(
+      expect.objectContaining({ rol: 'COORDINADOR' }),
     );
-    expect(request.user).toEqual(usuarioPerfil);
   });
 
   it('rejects a valid Keycloak token without sub', async () => {

@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -77,6 +77,7 @@ describe('VariablesClinicasService', () => {
   describe('create', () => {
     it('creates variable with defaults', async () => {
       const dto: CreateVariableClinicaDto = { codigo: 'peso', nombre: 'Peso', tipoDato: 'NUMERO' };
+      (repo.findOne as jest.Mock).mockResolvedValue(null);
       (repo.create as jest.Mock).mockReturnValue({ id: '1', ...dto, activa: true });
       (repo.save as jest.Mock).mockResolvedValue({ id: '1', ...dto, activa: true });
 
@@ -86,6 +87,26 @@ describe('VariablesClinicasService', () => {
       expect(auditorias.registrar).toHaveBeenCalledWith(
         expect.objectContaining({ entidad: 'variables_clinicas', accion: 'CREAR' }),
       );
+    });
+
+    it('rejects an active duplicate codigo with BadRequestException', async () => {
+      const dto: CreateVariableClinicaDto = { codigo: 'peso', nombre: 'Peso', tipoDato: 'NUMERO' };
+      (repo.findOne as jest.Mock).mockResolvedValue({ id: 'existing', codigo: dto.codigo, deletedAt: null });
+
+      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows reusing a codigo when no active row exists', async () => {
+      const dto: CreateVariableClinicaDto = { codigo: 'peso', nombre: 'Peso nueva', tipoDato: 'NUMERO' };
+      (repo.findOne as jest.Mock).mockResolvedValue(null);
+      (repo.create as jest.Mock).mockReturnValue({ id: 'new-id', ...dto, activa: true });
+      (repo.save as jest.Mock).mockResolvedValue({ id: 'new-id', ...dto, activa: true });
+
+      await expect(service.create(dto)).resolves.toEqual(expect.objectContaining({ id: 'new-id' }));
+      expect(repo.findOne).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ codigo: dto.codigo }),
+      }));
     });
   });
 

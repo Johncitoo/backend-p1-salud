@@ -34,13 +34,13 @@ export class FichasClinicasController {
   }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   create(@Body() dto: CreateFichaClinicaDto, @CurrentUser() user?: UsuarioPerfil) {
     return this.service.create(dto, toUuidOrUndefined(user?.id));
   }
 
   @Patch(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateFichaClinicaDto,
@@ -52,14 +52,14 @@ export class FichasClinicasController {
   }
 
   @Patch(':id/cerrar')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   cerrar(@Param('id') id: string, @CurrentUser() user?: UsuarioPerfil) {
     return this.service.cerrar(id, toUuidOrUndefined(user?.id));
   }
 
   @Delete(':id')
-  @Roles('ADMIN', 'SUPERVISOR')
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  @Roles('ADMIN')
+  remove(@Param('id') id: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.service.remove(id, toUuidOrUndefined(user?.id));
   }
 }

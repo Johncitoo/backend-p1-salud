@@ -139,7 +139,7 @@ describe('HTTP routes (e2e)', () => {
 
     await request(app.getHttpServer())
       .delete(`/zonas/${id}`)
-      .set('x-mock-role', 'SUPERVISOR')
+      .set('x-mock-role', 'ADMIN')
       .expect(200)
       .expect(response => {
         expect(response.body).toEqual(expect.objectContaining({ id, deletedAt: expect.any(String) }));

@@ -1,8 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { OptimisticLockVersionMismatchError } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { PlantillasFichaService } from '../plantillas-ficha/plantillas-ficha.service';
 import { VariablesClinicasService } from '../variables-clinicas/variables-clinicas.service';
 import { CreateFichaClinicaDto, UpdateFichaClinicaDto } from './dto/create-ficha-clinica.dto';
@@ -19,7 +20,23 @@ export class FichasClinicasService {
     private readonly plantillasService: PlantillasFichaService,
     private readonly variablesService: VariablesClinicasService,
     private readonly auditoriasService: AuditoriasService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
+
+  // Cuenta adjuntos activos de la ficha y emite el evento ficha_upsert a Analítica.
+  // Usa query nativo sobre documentos_adjuntos para no acoplar al módulo de adjuntos.
+  private async emitirFichaUpsert(ficha: FichaClinica): Promise<void> {
+    const result = await this.fichasRepo.manager
+      .createQueryBuilder()
+      .select('COUNT(*)', 'count')
+      .from('documentos_adjuntos', 'da')
+      .where('da.ficha_clinica_id = :fichaId', { fichaId: ficha.id })
+      .andWhere('da.deleted_at IS NULL')
+      .getRawOne<{ count: string }>();
+
+    const adjuntosCount = Number(result?.count ?? 0);
+    await this.analyticsService.sendFichaUpsertEvent(ficha, adjuntosCount);
+  }
 
   async findAll(filtros?: { visitaId?: string; pacienteId?: string; estado?: string }) {
     const qb = this.fichasRepo.createQueryBuilder('fc').where('fc.deleted_at IS NULL');
@@ -49,13 +66,34 @@ export class FichasClinicasService {
       creadaPorUsuarioId: usuarioId ?? null,
     });
 
-    const saved = await this.fichasRepo.save(ficha);
-    this.auditoriasService.registrar({ entidad: 'fichas_clinicas', entidadId: saved.id, accion: 'CREAR', detalle: 'Ficha clínica creada' });
+    let saved: FichaClinica;
+    try {
+      saved = await this.fichasRepo.save(ficha);
+    } catch (error) {
+      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+        const detail = (error as any).detail ?? '';
+        if (detail.includes('visita_id')) {
+          throw new ConflictException('La visita seleccionada ya tiene una ficha clínica asociada.');
+        }
+      }
+      throw error;
+    }
+
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'fichas_clinicas',
+      entidadId: saved.id,
+      accion: 'CREAR',
+      detalle: 'Ficha clínica creada',
+      newValues: this.auditFichaValues(saved),
+    });
 
     // Extraer mediciones si hay plantilla asociada
     if (dto.plantillaFichaId) {
       await this.syncMediciones(saved);
     }
+
+    await this.emitirFichaUpsert(saved);
 
     return saved;
   }
@@ -74,17 +112,37 @@ export class FichasClinicasService {
       await this.plantillasService.findOne(dto.plantillaFichaId);
     }
 
+    const oldValues = this.auditFichaValues(ficha);
     const oldEstado = ficha.estado;
-    Object.assign(ficha, dto);
+
+    if (dto.estado !== undefined) ficha.estado = dto.estado;
+    if (dto.plantillaFichaId !== undefined) ficha.plantillaFichaId = dto.plantillaFichaId;
+    if (dto.contenido !== undefined) ficha.contenido = dto.contenido;
     if (usuarioId) ficha.actualizadaPorUsuarioId = usuarioId;
+    const shouldSyncMediciones = dto.contenido !== undefined || dto.plantillaFichaId !== undefined;
+    const plantillaFichaIdForSync = ficha.plantillaFichaId ?? null;
 
     try {
       const saved = await this.fichasRepo.save(ficha);
-      this.auditoriasService.registrar({ entidad: 'fichas_clinicas', entidadId: saved.id, accion: 'ACTUALIZAR', detalle: `Ficha actualizada (${oldEstado} → ${saved.estado})` });
+      this.auditoriasService.registrar({
+        usuarioId,
+        entidad: 'fichas_clinicas',
+        entidadId: saved.id,
+        accion: 'ACTUALIZAR',
+        detalle: `Ficha actualizada (${oldEstado} → ${saved.estado})`,
+        oldValues,
+        newValues: this.auditFichaValues(saved),
+      });
 
-      if (dto.contenido || dto.plantillaFichaId) {
-        await this.syncMediciones(saved);
+      if (shouldSyncMediciones) {
+        await this.syncMediciones({
+          ...saved,
+          plantillaFichaId: saved.plantillaFichaId ?? plantillaFichaIdForSync,
+          contenido: saved.contenido ?? ficha.contenido,
+        });
       }
+
+      await this.emitirFichaUpsert(saved);
 
       return saved;
     } catch (error) {
@@ -100,18 +158,39 @@ export class FichasClinicasService {
   async cerrar(id: string, usuarioId?: string) {
     const ficha = await this.findOne(id);
     if (ficha.estado === 'CERRADA') throw new BadRequestException('La ficha ya está cerrada');
+    const oldValues = this.auditFichaValues(ficha);
     ficha.estado = 'CERRADA';
     if (usuarioId) ficha.actualizadaPorUsuarioId = usuarioId;
     const saved = await this.fichasRepo.save(ficha);
-    this.auditoriasService.registrar({ entidad: 'fichas_clinicas', entidadId: saved.id, accion: 'CERRAR', detalle: 'Ficha clínica cerrada' });
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'fichas_clinicas',
+      entidadId: saved.id,
+      accion: 'CERRAR',
+      detalle: 'Ficha clínica cerrada',
+      oldValues,
+      newValues: this.auditFichaValues(saved),
+    });
+
+    await this.emitirFichaUpsert(saved);
+
     return saved;
   }
 
-  async remove(id: string) {
+  async remove(id: string, usuarioId?: string) {
     const ficha = await this.findOne(id);
+    const oldValues = this.auditFichaValues(ficha);
     ficha.deletedAt = new Date();
     const saved = await this.fichasRepo.save(ficha);
-    this.auditoriasService.registrar({ entidad: 'fichas_clinicas', entidadId: saved.id, accion: 'ELIMINAR', detalle: 'Ficha clínica eliminada' });
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'fichas_clinicas',
+      entidadId: saved.id,
+      accion: 'ELIMINAR',
+      detalle: 'Ficha clínica eliminada',
+      oldValues,
+      newValues: this.auditFichaValues(saved),
+    });
     return saved;
   }
 
@@ -221,5 +300,17 @@ export class FichasClinicasService {
 
     if (!result?.pacienteId) throw new NotFoundException('No se pudo obtener el paciente desde la visita');
     return result.pacienteId;
+  }
+
+  private auditFichaValues(ficha: FichaClinica) {
+    return {
+      visitaId: ficha.visitaId,
+      plantillaFichaId: ficha.plantillaFichaId ?? null,
+      estado: ficha.estado,
+      version: ficha.version,
+      creadaPorUsuarioId: ficha.creadaPorUsuarioId ?? null,
+      actualizadaPorUsuarioId: ficha.actualizadaPorUsuarioId ?? null,
+      deletedAt: ficha.deletedAt ?? null,
+    };
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -35,6 +35,13 @@ export class VariablesClinicasService {
   }
 
   async create(dto: CreateVariableClinicaDto) {
+    const existente = await this.repo.findOne({
+      where: { codigo: dto.codigo, deletedAt: IsNull() },
+    });
+    if (existente) {
+      throw new BadRequestException(`Ya existe una variable clinica con el codigo ${dto.codigo}`);
+    }
+
     const entity = this.repo.create({
       codigo: dto.codigo,
       nombre: dto.nombre,

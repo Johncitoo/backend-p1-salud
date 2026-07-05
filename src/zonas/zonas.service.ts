@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { CreateZonaDto } from './dto/create-zona.dto';
 import { UpdateZonaDto } from './dto/update-zona.dto';
 import { Zona } from './entities/zona.entity';
@@ -12,6 +13,7 @@ export class ZonasService {
     @InjectRepository(Zona)
     private readonly zonasRepository: Repository<Zona>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   async findAll(): Promise<Zona[]> {
@@ -47,6 +49,8 @@ export class ZonasService {
       detalle: `Zona ${result.nombre} (${result.comuna}, ${result.region}) creada`,
     });
 
+    await this.analyticsService.sendZonaUpsertEvent(result);
+
     return result;
   }
 
@@ -66,6 +70,8 @@ export class ZonasService {
       oldValues,
       newValues: { nombre: result.nombre, comuna: result.comuna, region: result.region, activa: result.activa },
     });
+
+    await this.analyticsService.sendZonaUpsertEvent(result);
 
     return result;
   }
