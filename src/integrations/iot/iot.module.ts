@@ -7,7 +7,7 @@ import { PacienteSensor } from './entities/paciente-sensor.entity';
 import { MedicionesClinicasModule } from '../../mediciones-clinicas/mediciones-clinicas.module';
 import { AlertasModule } from '../../alertas/alertas.module';
 import { VariablesClinicasModule } from '../../variables-clinicas/variables-clinicas.module';
-import { IoTWebhookController } from './iot-webhook.controller';
+import { IoTCronService } from './iot-cron.service';
 @Module({
   imports: [
     UsuariosModule,
@@ -16,8 +16,8 @@ import { IoTWebhookController } from './iot-webhook.controller';
     AlertasModule,
     VariablesClinicasModule,
   ],
-  controllers: [IoTController, IoTWebhookController],
-  providers: [IoTService],
+  controllers: [IoTController],
+  providers: [IoTService, IoTCronService],
   exports: [IoTService],
 })
 export class IoTModule {}
