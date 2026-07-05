@@ -1,13 +1,17 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { DevAuthGuard } from '../../auth/guards/dev-auth.guard';
+import { IoTService } from './iot.service';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { IoTService } from './iot.service';
+import { IoTSyncService } from './iot-sync.service';
 
 @Controller('iot')
 @UseGuards(DevAuthGuard, RolesGuard)
 export class IoTController {
-  constructor(private readonly iotService: IoTService) {}
+  constructor(
+    private readonly iotService: IoTService,
+    private readonly iotSyncService: IoTSyncService
+  ) {}
 
   @Get('health')
   @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
@@ -64,5 +68,11 @@ export class IoTController {
     @Body('sensorType') sensorType: any
   ) {
     return this.iotService.assignSensorToPatient(pacienteId, assetId, sensorId, sensorType);
+  }
+
+  @Post('sync-patient/:pacienteId')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  syncPatientIoTData(@Param('pacienteId') pacienteId: string) {
+    return this.iotSyncService.syncForPatient(pacienteId);
   }
 }

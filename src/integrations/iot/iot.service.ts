@@ -197,12 +197,29 @@ export class IoTService {
           continue;
         }
 
+        const fechaMedicion = reading.createdAt ? new Date(reading.createdAt) : new Date();
+
+        // Evitar duplicados revisando si ya existe un registro con la misma fecha
+        if (reading.createdAt) {
+          const existentes = await this.medicionesClinicasService.findAll({
+            pacienteId: pacienteSensor.pacienteId,
+            variableClinicaId: variable.id,
+            origen: 'IOT',
+            fechaDesde: fechaMedicion.toISOString(),
+            fechaHasta: fechaMedicion.toISOString()
+          });
+          
+          if (existentes && existentes.length > 0) {
+            continue; // Ya existe esta medición exacta
+          }
+        }
+
         await this.medicionesClinicasService.create({
           pacienteId: pacienteSensor.pacienteId,
           variableClinicaId: variable.id,
           valorNumero: med.valor,
           origen: 'IOT',
-          fechaMedicion: reading.createdAt ? new Date(reading.createdAt) : new Date(),
+          fechaMedicion: fechaMedicion,
         });
       }
       this.logger.log(`Procesadas ${mediciones.length} mediciones para assetId: ${reading.assetId}`);

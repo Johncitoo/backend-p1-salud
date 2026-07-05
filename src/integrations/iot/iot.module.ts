@@ -7,7 +7,7 @@ import { PacienteSensor } from './entities/paciente-sensor.entity';
 import { MedicionesClinicasModule } from '../../mediciones-clinicas/mediciones-clinicas.module';
 import { AlertasModule } from '../../alertas/alertas.module';
 import { VariablesClinicasModule } from '../../variables-clinicas/variables-clinicas.module';
-import { IoTCronService } from './iot-cron.service';
+import { IoTSyncService } from './iot-sync.service';
 @Module({
   imports: [
     UsuariosModule,
@@ -17,7 +17,7 @@ import { IoTCronService } from './iot-cron.service';
     VariablesClinicasModule,
   ],
   controllers: [IoTController],
-  providers: [IoTService, IoTCronService],
+  providers: [IoTService, IoTSyncService],
   exports: [IoTService],
 })
 export class IoTModule {}
