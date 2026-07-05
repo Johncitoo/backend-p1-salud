@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { PacienteSensor } from './entities/paciente-sensor.entity';
+import { MedicionesClinicasService } from '../../mediciones-clinicas/mediciones-clinicas.service';
+import { VariablesClinicasService } from '../../variables-clinicas/variables-clinicas.service';
+import { AlertasService } from '../../alertas/alertas.service';
 
 // =========================================================
 // Integración con Grupo 8 (Plataforma IoT - Sensores médicos)
@@ -59,7 +65,14 @@ export const IOT_VARIABLE_MAP: Record<string, string> = {
 export class IoTService {
   private readonly logger = new Logger(IoTService.name);
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectRepository(PacienteSensor)
+    private readonly pacienteSensorRepo: Repository<PacienteSensor>,
+    private readonly medicionesClinicasService: MedicionesClinicasService,
+    private readonly variablesClinicasService: VariablesClinicasService,
+    private readonly alertasService: AlertasService,
+  ) {}
 
   // =========================================================
   // Configuración
@@ -158,4 +171,74 @@ export class IoTService {
 
     return mediciones;
   }
+
+  // =========================================================
+  // Procesamiento de Webhooks entrantes
+  // =========================================================
+
+  async processTelemetryWebhook(reading: IoTTelemetryReading): Promise<void> {
+    try {
+      const pacienteSensor = await this.pacienteSensorRepo.findOne({
+        where: { assetId: reading.assetId, isActive: true },
+        relations: ['paciente']
+      });
+
+      if (!pacienteSensor) {
+        this.logger.warn(`No se encontró paciente activo para assetId: ${reading.assetId}`);
+        return;
+      }
+
+      const mediciones = this.extractMediciones(reading);
+      
+      for (const med of mediciones) {
+        const variable = await this.variablesClinicasService.findByCodigo(med.codigoVariable);
+        if (!variable) {
+          this.logger.warn(`Variable clínica no encontrada: ${med.codigoVariable}`);
+          continue;
+        }
+
+        await this.medicionesClinicasService.create({
+          pacienteId: pacienteSensor.pacienteId,
+          variableClinicaId: variable.id,
+          valorNumero: med.valor,
+          origen: 'IOT',
+          fechaMedicion: reading.createdAt ? new Date(reading.createdAt) : new Date(),
+        });
+      }
+      this.logger.log(`Procesadas ${mediciones.length} mediciones para assetId: ${reading.assetId}`);
+    } catch (error) {
+      this.logger.error(`Error procesando telemetría webhook: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async processAlertWebhook(alert: IoTAlert): Promise<void> {
+    try {
+      // Intentamos buscar el assetId si viene embebido, o buscamos por sensorId
+      // El equipo 8 dice que el sensorId es "OXI-001" pero también hay un assetId.
+      // Si la alerta solo trae sensorId, buscamos por sensorId
+      const pacienteSensor = await this.pacienteSensorRepo.findOne({
+        where: { sensorId: alert.sensorId, isActive: true }
+      });
+
+      if (!pacienteSensor) {
+        this.logger.warn(`No se encontró paciente para alerta de sensorId: ${alert.sensorId}`);
+        return;
+      }
+
+      let prioridad = 'MEDIA';
+      if (alert.severity === 'CRITICAL' || alert.severity === 'HIGH') prioridad = 'ALTA';
+      if (alert.severity === 'LOW') prioridad = 'BAJA';
+
+      await this.alertasService.create({
+        pacienteId: pacienteSensor.pacienteId,
+        tipo: `IOT_${alert.type.toUpperCase()}`,
+        mensaje: alert.message,
+        prioridad: prioridad,
+      });
+      this.logger.log(`Alerta IoT creada para paciente ${pacienteSensor.pacienteId} desde sensor ${alert.sensorId}`);
+    } catch (error) {
+      this.logger.error(`Error procesando alerta webhook: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
+
