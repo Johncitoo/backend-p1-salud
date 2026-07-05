@@ -1,4 +1,6 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+
+const DIRECCION_TIPOS = ['DOMICILIO', 'TEMPORAL', 'CUIDADOR', 'OTRO'] as const;
 
 export class UpdateDireccionDto {
 	@IsOptional()
@@ -6,8 +8,12 @@ export class UpdateDireccionDto {
 	pacienteId?: string;
 
 	@IsOptional()
-	@IsString()
-	alias?: string;
+	@IsUUID()
+	zonaId?: string;
+
+	@IsOptional()
+	@IsIn(DIRECCION_TIPOS)
+	tipo?: string;
 
 	@IsOptional()
 	@IsString()
@@ -23,11 +29,19 @@ export class UpdateDireccionDto {
 
 	@IsOptional()
 	@IsString()
+	villaPoblacion?: string;
+
+	@IsOptional()
+	@IsString()
 	comuna?: string;
 
 	@IsOptional()
 	@IsString()
 	region?: string;
+
+	@IsOptional()
+	@IsString()
+	referencia?: string;
 
 	@IsOptional()
 	@IsNumber()
@@ -40,4 +54,8 @@ export class UpdateDireccionDto {
 	@IsOptional()
 	@IsBoolean()
 	esPrincipal?: boolean;
+
+	@IsOptional()
+	@IsBoolean()
+	activa?: boolean;
 }

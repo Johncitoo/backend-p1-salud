@@ -4,6 +4,7 @@ import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { CrmService } from '../integrations/crm/crm.service';
 import { PacientesService } from '../pacientes/pacientes.service';
+import { Paciente } from '../pacientes/entities/paciente.entity';
 import { CreateIncidenteSaludDto } from './dto/create-incidente-salud.dto';
 import { UpdateIncidenteSaludDto } from './dto/update-incidente-salud.dto';
 import { IncidenteSalud } from './entities/incidente-salud.entity';
@@ -75,7 +76,7 @@ export class IncidentesSaludService {
 
     // Crear ticket en CRM de forma asíncrona (fire and forget)
     try {
-      let paciente = null;
+      let paciente: Paciente | null = null;
       if (saved.pacienteId) {
         paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
       }
