@@ -19,5 +19,6 @@ import { PacientesService } from './pacientes.service';
   imports: [UsuariosModule, AuditoriasModule, AnalyticsModule, NotificacionesModule, VisitasModule, TypeOrmModule.forFeature([Paciente, DireccionPaciente, ContactoPaciente, PlanCuidado, Visita])],
   controllers: [PacientesController],
   providers: [PacientesService, DevAuthGuard, RolesGuard],
+  exports: [PacientesService],
 })
 export class PacientesModule {}
