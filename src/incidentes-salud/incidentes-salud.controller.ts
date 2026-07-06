@@ -9,6 +9,7 @@ import {
   Query,
   Request,
   UseGuards,
+
 } from '@nestjs/common';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -17,22 +18,76 @@ import { ApiKeyGuard } from '../auth/guards/api-key.guard';
 import { IncidentesSaludService } from './incidentes-salud.service';
 import { CreateIncidenteSaludDto } from './dto/create-incidente-salud.dto';
 import { UpdateIncidenteSaludDto } from './dto/update-incidente-salud.dto';
+import { PacientesService } from '../pacientes/pacientes.service';
 
 @Controller('incidentes-salud')
 export class IncidentesSaludController {
-  constructor(private readonly incidentesSaludService: IncidentesSaludService) {}
+  constructor(
+    private readonly incidentesSaludService: IncidentesSaludService,
+    private readonly pacientesService: PacientesService,
+  ) {}
 
   @Get('externo/:id')
   @UseGuards(ApiKeyGuard)
   async findOneExterno(@Param('id') id: string) {
     const incidente = await this.incidentesSaludService.findOne(id);
+    let paciente = null;
+    
+    if (incidente.pacienteId) {
+      paciente = await this.pacientesService.findOne(incidente.pacienteId).catch(() => null);
+    }
+    
+    const { visita, profesional, profesionalUsuario } = await this.incidentesSaludService.getContextInfo(incidente);
+    
     return {
       id: incidente.id,
       titulo: incidente.titulo,
       descripcion: incidente.descripcion,
       estado: incidente.estado,
       severidad: incidente.severidad,
+      tipo: incidente.tipo,
+      origen: incidente.origen,
+      createdAt: incidente.createdAt,
+      pacienteId: incidente.pacienteId,
+      paciente: paciente ? {
+        id: paciente.id,
+        rut: paciente.rut,
+        nombres: paciente.nombres,
+        apellidos: paciente.apellidos,
+        email: paciente.email,
+        telefono: paciente.telefono,
+        fechaNacimiento: paciente.fechaNacimiento,
+        sexo: paciente.sexo,
+        direccion: paciente.direccion,
+      } : null,
+      visitaId: incidente.visitaId,
+      visita: visita ? {
+        id: visita.id,
+        fechaProgramada: visita.fechaProgramada,
+        horaProgramada: visita.horaProgramada,
+        estado: visita.estado,
+        duracionEstimadaMin: visita.duracionEstimadaMin,
+        checkInAt: visita.checkInAt,
+        checkOutAt: visita.checkOutAt,
+        prioridad: visita.prioridad,
+      } : null,
+      profesionalSaludId: incidente.profesionalSaludId,
+      profesionalSalud: profesional ? {
+        id: profesional.id,
+        profesion: profesional.profesion,
+        numeroRegistro: profesional.numeroRegistro,
+        nombres: profesionalUsuario?.nombres,
+        apellidos: profesionalUsuario?.apellidos,
+        email: profesionalUsuario?.email,
+      } : null,
     };
+  }
+
+  @Get(':id/crm')
+  @UseGuards(DevAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'COORDINADOR', 'SUPERVISOR')
+  findCrmStatus(@Param('id') id: string) {
+    return this.incidentesSaludService.findCrmStatus(id);
   }
 
   @Get()

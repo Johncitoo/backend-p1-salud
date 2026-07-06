@@ -18,6 +18,23 @@ export interface CreateCrmTicketPayload {
   contexto?: string;
 }
 
+export interface CrmTicketStatus {
+  id: string;
+  asunto: string;
+  estado: string;
+  prioridad: string;
+  canal?: string;
+  cliente_nombre?: string;
+  resolucion?: string | null;
+  pedido_id_ref?: string | null;
+  suscripcion_id_ref?: string | null;
+  pago_id_ref?: string | null;
+  salud_ref?: string | null;
+  fecha_vencimiento_sla?: string | null;
+  creado_en?: string;
+  actualizado_en?: string;
+}
+
 @Injectable()
 export class CrmService {
   private readonly logger = new Logger(CrmService.name);
@@ -54,11 +71,24 @@ export class CrmService {
     }
   }
 
-  async consultarEstadoTicket(ticketId: string): Promise<string | null> {
+  extractTicketId(response: any): string | null {
+    return (
+      response?.ticket?.id ??
+      response?.ticket?.ticket_id ??
+      response?.ticket?.uuid ??
+      response?.id ??
+      response?.ticket_id ??
+      response?.data?.ticket?.id ??
+      null
+    );
+  }
+
+  async consultarEstadoTicket(ticketId: string): Promise<CrmTicketStatus | null> {
     try {
-      const url = `${this.apiUrl}/${ticketId}?api_key=${this.apiKey}`;
+      const query = new URLSearchParams({ api_key: this.apiKey });
+      const url = `${this.apiUrl}/${ticketId}?${query.toString()}`;
       const response = await firstValueFrom(this.httpService.get(url));
-      return response.data?.ticket?.estado || null;
+      return response.data?.ticket || null;
     } catch (error: any) {
       this.logger.error(
         `Error al consultar estado del ticket en CRM: ${error.message}`,

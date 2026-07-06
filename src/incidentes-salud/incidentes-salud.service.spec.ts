@@ -24,7 +24,7 @@ describe('IncidentesSaludService', () => {
   let repository: MockRepository<IncidenteSalud>;
 
   beforeEach(async () => {
-    repository = { find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), createQueryBuilder: jest.fn() };
+    repository = { find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), update: jest.fn(), createQueryBuilder: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         IncidentesSaludService,
@@ -34,7 +34,17 @@ describe('IncidentesSaludService', () => {
           provide: CrmService, 
           useValue: { 
             buildPayloadFromIncidente: jest.fn().mockReturnValue({}), 
-            crearTicket: jest.fn().mockResolvedValue({}) 
+            crearTicket: jest.fn().mockResolvedValue({ ticket: { id: 'crm-123' } }),
+            extractTicketId: jest.fn((response) => response?.ticket?.id ?? null),
+            consultarEstadoTicket: jest.fn().mockResolvedValue({
+              id: 'crm-123',
+              asunto: 'Ticket CRM',
+              estado: 'abierto',
+              prioridad: 'alta',
+              resolucion: null,
+              salud_ref: 'inc-1111',
+              fecha_vencimiento_sla: '2026-07-05T10:00:00.000Z',
+            }),
           } 
         },
         { 
@@ -64,6 +74,23 @@ describe('IncidentesSaludService', () => {
     repository.create!.mockReturnValue({ ...dto, severidad: 'MEDIA', estado: 'ABIERTO', origen: 'SISTEMA' });
     repository.save!.mockResolvedValue(incidente);
     await expect(service.create(dto as any, 'u-1111')).resolves.toEqual(incidente);
+  });
+
+  it('findCrmStatus consulta el estado externo si existe externalIncidentId', async () => {
+    repository.findOne!.mockResolvedValue({ ...incidente, externalIncidentId: 'crm-123' });
+
+    const result = await service.findCrmStatus('inc-1111');
+
+    expect(result).toMatchObject({
+      id: 'crm-123',
+      externalIncidentId: 'crm-123',
+      saludRef: 'inc-1111',
+      titulo: 'Ticket CRM',
+      estado: 'abierto',
+      severidad: 'alta',
+      fechaVencimientoSla: '2026-07-05T10:00:00.000Z',
+      sincronizado: true,
+    });
   });
 
   it('update modifica el incidente', async () => {
