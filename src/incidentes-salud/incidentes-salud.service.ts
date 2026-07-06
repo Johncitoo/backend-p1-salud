@@ -101,9 +101,9 @@ export class IncidentesSaludService {
   }
 
   async getContextInfo(incidente: IncidenteSalud) {
-    let visita = null;
-    let profesional = null;
-    let profesionalUsuario = null;
+    let visita: Visita | null = null;
+    let profesional: ProfesionalSalud | null = null;
+    let profesionalUsuario: Usuario | null = null;
 
     if (incidente.visitaId) {
       visita = await this.visitaRepository.findOne({ where: { id: incidente.visitaId } });

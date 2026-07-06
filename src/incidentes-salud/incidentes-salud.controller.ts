@@ -19,6 +19,7 @@ import { IncidentesSaludService } from './incidentes-salud.service';
 import { CreateIncidenteSaludDto } from './dto/create-incidente-salud.dto';
 import { UpdateIncidenteSaludDto } from './dto/update-incidente-salud.dto';
 import { PacientesService } from '../pacientes/pacientes.service';
+import { Paciente } from '../pacientes/entities/paciente.entity';
 
 @Controller('incidentes-salud')
 export class IncidentesSaludController {
@@ -31,7 +32,7 @@ export class IncidentesSaludController {
   @UseGuards(ApiKeyGuard)
   async findOneExterno(@Param('id') id: string) {
     const incidente = await this.incidentesSaludService.findOne(id);
-    let paciente = null;
+    let paciente: Paciente | null = null;
     
     if (incidente.pacienteId) {
       paciente = await this.pacientesService.findOne(incidente.pacienteId).catch(() => null);
