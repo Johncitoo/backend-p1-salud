@@ -4,6 +4,7 @@ import { AuditoriasModule } from '../auditorias/auditorias.module';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AnalyticsModule } from '../integrations/analytics/analytics.module';
+import { NotificacionesModule } from '../integrations/notificaciones/notificaciones.module';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { VisitasModule } from '../visitas/visitas.module';
 import { Paciente } from './entities/paciente.entity';
@@ -15,8 +16,9 @@ import { PacientesController } from './pacientes.controller';
 import { PacientesService } from './pacientes.service';
 
 @Module({
-  imports: [UsuariosModule, AuditoriasModule, AnalyticsModule, VisitasModule, TypeOrmModule.forFeature([Paciente, DireccionPaciente, ContactoPaciente, PlanCuidado, Visita])],
+  imports: [UsuariosModule, AuditoriasModule, AnalyticsModule, NotificacionesModule, VisitasModule, TypeOrmModule.forFeature([Paciente, DireccionPaciente, ContactoPaciente, PlanCuidado, Visita])],
   controllers: [PacientesController],
   providers: [PacientesService, DevAuthGuard, RolesGuard],
+  exports: [PacientesService],
 })
 export class PacientesModule {}

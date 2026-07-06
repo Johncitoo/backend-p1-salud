@@ -59,12 +59,33 @@ describe('PlantillasFichaService', () => {
   describe('create plantilla', () => {
     it('creates a plantilla with defaults', async () => {
       const dto: CreatePlantillaFichaDto = { codigo: 'TEST', nombre: 'Test' };
+      (plantillasRepo.findOne as jest.Mock).mockResolvedValue(null);
       (plantillasRepo.create as jest.Mock).mockReturnValue({ id: '1', ...dto, activa: true });
       (plantillasRepo.save as jest.Mock).mockResolvedValue({ id: '1', ...dto });
 
       const result = await service.create(dto);
       expect(result.codigo).toBe('TEST');
       expect(auditorias.registrar).toHaveBeenCalled();
+    });
+
+    it('rejects an active duplicate codigo with BadRequestException', async () => {
+      const dto: CreatePlantillaFichaDto = { codigo: 'TEST', nombre: 'Test duplicada' };
+      (plantillasRepo.findOne as jest.Mock).mockResolvedValue({ id: 'existing', codigo: dto.codigo, deletedAt: null });
+
+      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+      expect(plantillasRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows reusing a codigo when no active row exists', async () => {
+      const dto: CreatePlantillaFichaDto = { codigo: 'TEST', nombre: 'Test nueva' };
+      (plantillasRepo.findOne as jest.Mock).mockResolvedValue(null);
+      (plantillasRepo.create as jest.Mock).mockReturnValue({ id: 'new-id', ...dto, activa: true });
+      (plantillasRepo.save as jest.Mock).mockResolvedValue({ id: 'new-id', ...dto });
+
+      await expect(service.create(dto)).resolves.toEqual(expect.objectContaining({ id: 'new-id' }));
+      expect(plantillasRepo.findOne).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ codigo: dto.codigo }),
+      }));
     });
   });
 

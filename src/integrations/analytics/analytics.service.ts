@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Alerta } from '../../alertas/entities/alerta.entity';
 import { FichaClinica } from '../../fichas-clinicas/entities/ficha-clinica.entity';
 import { Paciente } from '../../pacientes/entities/paciente.entity';
 import { Visita } from '../../pacientes/entities/visita.entity';
@@ -35,6 +36,7 @@ type VisitaUpsertPayload = {
   fecha_fin_real: string | null;
   completada: 0 | 1;
   puntual: 0 | 1;
+  visit_type: string;
 };
 
 type UsuarioUpsertPayload = {
@@ -108,12 +110,24 @@ type FichaUpsertPayload = {
   cantidad_adjuntos?: string;
 };
 
+type AlertaUpsertPayload = {
+  alerta_id: string;
+  paciente_id: string;
+  visita_id?: string;
+  tipo: string;
+  mensaje?: string;
+  prioridad?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  estado?: 'OPEN' | 'IN_PROGRESS' | 'CLOSED';
+  dias_abierta?: number;
+};
+
 // =========================================================
 // Opciones / formas de datos auxiliares
 // =========================================================
 
-type VisitAnalyticsOptions = {
+export type VisitAnalyticsOptions = {
   puntual?: boolean | null;
+  visitType?: string | null;
 };
 
 // Forma estructural mínima para usuario (UsuariosService retorna UsuarioResponse,
@@ -140,6 +154,13 @@ export class AnalyticsService {
   // Es no-bloqueante: cualquier error se loguea, nunca se lanza.
   // =========================================================
 
+  // Reintentos con backoff: Render free tier puede tardar ~30-50s en "despertar"
+  // (cold start) y antes el primer fallo descartaba el evento para siempre,
+  // sin dejar ningún rastro recuperable más allá de un log de error.
+  private static readonly MAX_ATTEMPTS = 3;
+  private static readonly ATTEMPT_TIMEOUT_MS = 20_000;
+  private static readonly RETRY_BACKOFF_MS = [3_000, 8_000];
+
   private async sendEvent(event: AnalyticsEvent): Promise<void> {
     const enabled = this.configService.get<string>('ANALYTICS_ENABLED') === 'true';
     const baseUrl = (this.configService.get<string>('ANALYTICS_URL') ?? '').trim();
@@ -157,20 +178,57 @@ export class AnalyticsService {
 
     const endpoint = `${baseUrl}${this.normalizeEventsPath(eventsPath)}`;
 
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event),
-      });
+    this.logger.log(
+      `[Analytics outgoing] Evento ${event.event_type}:\n${JSON.stringify(event, null, 2)}`,
+    );
 
-      if (!response.ok) {
-        this.logger.error(`No se pudo enviar evento ${event.event_type} a Analítica: HTTP ${response.status}`);
+    for (let attempt = 1; attempt <= AnalyticsService.MAX_ATTEMPTS; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(),
+        AnalyticsService.ATTEMPT_TIMEOUT_MS,
+      );
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(event),
+          signal: controller.signal,
+        });
+
+        const responseText = typeof response.text === 'function'
+          ? await response.text().catch(() => '')
+          : '';
+        this.logger.log(
+          `[Analytics response] Evento ${event.event_type} (intento ${attempt}/${AnalyticsService.MAX_ATTEMPTS}): HTTP ${response.status} - ${responseText}`,
+        );
+
+        if (response.ok) return;
+
+        this.logger.error(
+          `No se pudo enviar evento ${event.event_type} a Analítica (intento ${attempt}/${AnalyticsService.MAX_ATTEMPTS}): HTTP ${response.status}`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `No se pudo enviar evento ${event.event_type} a Analítica (intento ${attempt}/${AnalyticsService.MAX_ATTEMPTS}): ${message}`,
+        );
+      } finally {
+        clearTimeout(timeout);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`No se pudo enviar evento ${event.event_type} a Analítica: ${message}`);
+
+      const backoff = AnalyticsService.RETRY_BACKOFF_MS[attempt - 1];
+      if (backoff) await this.delay(backoff);
     }
+
+    this.logger.error(
+      `Evento ${event.event_type} descartado tras ${AnalyticsService.MAX_ATTEMPTS} intentos fallidos: ${JSON.stringify(event)}`,
+    );
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // =========================================================
@@ -192,6 +250,7 @@ export class AnalyticsService {
       fecha_fin_real: this.formatDateTime(visita.fechaHoraFinReal),
       completada: estado === 'completada' ? 1 : 0,
       puntual: options.puntual === true ? 1 : 0,
+      visit_type: options.visitType ?? 'General',
     };
 
     await this.sendEvent({ source: 'salud', event_type: 'visita_upsert', payload });
@@ -202,9 +261,7 @@ export class AnalyticsService {
       usuario_id: usuario.id,
       nombres: usuario.nombres,
       apellidos: usuario.apellidos,
-      rut: usuario.rut,
       email: usuario.email,
-      telefono: usuario.telefono,
       activo: usuario.activo,
     };
 
@@ -237,7 +294,6 @@ export class AnalyticsService {
       nombres: usuario.nombres,
       apellidos: usuario.apellidos,
       profesion: profesional.profesion,
-      numero_registro: profesional.numeroRegistro ?? null,
       activo: profesional.activo,
     };
 
@@ -310,6 +366,30 @@ export class AnalyticsService {
     await this.sendEvent({ source: 'salud', event_type: 'ficha_upsert', payload });
   }
 
+  async sendAlertaUpsertEvent(alerta: Alerta): Promise<void> {
+    const payload: AlertaUpsertPayload = {
+      alerta_id: alerta.id,
+      paciente_id: alerta.pacienteId,
+      visita_id: alerta.visitaId,
+      tipo: alerta.tipo,
+      mensaje: alerta.mensaje,
+      prioridad: this.normalizeAlertaPrioridad(alerta.prioridad),
+      estado: this.normalizeAlertaEstado(alerta.estado),
+      dias_abierta: Math.max(
+        0,
+        Math.floor(
+          (Date.now() - new Date(alerta.createdAt).getTime()) / 86_400_000,
+        ),
+      ),
+    };
+
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'alerta_upsert',
+      payload,
+    });
+  }
+
   // =========================================================
   // Helpers de normalización de estados
   // =========================================================
@@ -324,7 +404,6 @@ export class AnalyticsService {
     return 'programada';
   }
 
-  // Estados de ficha del sistema (BORRADOR/CERRADA/ANULADA) -> los que espera el Grupo 9
   private normalizeFichaEstado(estado?: string): FichaUpsertPayload['estado'] {
     const normalized = estado?.trim().toUpperCase();
 
@@ -332,6 +411,31 @@ export class AnalyticsService {
     if (normalized === 'ANULADA') return 'ARCHIVED';
 
     return 'DRAFT';
+  }
+
+  private normalizeAlertaPrioridad(
+    prioridad?: string,
+  ): AlertaUpsertPayload['prioridad'] {
+    const normalized = prioridad?.trim().toUpperCase();
+
+    if (normalized === 'BAJA') return 'LOW';
+    if (normalized === 'MEDIA') return 'MEDIUM';
+    if (normalized === 'ALTA') return 'HIGH';
+    if (normalized === 'CRITICA') return 'CRITICAL';
+
+    return 'MEDIUM';
+  }
+
+  private normalizeAlertaEstado(
+    estado?: string,
+  ): AlertaUpsertPayload['estado'] {
+    const normalized = estado?.trim().toUpperCase();
+
+    if (normalized === 'EN_REVISION') return 'IN_PROGRESS';
+    if (['RESUELTA', 'CERRADA', 'CANCELADA'].includes(normalized ?? ''))
+      return 'CLOSED';
+
+    return 'OPEN';
   }
 
   // =========================================================

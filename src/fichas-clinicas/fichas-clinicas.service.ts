@@ -114,8 +114,13 @@ export class FichasClinicasService {
 
     const oldValues = this.auditFichaValues(ficha);
     const oldEstado = ficha.estado;
-    Object.assign(ficha, dto);
+
+    if (dto.estado !== undefined) ficha.estado = dto.estado;
+    if (dto.plantillaFichaId !== undefined) ficha.plantillaFichaId = dto.plantillaFichaId;
+    if (dto.contenido !== undefined) ficha.contenido = dto.contenido;
     if (usuarioId) ficha.actualizadaPorUsuarioId = usuarioId;
+    const shouldSyncMediciones = dto.contenido !== undefined || dto.plantillaFichaId !== undefined;
+    const plantillaFichaIdForSync = ficha.plantillaFichaId ?? null;
 
     try {
       const saved = await this.fichasRepo.save(ficha);
@@ -129,8 +134,12 @@ export class FichasClinicasService {
         newValues: this.auditFichaValues(saved),
       });
 
-      if (dto.contenido || dto.plantillaFichaId) {
-        await this.syncMediciones(saved);
+      if (shouldSyncMediciones) {
+        await this.syncMediciones({
+          ...saved,
+          plantillaFichaId: saved.plantillaFichaId ?? plantillaFichaIdForSync,
+          contenido: saved.contenido ?? ficha.contenido,
+        });
       }
 
       await this.emitirFichaUpsert(saved);
