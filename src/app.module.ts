@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
@@ -79,6 +80,7 @@ const isTest = process.env.NODE_ENV === 'test';
     VisitaCheckpointsModule,
     IncidentesSaludModule,
     IncidenteEstadoHistorialModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [AppService],

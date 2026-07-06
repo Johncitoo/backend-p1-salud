@@ -8,8 +8,8 @@ export class Alerta {
   @Column({ name: 'paciente_id', type: 'uuid' })
   pacienteId: string;
 
-  @Column({ name: 'visita_id', type: 'uuid' })
-  visitaId: string;
+  @Column({ name: 'visita_id', type: 'uuid', nullable: true })
+  visitaId?: string;
 
   @Column({ type: 'varchar', length: 50 })
   tipo: string;

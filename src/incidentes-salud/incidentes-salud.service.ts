@@ -76,7 +76,7 @@ export class IncidentesSaludService {
 
     // Crear ticket en CRM de forma asíncrona (fire and forget)
     try {
-      let paciente: Paciente | null = null;
+      let paciente = null;
       if (saved.pacienteId) {
         paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
       }
