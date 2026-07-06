@@ -173,10 +173,10 @@ export class IoTService {
   }
 
   // =========================================================
-  // Procesamiento de Webhooks entrantes
+  // Procesamiento de Lecturas (Polling)
   // =========================================================
 
-  async processTelemetryWebhook(reading: IoTTelemetryReading): Promise<void> {
+  async processTelemetryReading(reading: IoTTelemetryReading): Promise<void> {
     try {
       const pacienteSensor = await this.pacienteSensorRepo.findOne({
         where: { assetId: reading.assetId, isActive: true },
@@ -224,11 +224,11 @@ export class IoTService {
       }
       this.logger.log(`Procesadas ${mediciones.length} mediciones para assetId: ${reading.assetId}`);
     } catch (error) {
-      this.logger.error(`Error procesando telemetría webhook: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Error procesando telemetría: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  async processAlertWebhook(alert: IoTAlert): Promise<void> {
+  async processAlertReading(alert: IoTAlert): Promise<void> {
     try {
       // Intentamos buscar el assetId si viene embebido, o buscamos por sensorId
       // El equipo 8 dice que el sensorId es "OXI-001" pero también hay un assetId.
@@ -246,6 +246,15 @@ export class IoTService {
       if (alert.severity === 'CRITICAL' || alert.severity === 'HIGH') prioridad = 'ALTA';
       if (alert.severity === 'LOW') prioridad = 'BAJA';
 
+      const existentes = await this.alertasService.findAll({ pacienteId: pacienteSensor.pacienteId });
+      const duplicate = existentes.find(a => 
+        a.mensaje === alert.message && 
+        a.tipo === `IOT_${alert.type.toUpperCase()}`
+      );
+      if (duplicate) {
+        return; // Evitar duplicar alertas idénticas
+      }
+
       await this.alertasService.create({
         pacienteId: pacienteSensor.pacienteId,
         tipo: `IOT_${alert.type.toUpperCase()}`,
@@ -254,7 +263,7 @@ export class IoTService {
       });
       this.logger.log(`Alerta IoT creada para paciente ${pacienteSensor.pacienteId} desde sensor ${alert.sensorId}`);
     } catch (error) {
-      this.logger.error(`Error procesando alerta webhook: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Error procesando alerta: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
