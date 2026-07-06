@@ -4,8 +4,9 @@ export class CreateAlertaDto {
   @IsUUID()
   pacienteId: string;
 
+  @IsOptional()
   @IsUUID()
-  visitaId: string;
+  visitaId?: string;
 
   @IsString()
   @MaxLength(50)

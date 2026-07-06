@@ -1,11 +1,16 @@
 import { NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import { IsNull, Repository } from 'typeorm';
 import { IncidenteSalud } from './entities/incidente-salud.entity';
 import { IncidentesSaludService } from './incidentes-salud.service';
+import { Visita } from '../pacientes/entities/visita.entity';
+import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { CrmService } from '../integrations/crm/crm.service';
+import { IncidentesService } from '../integrations/incidentes/incidentes.service';
 import { PacientesService } from '../pacientes/pacientes.service';
 
 type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
@@ -22,19 +27,35 @@ const incidente: IncidenteSalud = {
 describe('IncidentesSaludService', () => {
   let service: IncidentesSaludService;
   let repository: MockRepository<IncidenteSalud>;
+  let incidentesServiceMock: any;
 
   beforeEach(async () => {
-    repository = { find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), createQueryBuilder: jest.fn() };
+    jest.clearAllMocks();
+    repository = { find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), update: jest.fn(), createQueryBuilder: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         IncidentesSaludService,
         { provide: getRepositoryToken(IncidenteSalud), useValue: repository },
+        { provide: getRepositoryToken(Visita), useValue: {} },
+        { provide: getRepositoryToken(ProfesionalSalud), useValue: {} },
+        { provide: getRepositoryToken(Usuario), useValue: {} },
         { provide: AuditoriasService, useValue: { registrar: jest.fn() } },
+        { provide: IncidentesService, useValue: { enviarIncidente: jest.fn().mockResolvedValue(true) } },
         { 
           provide: CrmService, 
           useValue: { 
             buildPayloadFromIncidente: jest.fn().mockReturnValue({}), 
-            crearTicket: jest.fn().mockResolvedValue({}) 
+            crearTicket: jest.fn().mockResolvedValue({ ticket: { id: 'crm-123' } }),
+            extractTicketId: jest.fn((response) => response?.ticket?.id ?? null),
+            consultarEstadoTicket: jest.fn().mockResolvedValue({
+              id: 'crm-123',
+              asunto: 'Ticket CRM',
+              estado: 'abierto',
+              prioridad: 'alta',
+              resolucion: null,
+              salud_ref: 'inc-1111',
+              fecha_vencimiento_sla: '2026-07-05T10:00:00.000Z',
+            }),
           } 
         },
         { 
@@ -46,6 +67,7 @@ describe('IncidentesSaludService', () => {
       ],
     }).compile();
     service = module.get<IncidentesSaludService>(IncidentesSaludService);
+    incidentesServiceMock = module.get<IncidentesService>(IncidentesService);
   });
 
   it('findOne retorna el incidente si existe', async () => {
@@ -61,9 +83,37 @@ describe('IncidentesSaludService', () => {
 
   it('create guarda con valores por defecto', async () => {
     const dto = { tipo: 'CAIDA', titulo: 'Test', pacienteId: 'p-2222' };
+    const savedMock = { ...incidente, severidad: 'MEDIA' };
     repository.create!.mockReturnValue({ ...dto, severidad: 'MEDIA', estado: 'ABIERTO', origen: 'SISTEMA' });
-    repository.save!.mockResolvedValue(incidente);
-    await expect(service.create(dto as any, 'u-1111')).resolves.toEqual(incidente);
+    repository.save!.mockResolvedValue(savedMock);
+    await expect(service.create(dto as any, 'u-1111')).resolves.toEqual(savedMock);
+    expect(incidentesServiceMock.enviarIncidente).not.toHaveBeenCalled();
+  });
+
+  it('create dispara enviarIncidente al Proyecto 11 si es ALTA o CRITICA', async () => {
+    const dto = { tipo: 'CAIDA', titulo: 'Test grave', pacienteId: 'p-2222', severidad: 'CRITICA' };
+    const incidenteCritico = { ...incidente, severidad: 'CRITICA' };
+    repository.create!.mockReturnValue(incidenteCritico);
+    repository.save!.mockResolvedValue(incidenteCritico);
+    await service.create(dto as any, 'u-1111');
+    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteCritico);
+  });
+
+  it('findCrmStatus consulta el estado externo si existe externalIncidentId', async () => {
+    repository.findOne!.mockResolvedValue({ ...incidente, externalIncidentId: 'crm-123' });
+
+    const result = await service.findCrmStatus('inc-1111');
+
+    expect(result).toMatchObject({
+      id: 'crm-123',
+      externalIncidentId: 'crm-123',
+      saludRef: 'inc-1111',
+      titulo: 'Ticket CRM',
+      estado: 'abierto',
+      severidad: 'alta',
+      fechaVencimientoSla: '2026-07-05T10:00:00.000Z',
+      sincronizado: true,
+    });
   });
 
   it('update modifica el incidente', async () => {

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
@@ -30,6 +31,7 @@ import { VisitaEstadoHistorialModule } from './visita-estado-historial/visita-es
 import { VisitaCheckpointsModule } from './visita-checkpoints/visita-checkpoints.module';
 import { IncidentesSaludModule } from './incidentes-salud/incidentes-salud.module';
 import { IncidenteEstadoHistorialModule } from './incidente-estado-historial/incidente-estado-historial.module';
+import { IncidentesModule } from './integrations/incidentes/incidentes.module';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -79,6 +81,8 @@ const isTest = process.env.NODE_ENV === 'test';
     VisitaCheckpointsModule,
     IncidentesSaludModule,
     IncidenteEstadoHistorialModule,
+    IncidentesModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [AppService],
