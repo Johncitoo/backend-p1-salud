@@ -6,6 +6,7 @@ import { PacienteSensor } from './entities/paciente-sensor.entity';
 import { MedicionesClinicasService } from '../../mediciones-clinicas/mediciones-clinicas.service';
 import { VariablesClinicasService } from '../../variables-clinicas/variables-clinicas.service';
 import { AlertasService } from '../../alertas/alertas.service';
+import { IncidentesSaludService } from '../../incidentes-salud/incidentes-salud.service';
 
 describe('IoTService', () => {
   let service: IoTService;
@@ -39,6 +40,7 @@ describe('IoTService', () => {
         { provide: MedicionesClinicasService, useValue: mockMedicionesClinicasService },
         { provide: VariablesClinicasService, useValue: mockVariablesClinicasService },
         { provide: AlertasService, useValue: mockAlertasService },
+        { provide: IncidentesSaludService, useValue: { create: jest.fn() } },
       ],
     }).compile();
 
