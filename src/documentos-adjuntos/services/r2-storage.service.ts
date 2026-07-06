@@ -2,9 +2,11 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
+import { StorageService } from './storage.interface';
 
 @Injectable()
-export class R2StorageService {
+export class R2StorageService implements StorageService {
+  readonly providerName = 'R2';
   private client?: S3Client;
 
   constructor(private readonly configService: ConfigService) {}
