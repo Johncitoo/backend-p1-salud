@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditoriasModule } from '../auditorias/auditorias.module';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { CrmModule } from '../integrations/crm/crm.module';
+import { IncidentesModule } from '../integrations/incidentes/incidentes.module';
 import { PacientesModule } from '../pacientes/pacientes.module';
 import { Visita } from '../pacientes/entities/visita.entity';
 import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.entity';
@@ -16,6 +17,7 @@ import { IncidentesSaludService } from './incidentes-salud.service';
     UsuariosModule,
     AuditoriasModule,
     CrmModule,
+    IncidentesModule,
     PacientesModule,
     TypeOrmModule.forFeature([IncidenteSalud, Visita, ProfesionalSalud, Usuario]),
   ],
