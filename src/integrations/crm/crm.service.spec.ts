@@ -90,17 +90,34 @@ describe('CrmService', () => {
   });
 
   describe('consultarEstadoTicket', () => {
-    it('should return estado when successful', async () => {
-      mockHttpService.get.mockReturnValue(of({ data: { ticket: { estado: 'abierto' } } }));
-      const estado = await service.consultarEstadoTicket('t-123');
+    it('should return ticket when successful', async () => {
+      const ticket = {
+        id: 't-123',
+        asunto: 'Alerta de salud',
+        estado: 'abierto',
+        prioridad: 'media',
+        resolucion: null,
+        salud_ref: 'inc-123',
+      };
+      mockHttpService.get.mockReturnValue(of({ data: { ok: true, ticket } }));
+      const result = await service.consultarEstadoTicket('t-123');
       expect(mockHttpService.get).toHaveBeenCalledWith('http://mock-crm.url/api/t-123?api_key=mock-key');
-      expect(estado).toBe('abierto');
+      expect(result).toEqual(ticket);
     });
 
     it('should return null when error occurs', async () => {
       mockHttpService.get.mockReturnValue(throwError(() => new Error('API Error')));
       const estado = await service.consultarEstadoTicket('t-123');
       expect(estado).toBeNull();
+    });
+  });
+
+  describe('extractTicketId', () => {
+    it('should extract ticket id from common CRM response shapes', () => {
+      expect(service.extractTicketId({ ticket: { id: 't-1' } })).toBe('t-1');
+      expect(service.extractTicketId({ id: 't-2' })).toBe('t-2');
+      expect(service.extractTicketId({ data: { ticket: { id: 't-3' } } })).toBe('t-3');
+      expect(service.extractTicketId({ ok: true })).toBeNull();
     });
   });
 
