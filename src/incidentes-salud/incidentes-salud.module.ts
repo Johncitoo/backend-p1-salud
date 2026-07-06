@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditoriasModule } from '../auditorias/auditorias.module';
 import { UsuariosModule } from '../usuarios/usuarios.module';
@@ -18,7 +18,7 @@ import { IncidentesSaludService } from './incidentes-salud.service';
     AuditoriasModule,
     CrmModule,
     IncidentesModule,
-    PacientesModule,
+    forwardRef(() => PacientesModule),
     TypeOrmModule.forFeature([IncidenteSalud, Visita, ProfesionalSalud, Usuario]),
   ],
   controllers: [IncidentesSaludController],

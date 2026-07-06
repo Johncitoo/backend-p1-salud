@@ -6,6 +6,7 @@ import { PacienteSensor } from './entities/paciente-sensor.entity';
 import { MedicionesClinicasService } from '../../mediciones-clinicas/mediciones-clinicas.service';
 import { VariablesClinicasService } from '../../variables-clinicas/variables-clinicas.service';
 import { AlertasService } from '../../alertas/alertas.service';
+import { IncidentesSaludService } from '../../incidentes-salud/incidentes-salud.service';
 
 // =========================================================
 // Integración con Grupo 8 (Plataforma IoT - Sensores médicos)
@@ -72,6 +73,7 @@ export class IoTService {
     private readonly medicionesClinicasService: MedicionesClinicasService,
     private readonly variablesClinicasService: VariablesClinicasService,
     private readonly alertasService: AlertasService,
+    private readonly incidentesSaludService: IncidentesSaludService,
   ) {}
 
   // =========================================================
@@ -262,6 +264,19 @@ export class IoTService {
         prioridad: prioridad,
       });
       this.logger.log(`Alerta IoT creada para paciente ${pacienteSensor.pacienteId} desde sensor ${alert.sensorId}`);
+      
+      if (prioridad === 'ALTA') {
+        this.logger.log(`Alerta crítica IoT detectada. Generando Incidente Clínico para P11...`);
+        await this.incidentesSaludService.create({
+          titulo: `Falla Crítica de Sensor IoT (${alert.type})`,
+          descripcion: alert.message,
+          tipo: 'FALLA_CONEXION', // u otro que aplique
+          severidad: 'CRITICA',
+          estado: 'ABIERTO',
+          origen: 'SISTEMA',
+          pacienteId: pacienteSensor.pacienteId,
+        });
+      }
     } catch (error) {
       this.logger.error(`Error procesando alerta: ${error instanceof Error ? error.message : String(error)}`);
     }
