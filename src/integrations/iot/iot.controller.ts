@@ -75,4 +75,20 @@ export class IoTController {
   syncPatientIoTData(@Param('pacienteId') pacienteId: string) {
     return this.iotSyncService.syncForPatient(pacienteId);
   }
+
+  // =========================================================
+  // Kit portátil (auto-llenado de signos vitales en la ficha)
+  // =========================================================
+
+  @Post('paciente-sensores/:pacienteId/reclamar-kit')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
+  reclamarKitPortatil(@Param('pacienteId') pacienteId: string) {
+    return this.iotService.claimPortableKit(pacienteId);
+  }
+
+  @Get('paciente-sensores/:pacienteId/signos-vitales')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  getSignosVitales(@Param('pacienteId') pacienteId: string) {
+    return this.iotService.getLatestVitalsForPatient(pacienteId);
+  }
 }
