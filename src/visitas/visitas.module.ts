@@ -6,6 +6,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { AnalyticsModule } from '../integrations/analytics/analytics.module';
 import { NotificacionesModule } from '../integrations/notificaciones/notificaciones.module';
 import { BloqueoAgenda } from '../bloqueos-agenda/entities/bloqueo-agenda.entity';
+import { MotivoCancelacion } from '../motivos-cancelacion/entities/motivo-cancelacion.entity';
+import { MotivoReprogramacion } from '../motivos-reprogramacion/entities/motivo-reprogramacion.entity';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
 import { Paciente } from '../pacientes/entities/paciente.entity';
 import { PlanCuidado } from '../pacientes/entities/plan-cuidado.entity';
@@ -42,6 +44,8 @@ import { GoogleCalendarModule } from '../google-calendar/google-calendar.module'
       VisitaEstadoHistorial,
       Prestacion,
       VisitaPrestacion,
+      MotivoCancelacion,
+      MotivoReprogramacion,
     ]),
   ],
   controllers: [VisitasController],
