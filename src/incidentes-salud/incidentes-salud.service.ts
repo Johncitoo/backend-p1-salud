@@ -142,28 +142,33 @@ export class IncidentesSaludService {
       detalle: `Incidente ${saved.tipo} - ${saved.titulo} creado (severidad: ${saved.severidad})`,
     });
 
-    // Crear ticket en CRM de forma asíncrona para no bloquear el flujo principal.
-    try {
-      let paciente: any = null;
-      if (saved.pacienteId) {
-        paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
-      }
-      const crmPayload = this.crmService.buildPayloadFromIncidente(saved, paciente);
-      this.crmService
-        .crearTicket(crmPayload)
-        .then(async (crmResponse) => {
-          const externalIncidentId = this.crmService.extractTicketId(crmResponse);
-          if (!externalIncidentId) return;
-
-          await this.repository.update(saved.id, { externalIncidentId });
-          saved.externalIncidentId = externalIncidentId;
-        })
-        .catch((err) => {
-          this.logger.error(`Error en promesa de CRM: ${err.message}`);
-        });
-    } catch (err: any) {
-      this.logger.error(`Error preparando ticket CRM: ${err.message}`);
-    }
+    // DESHABILITADO TEMPORALMENTE (2026-07-07): todo incidente (incluyendo los automaticos
+    // de IoT y del cron de visitas atrasadas) disparaba un ticket a CRM sin distincion,
+    // inundandolos de tickets que su agente no puede resolver (ej. "bateria baja de sensor").
+    // Pendiente: reactivar filtrando por tipo de incidente (ej. solo 'VISITA_NO_REGISTRADA')
+    // antes de volver a habilitar este bloque.
+    //
+    // try {
+    //   let paciente: any = null;
+    //   if (saved.pacienteId) {
+    //     paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
+    //   }
+    //   const crmPayload = this.crmService.buildPayloadFromIncidente(saved, paciente);
+    //   this.crmService
+    //     .crearTicket(crmPayload)
+    //     .then(async (crmResponse) => {
+    //       const externalIncidentId = this.crmService.extractTicketId(crmResponse);
+    //       if (!externalIncidentId) return;
+    //
+    //       await this.repository.update(saved.id, { externalIncidentId });
+    //       saved.externalIncidentId = externalIncidentId;
+    //     })
+    //     .catch((err) => {
+    //       this.logger.error(`Error en promesa de CRM: ${err.message}`);
+    //     });
+    // } catch (err: any) {
+    //   this.logger.error(`Error preparando ticket CRM: ${err.message}`);
+    // }
 
     if (saved.severidad === 'ALTA' || saved.severidad === 'CRITICA') {
       this.incidentesService.enviarIncidente(saved).catch((err) => {
