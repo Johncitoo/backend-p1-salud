@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { CrmService } from '../integrations/crm/crm.service';
+import { IncidentesService } from '../integrations/incidentes/incidentes.service';
 import { PacientesService } from '../pacientes/pacientes.service';
 import { Visita } from '../pacientes/entities/visita.entity';
 import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.entity';
@@ -26,6 +27,7 @@ export class IncidentesSaludService {
     private readonly usuarioRepository: Repository<Usuario>,
     private readonly auditoriasService: AuditoriasService,
     private readonly crmService: CrmService,
+    private readonly incidentesService: IncidentesService,
     private readonly pacientesService: PacientesService,
   ) {}
 
@@ -161,6 +163,12 @@ export class IncidentesSaludService {
         });
     } catch (err: any) {
       this.logger.error(`Error preparando ticket CRM: ${err.message}`);
+    }
+
+    if (saved.severidad === 'ALTA' || saved.severidad === 'CRITICA') {
+      this.incidentesService.enviarIncidente(saved).catch((err) => {
+        this.logger.error(`Error en promesa de Incidentes: ${err.message}`);
+      });
     }
 
     return saved;

@@ -8,6 +8,8 @@ import { MedicionesClinicasModule } from '../../mediciones-clinicas/mediciones-c
 import { AlertasModule } from '../../alertas/alertas.module';
 import { VariablesClinicasModule } from '../../variables-clinicas/variables-clinicas.module';
 import { IoTSyncService } from './iot-sync.service';
+import { IncidentesSaludModule } from '../../incidentes-salud/incidentes-salud.module';
+
 @Module({
   imports: [
     UsuariosModule,
@@ -15,6 +17,7 @@ import { IoTSyncService } from './iot-sync.service';
     MedicionesClinicasModule,
     AlertasModule,
     VariablesClinicasModule,
+    IncidentesSaludModule,
   ],
   controllers: [IoTController],
   providers: [IoTService, IoTSyncService],
