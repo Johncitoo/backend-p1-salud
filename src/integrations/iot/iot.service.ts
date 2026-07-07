@@ -126,6 +126,15 @@ export class IoTService {
     }
   }
 
+  // La API del Grupo 8 devuelve las listas envueltas en { data, page, limit, total }
+  // (confirmado contra su API real), a diferencia de /sensors/latest que devuelve
+  // el objeto plano. Desenvolvemos aqui para no filtrar ese detalle al resto del servicio.
+  private async fetchListFromIoT<T>(path: string): Promise<T[] | null> {
+    const response = await this.fetchFromIoT<{ data: T[] } | T[]>(path);
+    if (!response) return null;
+    return Array.isArray(response) ? response : (response.data ?? null);
+  }
+
   // =========================================================
   // Endpoints del Grupo 8
   // =========================================================
@@ -135,23 +144,25 @@ export class IoTService {
   }
 
   async getAllReadings(): Promise<IoTTelemetryReading[] | null> {
-    return this.fetchFromIoT<IoTTelemetryReading[]>('/sensors');
+    return this.fetchListFromIoT<IoTTelemetryReading>('/sensors');
   }
 
   async getLatestReading(): Promise<IoTTelemetryReading | null> {
     return this.fetchFromIoT<IoTTelemetryReading>('/sensors/latest');
   }
 
-  async getReadingsBySensor(sensorId: string): Promise<IoTTelemetryReading[] | null> {
-    return this.fetchFromIoT<IoTTelemetryReading[]>(`/sensors/sensor/${sensorId}`);
+  async getReadingsBySensor(sensorId: string, limit?: number): Promise<IoTTelemetryReading[] | null> {
+    const query = limit ? `?limit=${limit}` : '';
+    return this.fetchListFromIoT<IoTTelemetryReading>(`/sensors/sensor/${sensorId}${query}`);
   }
 
   async getAllAlerts(): Promise<IoTAlert[] | null> {
-    return this.fetchFromIoT<IoTAlert[]>('/alerts');
+    return this.fetchListFromIoT<IoTAlert>('/alerts');
   }
 
-  async getAlertsBySensor(sensorId: string): Promise<IoTAlert[] | null> {
-    return this.fetchFromIoT<IoTAlert[]>(`/alerts/sensor/${sensorId}`);
+  async getAlertsBySensor(sensorId: string, limit?: number): Promise<IoTAlert[] | null> {
+    const query = limit ? `?limit=${limit}` : '';
+    return this.fetchListFromIoT<IoTAlert>(`/alerts/sensor/${sensorId}${query}`);
   }
 
   // =========================================================
@@ -244,9 +255,12 @@ export class IoTService {
         return;
       }
 
+      // Normalizamos a mayusculas: su API real usa minusculas (ej. "warning"),
+      // a diferencia de lo que asumimos inicialmente.
+      const severity = (alert.severity ?? '').toUpperCase();
       let prioridad = 'MEDIA';
-      if (alert.severity === 'CRITICAL' || alert.severity === 'HIGH') prioridad = 'ALTA';
-      if (alert.severity === 'LOW') prioridad = 'BAJA';
+      if (severity === 'CRITICAL' || severity === 'HIGH') prioridad = 'ALTA';
+      if (severity === 'LOW' || severity === 'INFO') prioridad = 'BAJA';
 
       const existentes = await this.alertasService.findAll({ pacienteId: pacienteSensor.pacienteId });
       const duplicate = existentes.find(a => 
