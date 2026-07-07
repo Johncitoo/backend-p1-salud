@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditoriasModule } from '../auditorias/auditorias.module';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
@@ -23,6 +23,8 @@ import { Zona } from '../zonas/entities/zona.entity';
 import { VisitasController } from './visitas.controller';
 import { VisitasService } from './visitas.service';
 import { GoogleCalendarModule } from '../google-calendar/google-calendar.module';
+import { VisitasCronService } from './visitas-cron.service';
+import { IncidentesSaludModule } from '../incidentes-salud/incidentes-salud.module';
 
 @Module({
   imports: [
@@ -31,6 +33,7 @@ import { GoogleCalendarModule } from '../google-calendar/google-calendar.module'
     GoogleCalendarModule,
     AnalyticsModule,
     NotificacionesModule,
+    forwardRef(() => IncidentesSaludModule),
     TypeOrmModule.forFeature([
       Visita,
       Paciente,
@@ -49,7 +52,7 @@ import { GoogleCalendarModule } from '../google-calendar/google-calendar.module'
     ]),
   ],
   controllers: [VisitasController],
-  providers: [VisitasService, DevAuthGuard, RolesGuard],
+  providers: [VisitasService, DevAuthGuard, RolesGuard, VisitasCronService],
   exports: [VisitasService],
 })
 export class VisitasModule {}
