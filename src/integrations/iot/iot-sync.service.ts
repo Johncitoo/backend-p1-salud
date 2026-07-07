@@ -30,8 +30,8 @@ export class IoTSyncService {
         
         if (readings && readings.length > 0) {
           for (const reading of readings) {
-            // El IoTService se encargará de ignorar duplicados gracias a la validación en processTelemetryWebhook
-            await this.iotService.processTelemetryWebhook(reading);
+            // El IoTService se encargará de ignorar duplicados gracias a la validación en processTelemetryReading
+            await this.iotService.processTelemetryReading(reading);
             processedCount++;
           }
         }
@@ -40,7 +40,7 @@ export class IoTSyncService {
         const alerts = await this.iotService.getAlertsBySensor(sensor.sensorId);
         if (alerts && alerts.length > 0) {
           for (const alert of alerts) {
-            await this.iotService.processAlertWebhook(alert);
+            await this.iotService.processAlertReading(alert);
             processedCount++; // Sumamos también las alertas procesadas
           }
         }
