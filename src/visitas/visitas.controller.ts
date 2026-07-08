@@ -8,6 +8,7 @@ import { CreateVisitaDto } from '../pacientes/dto/create-visita.dto';
 import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
 import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
+import { ReprogramarVisitaDto } from './dto/reprogramar-visita.dto';
 import { FindCalendarioQueryDto } from './dto/find-calendario-query.dto';
 import { CompletarVisitaDto } from './dto/completar-visita.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
@@ -93,6 +94,16 @@ export class VisitasController {
     @CurrentUser() user?: UsuarioPerfil,
   ) {
     return this.visitasService.completar(id, dto, uuidOrUndefined(user?.id));
+  }
+
+  @Patch(':id/reprogramar')
+  @Roles('ADMIN', 'COORDINADOR')
+  reprogramar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReprogramarVisitaDto,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
+    return this.visitasService.reprogramar(id, dto, uuidOrUndefined(user?.id));
   }
 
   @Patch(':id/cancelar')

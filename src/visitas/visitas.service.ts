@@ -23,6 +23,7 @@ import { VisitaEstadoHistorial } from '../visita-estado-historial/entities/visit
 import { Zona } from '../zonas/entities/zona.entity';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
 import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
+import { ReprogramarVisitaDto } from './dto/reprogramar-visita.dto';
 import { FindCalendarioQueryDto } from './dto/find-calendario-query.dto';
 import { CompletarVisitaDto } from './dto/completar-visita.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
@@ -447,6 +448,53 @@ export class VisitasService {
       const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
       await this.notificacionesService.notificarProfesionalEnCamino(saved, paciente, profesionalUsuario);
     }
+
+    return saved;
+  }
+
+  async reprogramar(id: string, dto: ReprogramarVisitaDto, usuarioId?: string): Promise<Visita> {
+    const visita = await this.findOne(id);
+    if (['CANCELADA', 'REALIZADA'].includes(visita.estado)) {
+      throw new BadRequestException('No se puede reprogramar una visita cancelada o realizada');
+    }
+
+    const estadoAnterior = visita.estado;
+    const fechaAnterior = visita.fechaProgramada;
+    const horaAnterior = visita.horaProgramada;
+
+    visita.fechaProgramada = dto.fechaProgramadaNueva;
+    visita.horaProgramada = dto.horaProgramadaNueva;
+    visita.estado = 'PROGRAMADA';
+
+    const saved = await this.visitasRepository.save(visita);
+
+    await this.reprogramacionesRepository.save(
+      this.reprogramacionesRepository.create({
+        visitaId: saved.id,
+        fechaProgramadaAnterior: fechaAnterior,
+        horaProgramadaAnterior: horaAnterior,
+        fechaProgramadaNueva: dto.fechaProgramadaNueva,
+        horaProgramadaNueva: dto.horaProgramadaNueva,
+        motivoReprogramacionId: dto.motivoReprogramacionId ?? null,
+        observacion: dto.observacion ?? null,
+        reprogramadaPorUsuarioId: usuarioId,
+      }),
+    );
+
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'visitas',
+      entidadId: saved.id,
+      accion: 'REPROGRAMAR',
+      detalle: `Visita reprogramada de ${fechaAnterior} ${horaAnterior} a ${dto.fechaProgramadaNueva} ${dto.horaProgramadaNueva}`,
+    });
+    await this.registrarEstadoHistorial(saved, estadoAnterior, saved.estado, usuarioId, 'Visita reprogramada');
+
+    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
+
+    const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
+    const motivo = await this.resolverMotivoReprogramacion(dto.motivoReprogramacionId, dto.observacion);
+    await this.notificacionesService.notificarVisitaReprogramada(saved, paciente, profesionalUsuario, motivo);
 
     return saved;
   }

@@ -151,6 +151,61 @@ export class NotificacionesService {
   }
 
   // =========================================================
+  // Plantilla de email (HTML final que recibe el Grupo 6 en body.email).
+  // Estilos inline porque los clientes de correo no cargan hojas de estilo
+  // externas ni respetan <style> de forma confiable. Colores tomados del
+  // theme de la app (yaleBlue/stormyTeal/danger) para que se vea consistente
+  // con el resto del producto.
+  // =========================================================
+
+  private renderEmailTemplate(saludo: string, contenidoHtml: string): string {
+    return `<!doctype html>
+<html>
+  <body style="margin:0;padding:24px 12px;background-color:#F5F7FA;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background-color:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(40,75,99,0.12);">
+            <tr>
+              <td style="background-color:#284B63;padding:20px 28px;">
+                <span style="color:#FFFFFF;font-size:17px;font-weight:bold;">🏥 Salud Domiciliaria</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;color:#353535;font-size:15px;line-height:1.6;">
+                <p style="margin:0 0 12px;">Hola ${saludo},</p>
+                ${contenidoHtml}
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color:#F5F7FA;padding:14px 28px;color:#7A7A7A;font-size:11.5px;border-top:1px solid #EAEAEA;">
+                Mensaje automático de tu sistema de atención domiciliaria. No respondas a este correo.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+  }
+
+  // Tarjeta destacada con fecha/hora — reutilizada en todos los eventos de visita.
+  private renderFechaHoraBox(fecha: string | null, hora: string | null): string {
+    if (!fecha && !hora) return '';
+    return `<div style="background-color:#EEF3F2;border-left:4px solid #3C6E71;border-radius:6px;padding:12px 16px;margin:4px 0 16px;">
+      <span style="color:#284B63;font-size:16px;font-weight:bold;">${fecha ?? ''}${fecha && hora ? ' · ' : ''}${hora ?? ''}</span>
+    </div>`;
+  }
+
+  private renderMotivoBox(motivo?: string | null): string {
+    if (!motivo) return '';
+    return `<div style="background-color:#FDECEC;border-radius:6px;padding:10px 14px;margin-top:4px;color:#B71C1C;font-size:13.5px;">
+      <strong>Motivo:</strong> ${motivo}
+    </div>`;
+  }
+
+  // =========================================================
   // Notificaciones de creación de entidades
   // =========================================================
 
@@ -160,7 +215,10 @@ export class NotificacionesService {
       'paciente_creado',
       { email: paciente.email, telefono: paciente.telefono },
       'Bienvenido/a a Salud Domiciliaria',
-      `<p>Hola ${nombre},</p><p>Tu ficha como paciente fue creada correctamente en nuestro sistema de atención domiciliaria.</p>`,
+      this.renderEmailTemplate(
+        nombre,
+        `<p style="margin:0;">Tu ficha como paciente fue creada correctamente en nuestro sistema de atención domiciliaria.</p>`,
+      ),
       undefined,
       { pacienteId: paciente.id },
     );
@@ -172,7 +230,10 @@ export class NotificacionesService {
       'profesional_creado',
       { email: usuario.email, telefono: usuario.telefono },
       'Bienvenido/a a Salud Domiciliaria',
-      `<p>Hola ${nombre},</p><p>Tu cuenta de profesional fue creada correctamente en nuestro sistema de atención domiciliaria.</p>`,
+      this.renderEmailTemplate(
+        nombre,
+        `<p style="margin:0;">Tu cuenta de profesional fue creada correctamente en nuestro sistema de atención domiciliaria.</p>`,
+      ),
     );
   }
 
@@ -191,10 +252,11 @@ export class NotificacionesService {
         'visita_agendada',
         { email: paciente.email, telefono: paciente.telefono },
         'Confirmación de tu hora de atención domiciliaria',
-        `<p>Hola ${nombrePaciente},</p>` +
-        `<p>Se agendó tu atención domiciliaria para el <b>${fecha}</b> a las <b>${hora}</b>` +
-        (nombreProfesional ? ` con ${nombreProfesional}` : '') +
-        `.</p>`,
+        this.renderEmailTemplate(
+          nombrePaciente,
+          `<p style="margin:0 0 4px;">Se agendó tu atención domiciliaria${nombreProfesional ? ` con <b>${nombreProfesional}</b>` : ''}:</p>` +
+          this.renderFechaHoraBox(fecha, hora),
+        ),
         undefined,
         { visitaId: visita.id, pacienteId: paciente.id },
       );
@@ -205,10 +267,11 @@ export class NotificacionesService {
         'visita_agendada',
         { email: profesionalUsuario.email, telefono: profesionalUsuario.telefono },
         'Nueva visita agendada',
-        `<p>Hola ${nombreProfesional},</p>` +
-        `<p>Tienes una nueva visita agendada para el <b>${fecha}</b> a las <b>${hora}</b>` +
-        (nombrePaciente ? ` con el paciente ${nombrePaciente}` : '') +
-        `.</p>`,
+        this.renderEmailTemplate(
+          nombreProfesional,
+          `<p style="margin:0 0 4px;">Tienes una nueva visita agendada${nombrePaciente ? ` con el paciente <b>${nombrePaciente}</b>` : ''}:</p>` +
+          this.renderFechaHoraBox(fecha, hora),
+        ),
         undefined,
         { visitaId: visita.id },
       );
@@ -223,7 +286,6 @@ export class NotificacionesService {
   ): Promise<void> {
     const fecha = this.formatDateOnly(visita.fechaProgramada);
     const hora = this.formatTimeOnly(visita.horaProgramada);
-    const motivoHtml = motivo ? `<p><b>Motivo:</b> ${motivo}</p>` : '';
     const motivoSms = motivo ? ` Motivo: ${motivo}.` : '';
 
     if (paciente) {
@@ -232,7 +294,12 @@ export class NotificacionesService {
         'visita_cancelada',
         { email: paciente.email, telefono: paciente.telefono },
         'Tu atención domiciliaria fue cancelada',
-        `<p>Hola ${nombre},</p><p>Tu atención domiciliaria del <b>${fecha}</b> a las <b>${hora}</b> fue cancelada.</p>${motivoHtml}`,
+        this.renderEmailTemplate(
+          nombre,
+          `<p style="margin:0 0 4px;">Tu atención domiciliaria fue <b style="color:#B71C1C;">cancelada</b>:</p>` +
+          this.renderFechaHoraBox(fecha, hora) +
+          this.renderMotivoBox(motivo),
+        ),
         `Tu atención del ${fecha} ${hora} fue cancelada.${motivoSms}`,
         { visitaId: visita.id, pacienteId: paciente.id },
       );
@@ -244,7 +311,12 @@ export class NotificacionesService {
         'visita_cancelada',
         { email: profesionalUsuario.email, telefono: profesionalUsuario.telefono },
         'Visita cancelada',
-        `<p>Hola ${nombre},</p><p>La visita del <b>${fecha}</b> a las <b>${hora}</b> fue cancelada.</p>${motivoHtml}`,
+        this.renderEmailTemplate(
+          nombre,
+          `<p style="margin:0 0 4px;">La siguiente visita fue <b style="color:#B71C1C;">cancelada</b>:</p>` +
+          this.renderFechaHoraBox(fecha, hora) +
+          this.renderMotivoBox(motivo),
+        ),
         undefined,
         { visitaId: visita.id },
       );
@@ -259,7 +331,6 @@ export class NotificacionesService {
   ): Promise<void> {
     const fecha = this.formatDateOnly(visita.fechaProgramada);
     const hora = this.formatTimeOnly(visita.horaProgramada);
-    const motivoHtml = motivo ? `<p><b>Motivo:</b> ${motivo}</p>` : '';
     const motivoSms = motivo ? ` Motivo: ${motivo}.` : '';
 
     if (paciente) {
@@ -268,7 +339,12 @@ export class NotificacionesService {
         'visita_reprogramada',
         { email: paciente.email, telefono: paciente.telefono },
         'Tu atención domiciliaria fue reprogramada',
-        `<p>Hola ${nombre},</p><p>Tu atención domiciliaria fue reprogramada para el <b>${fecha}</b> a las <b>${hora}</b>.</p>${motivoHtml}`,
+        this.renderEmailTemplate(
+          nombre,
+          `<p style="margin:0 0 4px;">Tu atención domiciliaria fue <b style="color:#F9A825;">reprogramada</b> para:</p>` +
+          this.renderFechaHoraBox(fecha, hora) +
+          this.renderMotivoBox(motivo),
+        ),
         `Tu atención fue reprogramada para el ${fecha} ${hora}.${motivoSms}`,
         { visitaId: visita.id, pacienteId: paciente.id },
       );
@@ -280,7 +356,12 @@ export class NotificacionesService {
         'visita_reprogramada',
         { email: profesionalUsuario.email, telefono: profesionalUsuario.telefono },
         'Visita reprogramada',
-        `<p>Hola ${nombre},</p><p>La visita fue reprogramada para el <b>${fecha}</b> a las <b>${hora}</b>.</p>${motivoHtml}`,
+        this.renderEmailTemplate(
+          nombre,
+          `<p style="margin:0 0 4px;">La siguiente visita fue <b style="color:#F9A825;">reprogramada</b> para:</p>` +
+          this.renderFechaHoraBox(fecha, hora) +
+          this.renderMotivoBox(motivo),
+        ),
         undefined,
         { visitaId: visita.id },
       );
@@ -301,7 +382,11 @@ export class NotificacionesService {
       'profesional_en_camino',
       { email: paciente.email, telefono: paciente.telefono },
       'Tu profesional va en camino',
-      `<p>Hola ${nombrePaciente},</p><p>${nombreProfesional} va en camino hacia tu domicilio para tu atención de las <b>${hora}</b>.</p>`,
+      this.renderEmailTemplate(
+        nombrePaciente,
+        `<p style="margin:0 0 4px;">🚗 <b>${nombreProfesional}</b> va en camino hacia tu domicilio para tu atención de las:</p>` +
+        this.renderFechaHoraBox(null, hora),
+      ),
       `${nombreProfesional} va en camino a tu domicilio.`,
       { visitaId: visita.id, pacienteId: paciente.id },
     );
@@ -319,7 +404,11 @@ export class NotificacionesService {
         'recordatorio_visita',
         { email: paciente.email, telefono: paciente.telefono },
         'Recordatorio: tu atención domiciliaria es mañana',
-        `<p>Hola ${nombre},</p><p>Te recordamos que tienes una atención domiciliaria agendada para mañana <b>${fecha}</b> a las <b>${hora}</b>.</p>`,
+        this.renderEmailTemplate(
+          nombre,
+          `<p style="margin:0 0 4px;">🔔 Te recordamos tu atención domiciliaria de mañana:</p>` +
+          this.renderFechaHoraBox(fecha, hora),
+        ),
         `Recordatorio: tu atención domiciliaria es mañana ${fecha} a las ${hora}.`,
         { visitaId: visita.id, pacienteId: paciente.id },
       );
@@ -331,7 +420,11 @@ export class NotificacionesService {
         'recordatorio_visita',
         { email: profesionalUsuario.email, telefono: profesionalUsuario.telefono },
         'Recordatorio: tienes una visita mañana',
-        `<p>Hola ${nombre},</p><p>Tienes una visita domiciliaria agendada para mañana <b>${fecha}</b> a las <b>${hora}</b>.</p>`,
+        this.renderEmailTemplate(
+          nombre,
+          `<p style="margin:0 0 4px;">🔔 Tienes una visita domiciliaria agendada para mañana:</p>` +
+          this.renderFechaHoraBox(fecha, hora),
+        ),
         undefined,
         { visitaId: visita.id },
       );
