@@ -49,6 +49,20 @@ export class CrmService {
     this.apiKey = this.configService.get<string>('CRM_API_KEY') || 'salud_secret_p01';
   }
 
+  /**
+   * CRM (Proyecto 07) es una tiquetería de SOPORTE al cliente: sus agentes atienden
+   * casos ingresados MANUALMENTE por un profesional ante situaciones ligadas a la
+   * atención (origen WEB/APP). Los incidentes AUTOMÁTICOS del sistema —cron de visitas
+   * atrasadas y alertas de IoT (batería baja, sensor offline, etc.), todos con
+   * origen SISTEMA— NO deben ir a CRM: inundaban su bandeja con casos que su agente
+   * no puede resolver. Esos siguen escalándose a Grupo 11 (incidentes operacionales).
+   */
+  private static readonly ORIGENES_MANUALES = new Set(['WEB', 'APP']);
+
+  debeEnviarTicket(incidente: IncidenteSalud): boolean {
+    return CrmService.ORIGENES_MANUALES.has((incidente.origen ?? '').toUpperCase());
+  }
+
   async crearTicket(payload: CreateCrmTicketPayload): Promise<any> {
     try {
       const response = await firstValueFrom(

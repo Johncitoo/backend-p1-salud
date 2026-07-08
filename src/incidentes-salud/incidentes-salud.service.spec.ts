@@ -1,5 +1,4 @@
 import { NotFoundException } from '@nestjs/common';
-import { NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import { IsNull, Repository } from 'typeorm';
@@ -28,6 +27,7 @@ describe('IncidentesSaludService', () => {
   let service: IncidentesSaludService;
   let repository: MockRepository<IncidenteSalud>;
   let incidentesServiceMock: any;
+  let crmServiceMock: any;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -43,8 +43,9 @@ describe('IncidentesSaludService', () => {
         { provide: IncidentesService, useValue: { enviarIncidente: jest.fn().mockResolvedValue(true) } },
         { 
           provide: CrmService, 
-          useValue: { 
-            buildPayloadFromIncidente: jest.fn().mockReturnValue({}), 
+          useValue: {
+            debeEnviarTicket: jest.fn((inc: any) => ['WEB', 'APP'].includes((inc?.origen ?? '').toUpperCase())),
+            buildPayloadFromIncidente: jest.fn().mockReturnValue({}),
             crearTicket: jest.fn().mockResolvedValue({ ticket: { id: 'crm-123' } }),
             extractTicketId: jest.fn((response) => response?.ticket?.id ?? null),
             consultarEstadoTicket: jest.fn().mockResolvedValue({
@@ -68,6 +69,7 @@ describe('IncidentesSaludService', () => {
     }).compile();
     service = module.get<IncidentesSaludService>(IncidentesSaludService);
     incidentesServiceMock = module.get<IncidentesService>(IncidentesService);
+    crmServiceMock = module.get<CrmService>(CrmService);
   });
 
   it('findOne retorna el incidente si existe', async () => {
@@ -87,16 +89,46 @@ describe('IncidentesSaludService', () => {
     repository.create!.mockReturnValue({ ...dto, severidad: 'MEDIA', estado: 'ABIERTO', origen: 'SISTEMA' });
     repository.save!.mockResolvedValue(savedMock);
     await expect(service.create(dto as any, 'u-1111')).resolves.toEqual(savedMock);
-    expect(incidentesServiceMock.enviarIncidente).not.toHaveBeenCalled();
   });
 
-  it('create dispara enviarIncidente al Proyecto 11 si es ALTA o CRITICA', async () => {
+  it('create reporta TODO incidente al Proyecto 11 (sin importar la severidad)', async () => {
     const dto = { tipo: 'CAIDA', titulo: 'Test grave', pacienteId: 'p-2222', severidad: 'CRITICA' };
     const incidenteCritico = { ...incidente, severidad: 'CRITICA' };
     repository.create!.mockReturnValue(incidenteCritico);
     repository.save!.mockResolvedValue(incidenteCritico);
     await service.create(dto as any, 'u-1111');
     expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteCritico);
+  });
+
+  it('create también reporta a Proyecto 11 los incidentes de baja severidad', async () => {
+    const dto = { tipo: 'FALLA_DISPOSITIVO', titulo: 'Batería baja', pacienteId: 'p-2222', severidad: 'BAJA' };
+    const incidenteBajo = { ...incidente, severidad: 'BAJA', tipo: 'FALLA_DISPOSITIVO' };
+    repository.create!.mockReturnValue(incidenteBajo);
+    repository.save!.mockResolvedValue(incidenteBajo);
+    await service.create(dto as any, 'u-1111');
+    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteBajo);
+  });
+
+  it('crea ticket en CRM para incidentes MANUALES (origen WEB)', async () => {
+    const dto = { tipo: 'CAIDA_PACIENTE', titulo: 'Caída', pacienteId: 'p-2222', origen: 'WEB' };
+    const incidenteManual = { ...incidente, origen: 'WEB' };
+    repository.create!.mockReturnValue(incidenteManual);
+    repository.save!.mockResolvedValue(incidenteManual);
+    await service.create(dto as any, 'u-1111');
+    await new Promise((r) => setImmediate(r)); // deja resolver la promesa de CRM
+    expect(crmServiceMock.crearTicket).toHaveBeenCalled();
+  });
+
+  it('NO crea ticket en CRM para incidentes automáticos del sistema (origen SISTEMA)', async () => {
+    const dto = { tipo: 'FALLA_DISPOSITIVO', titulo: 'Batería baja', pacienteId: 'p-2222', origen: 'SISTEMA' };
+    const incidenteSistema = { ...incidente, origen: 'SISTEMA', tipo: 'FALLA_DISPOSITIVO' };
+    repository.create!.mockReturnValue(incidenteSistema);
+    repository.save!.mockResolvedValue(incidenteSistema);
+    await service.create(dto as any, 'u-1111');
+    await new Promise((r) => setImmediate(r));
+    expect(crmServiceMock.crearTicket).not.toHaveBeenCalled();
+    // Pero sí se escala a Grupo 11 (incidentes operacionales)
+    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteSistema);
   });
 
   it('findCrmStatus consulta el estado externo si existe externalIncidentId', async () => {

@@ -23,7 +23,10 @@ export class MedicionesClinicasService {
     fechaDesde?: string;
     fechaHasta?: string;
   }) {
-    const qb = this.repo.createQueryBuilder('mc').where('mc.deleted_at IS NULL');
+    const qb = this.repo
+      .createQueryBuilder('mc')
+      .leftJoinAndSelect('mc.variableClinica', 'variableClinica')
+      .where('mc.deleted_at IS NULL');
 
     if (filtros?.pacienteId) qb.andWhere('mc.paciente_id = :pacienteId', { pacienteId: filtros.pacienteId });
     if (filtros?.visitaId) qb.andWhere('mc.visita_id = :visitaId', { visitaId: filtros.visitaId });

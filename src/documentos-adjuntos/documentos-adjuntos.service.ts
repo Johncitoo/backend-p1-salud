@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'crypto';
 import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
@@ -10,7 +10,8 @@ import { DocumentoAdjunto } from './entities/documento-adjunto.entity';
 import { FileEncryptionService } from './services/file-encryption.service';
 import { FileValidationService } from './services/file-validation.service';
 import { ImageOptimizerService } from './services/image-optimizer.service';
-import { R2StorageService } from './services/r2-storage.service';
+import { STORAGE_SERVICE } from './services/storage.interface';
+import type { StorageService } from './services/storage.interface';
 import type { UploadedClinicalFile } from './types/uploaded-file.type';
 
 export type DownloadDocumentoAdjunto = {
@@ -31,7 +32,7 @@ export class DocumentosAdjuntosService {
     private readonly fileValidation: FileValidationService,
     private readonly imageOptimizer: ImageOptimizerService,
     private readonly encryption: FileEncryptionService,
-    private readonly storage: R2StorageService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly auditoriasService: AuditoriasService,
   ) {}
 
@@ -69,7 +70,7 @@ export class DocumentosAdjuntosService {
         storedExtension: processed.extension,
       },
       subidoPorUsuarioId: usuarioId ?? null,
-      storageProvider: 'R2',
+      storageProvider: this.storage.providerName,
       bucket: this.storage.getBucket(),
       objectKey,
       mimeTypeOriginal: validated.mimeType,
@@ -218,7 +219,7 @@ export class DocumentosAdjuntosService {
     const { encryptionIv, encryptionTag, objectKey, ...safeDocumento } = documento;
     return {
       ...safeDocumento,
-      objectKey: objectKey ? 'r2://encrypted-object' : null,
+      objectKey: objectKey ? `${documento.storageProvider.toLowerCase()}://encrypted-object` : null,
       encryptionIv: encryptionIv ? '***' : null,
       encryptionTag: encryptionTag ? '***' : null,
     };

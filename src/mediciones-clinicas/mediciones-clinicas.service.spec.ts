@@ -40,7 +40,7 @@ describe('MedicionesClinicasService', () => {
 
   describe('findAll with filters', () => {
     it('applies pacienteId filter', async () => {
-      const mockQB = { where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), innerJoin: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(), getMany: jest.fn().mockResolvedValue([]) };
+      const mockQB = { where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), innerJoin: jest.fn().mockReturnThis(), leftJoinAndSelect: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(), getMany: jest.fn().mockResolvedValue([]) };
       (repo.createQueryBuilder as jest.Mock).mockReturnValue(mockQB);
 
       await service.findAll({ pacienteId: 'p1' });
@@ -48,7 +48,7 @@ describe('MedicionesClinicasService', () => {
     });
 
     it('applies codigoVariable filter with join', async () => {
-      const mockQB = { where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), innerJoin: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(), getMany: jest.fn().mockResolvedValue([]) };
+      const mockQB = { where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), innerJoin: jest.fn().mockReturnThis(), leftJoinAndSelect: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(), getMany: jest.fn().mockResolvedValue([]) };
       (repo.createQueryBuilder as jest.Mock).mockReturnValue(mockQB);
 
       await service.findAll({ codigoVariable: 'PA' });
@@ -71,7 +71,7 @@ describe('MedicionesClinicasService', () => {
 
   describe('findByVisita / findByPaciente', () => {
     it('delegates to findAll with visitaId', async () => {
-      const mockQB = { where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), innerJoin: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(), getMany: jest.fn().mockResolvedValue([]) };
+      const mockQB = { where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), innerJoin: jest.fn().mockReturnThis(), leftJoinAndSelect: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(), getMany: jest.fn().mockResolvedValue([]) };
       (repo.createQueryBuilder as jest.Mock).mockReturnValue(mockQB);
 
       await service.findByVisita('v1');
@@ -79,7 +79,7 @@ describe('MedicionesClinicasService', () => {
     });
 
     it('delegates to findAll with pacienteId', async () => {
-      const mockQB = { where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), innerJoin: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(), getMany: jest.fn().mockResolvedValue([]) };
+      const mockQB = { where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), innerJoin: jest.fn().mockReturnThis(), leftJoinAndSelect: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(), getMany: jest.fn().mockResolvedValue([]) };
       (repo.createQueryBuilder as jest.Mock).mockReturnValue(mockQB);
 
       await service.findByPaciente('p1');
