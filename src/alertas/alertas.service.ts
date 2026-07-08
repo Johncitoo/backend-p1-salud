@@ -21,9 +21,17 @@ export class AlertasService {
     visitaId?: string;
     estado?: string;
     prioridad?: string;
-  }): Promise<Alerta[]> {
+  }): Promise<Array<Alerta & { especialidad: string | null }>> {
     const qb = this.alertasRepository
       .createQueryBuilder('alerta')
+      // La especialidad no se guarda en la alerta: se resuelve al vuelo desde la
+      // profesión del profesional que hizo la visita (visita.profesional_salud_id),
+      // así siempre refleja el dato real de /profesionales en vez de una copia que
+      // podría quedar desactualizada. Alertas sin visita asociada (visitaId
+      // opcional) simplemente no tienen especialidad.
+      .leftJoin('visitas', 'visita', 'visita.id = alerta.visita_id')
+      .leftJoin('profesionales_salud', 'profesional', 'profesional.id = visita.profesional_salud_id')
+      .addSelect('profesional.profesion', 'especialidad')
       .where('alerta.deleted_at IS NULL');
 
     if (filtros?.pacienteId)
@@ -41,7 +49,14 @@ export class AlertasService {
         prioridad: filtros.prioridad,
       });
 
-    return qb.orderBy('alerta.created_at', 'DESC').getMany();
+    const { entities, raw } = await qb
+      .orderBy('alerta.created_at', 'DESC')
+      .getRawAndEntities();
+
+    return entities.map((alerta, index) => ({
+      ...alerta,
+      especialidad: raw[index]?.especialidad ?? null,
+    }));
   }
 
   async findOne(id: string): Promise<Alerta> {
