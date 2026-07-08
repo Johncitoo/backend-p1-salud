@@ -5,6 +5,7 @@ import { AuditoriasService } from '../auditorias/auditorias.service';
 import { CrmService } from '../integrations/crm/crm.service';
 import { IncidentesService } from '../integrations/incidentes/incidentes.service';
 import { PacientesService } from '../pacientes/pacientes.service';
+import { Paciente } from '../pacientes/entities/paciente.entity';
 import { Visita } from '../pacientes/entities/visita.entity';
 import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -144,7 +145,7 @@ export class IncidentesSaludService {
 
     // Crear ticket en CRM de forma asíncrona para no bloquear el flujo principal.
     try {
-      let paciente: any = null;
+      let paciente: Paciente | null = null;
       if (saved.pacienteId) {
         paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
       }

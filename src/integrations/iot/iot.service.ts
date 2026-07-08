@@ -62,6 +62,17 @@ export const IOT_VARIABLE_MAP: Record<string, string> = {
   glucoseLevel: 'glicemia_capilar',
 };
 
+// Kit portátil simulado por el Grupo 8: un único asset ("PATIENT-001") con 3
+// sensores que el profesional "reclama" para el paciente que está atendiendo
+// en ese momento (assetId+sensorId es único por diseño en PacienteSensor, así
+// que no puede estar asignado a varios pacientes a la vez — se reasigna en
+// cada visita, igual que un tensiómetro físico portátil que se comparte).
+export const PORTABLE_KIT_SENSORS: Array<{ sensorId: string; assetId: string; sensorType: SensorType }> = [
+  { sensorId: 'GLUCO-001', assetId: 'PATIENT-001', sensorType: 'glucometer' },
+  { sensorId: 'OXI-001', assetId: 'PATIENT-001', sensorType: 'pulse_oximeter' },
+  { sensorId: 'BP-001', assetId: 'PATIENT-001', sensorType: 'sphygmomanometer' },
+];
+
 @Injectable()
 export class IoTService {
   private readonly logger = new Logger(IoTService.name);
@@ -202,7 +213,7 @@ export class IoTService {
       }
 
       const mediciones = this.extractMediciones(reading);
-      
+
       for (const med of mediciones) {
         const variable = await this.variablesClinicasService.findByCodigo(med.codigoVariable);
         if (!variable) {
@@ -221,7 +232,7 @@ export class IoTService {
             fechaDesde: fechaMedicion.toISOString(),
             fechaHasta: fechaMedicion.toISOString()
           });
-          
+
           if (existentes && existentes.length > 0) {
             continue; // Ya existe esta medición exacta
           }
@@ -263,8 +274,8 @@ export class IoTService {
       if (severity === 'LOW' || severity === 'INFO') prioridad = 'BAJA';
 
       const existentes = await this.alertasService.findAll({ pacienteId: pacienteSensor.pacienteId });
-      const duplicate = existentes.find(a => 
-        a.mensaje === alert.message && 
+      const duplicate = existentes.find(a =>
+        a.mensaje === alert.message &&
         a.tipo === `IOT_${alert.type.toUpperCase()}`
       );
       if (duplicate) {
@@ -278,7 +289,7 @@ export class IoTService {
         prioridad: prioridad,
       });
       this.logger.log(`Alerta IoT creada para paciente ${pacienteSensor.pacienteId} desde sensor ${alert.sensorId}`);
-      
+
       if (prioridad === 'ALTA') {
         this.logger.log(`Alerta crítica IoT detectada. Generando Incidente Clínico para P11...`);
         await this.incidentesSaludService.create({
@@ -334,5 +345,54 @@ export class IoTService {
 
     return this.pacienteSensorRepo.save(sensor);
   }
-}
 
+  // =========================================================
+  // Kit portátil (auto-llenado de signos vitales en la ficha)
+  // =========================================================
+
+  // Reclama el kit portátil (GLUCO-001/OXI-001/BP-001) para este paciente,
+  // reasignando cada sensor si estaba en otro paciente. Se llama al hacer
+  // check-in en una visita.
+  async claimPortableKit(pacienteId: string): Promise<PacienteSensor[]> {
+    const asignados: PacienteSensor[] = [];
+    for (const s of PORTABLE_KIT_SENSORS) {
+      const sensor = await this.assignSensorToPatient(pacienteId, s.assetId, s.sensorId, s.sensorType);
+      asignados.push(sensor);
+    }
+    return asignados;
+  }
+
+  // Última lectura de cada sensor activo del paciente, mapeada a los códigos
+  // de variable clínica (mismos nombres que IOT_VARIABLE_MAP) para que el
+  // formulario de la ficha pueda auto-completarse directamente.
+  async getLatestVitalsForPatient(pacienteId: string): Promise<Record<string, number>> {
+    const sensoresPaciente = await this.getSensorsByPatient(pacienteId);
+    if (sensoresPaciente.length === 0) return {};
+
+    const sensorIds = new Set(sensoresPaciente.map(s => s.sensorId));
+    const lecturas = await this.getAllReadings();
+    if (!lecturas) return {};
+
+    const vitales: Record<string, number> = {};
+    for (const lectura of lecturas) {
+      if (!sensorIds.has(lectura.sensorId)) continue;
+      for (const [campoIot, valor] of Object.entries(this.extractMedicionesRaw(lectura))) {
+        vitales[campoIot] = valor;
+      }
+    }
+    return vitales;
+  }
+
+  // Igual que extractMediciones pero devuelve { codigoVariable: valor } en vez
+  // de un array, para armar el objeto plano de getLatestVitalsForPatient.
+  private extractMedicionesRaw(reading: IoTTelemetryReading): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [iotField, variableCodigo] of Object.entries(IOT_VARIABLE_MAP)) {
+      const value = reading[iotField as keyof IoTTelemetryReading];
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        out[variableCodigo] = value;
+      }
+    }
+    return out;
+  }
+}

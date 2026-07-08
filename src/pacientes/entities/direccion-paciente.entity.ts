@@ -8,23 +8,32 @@ export class DireccionPaciente {
   @Column({ name: 'paciente_id', type: 'uuid' })
   pacienteId: string;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  alias?: string | null;
+  @Column({ name: 'zona_id', type: 'uuid', nullable: true })
+  zonaId?: string | null;
 
-  @Column({ length: 200 })
-  calle: string;
+  @Column({ type: 'varchar', length: 30, default: 'DOMICILIO' })
+  tipo: string;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  calle?: string | null;
+
+  @Column({ type: 'varchar', length: 30, nullable: true })
   numero?: string | null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ type: 'varchar', length: 50, nullable: true })
   departamento?: string | null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  comuna?: string | null;
+  @Column({ name: 'villa_poblacion', type: 'varchar', length: 150, nullable: true })
+  villaPoblacion?: string | null;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  region?: string | null;
+  @Column({ length: 100 })
+  comuna: string;
+
+  @Column({ length: 100 })
+  region: string;
+
+  @Column({ type: 'text', nullable: true })
+  referencia?: string | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
   latitud?: number | null;
@@ -32,8 +41,11 @@ export class DireccionPaciente {
   @Column({ type: 'decimal', precision: 10, scale: 7, nullable: true })
   longitud?: number | null;
 
-  @Column({ default: false })
+  @Column({ name: 'es_principal', default: false })
   esPrincipal: boolean;
+
+  @Column({ default: true })
+  activa: boolean;
 
   @Column({ name: 'created_at', type: 'timestamp', default: () => 'NOW()' })
   createdAt: Date;

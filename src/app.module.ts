@@ -32,6 +32,8 @@ import { VisitaCheckpointsModule } from './visita-checkpoints/visita-checkpoints
 import { IncidentesSaludModule } from './incidentes-salud/incidentes-salud.module';
 import { IncidenteEstadoHistorialModule } from './incidente-estado-historial/incidente-estado-historial.module';
 import { IncidentesModule } from './integrations/incidentes/incidentes.module';
+import { DiagnosticosModule } from './diagnosticos/diagnosticos.module';
+import { MedicamentosModule } from './medicamentos/medicamentos.module';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -82,6 +84,8 @@ const isTest = process.env.NODE_ENV === 'test';
     IncidentesSaludModule,
     IncidenteEstadoHistorialModule,
     IncidentesModule,
+    DiagnosticosModule,
+    MedicamentosModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
