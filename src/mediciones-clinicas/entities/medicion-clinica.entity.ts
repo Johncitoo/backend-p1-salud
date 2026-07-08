@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { VariableClinica } from '../../variables-clinicas/entities/variable-clinica.entity';
 
 @Entity({ name: 'mediciones_clinicas' })
 export class MedicionClinica {
@@ -16,6 +17,10 @@ export class MedicionClinica {
 
   @Column({ name: 'variable_clinica_id', type: 'uuid' })
   variableClinicaId: string;
+
+  @ManyToOne(() => VariableClinica)
+  @JoinColumn({ name: 'variable_clinica_id' })
+  variableClinica?: VariableClinica;
 
   @Column({ name: 'valor_numero', type: 'numeric', precision: 12, scale: 4, nullable: true })
   valorNumero?: number | null;

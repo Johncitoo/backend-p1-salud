@@ -129,7 +129,7 @@ export class IoTService {
         return null;
       }
 
-      return await response.json();
+      return await response.json() as T;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`No se pudo conectar con IoT API: ${message}`);
@@ -137,15 +137,13 @@ export class IoTService {
     }
   }
 
-  // Igual que fetchFromIoT, pero para endpoints que devuelven una lista: la
-  // API real del Grupo 8 envuelve los arrays en { data: [...] } (a diferencia
-  // de /sensors/latest y /health, que devuelven el objeto directo).
-  private async fetchArrayFromIoT<T>(path: string): Promise<T[] | null> {
-    const result = await this.fetchFromIoT<T[] | { data: T[] }>(path);
-    if (result === null) return null;
-    if (Array.isArray(result)) return result;
-    if (Array.isArray((result as { data: T[] }).data)) return (result as { data: T[] }).data;
-    return null;
+  // La API del Grupo 8 devuelve las listas envueltas en { data, page, limit, total }
+  // (confirmado contra su API real), a diferencia de /sensors/latest que devuelve
+  // el objeto plano. Desenvolvemos aqui para no filtrar ese detalle al resto del servicio.
+  private async fetchListFromIoT<T>(path: string): Promise<T[] | null> {
+    const response = await this.fetchFromIoT<{ data: T[] } | T[]>(path);
+    if (!response) return null;
+    return Array.isArray(response) ? response : (response.data ?? null);
   }
 
   // =========================================================
@@ -157,23 +155,25 @@ export class IoTService {
   }
 
   async getAllReadings(): Promise<IoTTelemetryReading[] | null> {
-    return this.fetchArrayFromIoT<IoTTelemetryReading>('/sensors');
+    return this.fetchListFromIoT<IoTTelemetryReading>('/sensors');
   }
 
   async getLatestReading(): Promise<IoTTelemetryReading | null> {
     return this.fetchFromIoT<IoTTelemetryReading>('/sensors/latest');
   }
 
-  async getReadingsBySensor(sensorId: string): Promise<IoTTelemetryReading[] | null> {
-    return this.fetchArrayFromIoT<IoTTelemetryReading>(`/sensors/sensor/${sensorId}`);
+  async getReadingsBySensor(sensorId: string, limit?: number): Promise<IoTTelemetryReading[] | null> {
+    const query = limit ? `?limit=${limit}` : '';
+    return this.fetchListFromIoT<IoTTelemetryReading>(`/sensors/sensor/${sensorId}${query}`);
   }
 
   async getAllAlerts(): Promise<IoTAlert[] | null> {
-    return this.fetchArrayFromIoT<IoTAlert>('/alerts');
+    return this.fetchListFromIoT<IoTAlert>('/alerts');
   }
 
-  async getAlertsBySensor(sensorId: string): Promise<IoTAlert[] | null> {
-    return this.fetchArrayFromIoT<IoTAlert>(`/alerts/sensor/${sensorId}`);
+  async getAlertsBySensor(sensorId: string, limit?: number): Promise<IoTAlert[] | null> {
+    const query = limit ? `?limit=${limit}` : '';
+    return this.fetchListFromIoT<IoTAlert>(`/alerts/sensor/${sensorId}${query}`);
   }
 
   // =========================================================
@@ -213,7 +213,7 @@ export class IoTService {
       }
 
       const mediciones = this.extractMediciones(reading);
-      
+
       for (const med of mediciones) {
         const variable = await this.variablesClinicasService.findByCodigo(med.codigoVariable);
         if (!variable) {
@@ -232,7 +232,7 @@ export class IoTService {
             fechaDesde: fechaMedicion.toISOString(),
             fechaHasta: fechaMedicion.toISOString()
           });
-          
+
           if (existentes && existentes.length > 0) {
             continue; // Ya existe esta medición exacta
           }
@@ -266,13 +266,16 @@ export class IoTService {
         return;
       }
 
+      // Normalizamos a mayusculas: su API real usa minusculas (ej. "warning"),
+      // a diferencia de lo que asumimos inicialmente.
+      const severity = (alert.severity ?? '').toUpperCase();
       let prioridad = 'MEDIA';
-      if (alert.severity === 'CRITICAL' || alert.severity === 'HIGH') prioridad = 'ALTA';
-      if (alert.severity === 'LOW') prioridad = 'BAJA';
+      if (severity === 'CRITICAL' || severity === 'HIGH') prioridad = 'ALTA';
+      if (severity === 'LOW' || severity === 'INFO') prioridad = 'BAJA';
 
       const existentes = await this.alertasService.findAll({ pacienteId: pacienteSensor.pacienteId });
-      const duplicate = existentes.find(a => 
-        a.mensaje === alert.message && 
+      const duplicate = existentes.find(a =>
+        a.mensaje === alert.message &&
         a.tipo === `IOT_${alert.type.toUpperCase()}`
       );
       if (duplicate) {
@@ -286,7 +289,7 @@ export class IoTService {
         prioridad: prioridad,
       });
       this.logger.log(`Alerta IoT creada para paciente ${pacienteSensor.pacienteId} desde sensor ${alert.sensorId}`);
-      
+
       if (prioridad === 'ALTA') {
         this.logger.log(`Alerta crítica IoT detectada. Generando Incidente Clínico para P11...`);
         await this.incidentesSaludService.create({
@@ -393,4 +396,3 @@ export class IoTService {
     return out;
   }
 }
-
