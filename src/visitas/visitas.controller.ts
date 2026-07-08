@@ -43,13 +43,13 @@ export class VisitasController {
   }
 
   @Post()
-  @Roles('COORDINADOR')
+  @Roles('ADMIN', 'COORDINADOR')
   create(@Body() dto: CreateVisitaDto, @CurrentUser() user?: UsuarioPerfil) {
     return this.visitasService.create(dto, uuidOrUndefined(user?.id));
   }
 
   @Patch(':id')
-  @Roles('COORDINADOR')
+  @Roles('ADMIN', 'COORDINADOR')
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateVisitaDto,
@@ -107,7 +107,7 @@ export class VisitasController {
   }
 
   @Patch(':id/cancelar')
-  @Roles('COORDINADOR')
+  @Roles('ADMIN', 'COORDINADOR')
   cancelar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelarVisitaDto,
@@ -117,7 +117,7 @@ export class VisitasController {
   }
 
   @Delete(':id')
-  @Roles('COORDINADOR')
+  @Roles('ADMIN', 'COORDINADOR')
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
     return this.visitasService.remove(id, uuidOrUndefined(user?.id));
   }
