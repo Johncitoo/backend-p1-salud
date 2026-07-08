@@ -4,6 +4,9 @@
 /build
 /tmp
 
+# Documentos adjuntos cifrados guardados en disco (STORAGE_PROVIDER=LOCAL)
+/storage
+
 # Logs
 logs
 *.log

@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -16,6 +17,8 @@ import { VisitaPrestacion } from '../prestaciones/entities/visita-prestacion.ent
 import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.entity';
 import { ReprogramacionVisita } from '../reprogramaciones-visita/entities/reprogramacion-visita.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { MotivoCancelacion } from '../motivos-cancelacion/entities/motivo-cancelacion.entity';
+import { MotivoReprogramacion } from '../motivos-reprogramacion/entities/motivo-reprogramacion.entity';
 import { VisitaEstadoHistorial } from '../visita-estado-historial/entities/visita-estado-historial.entity';
 import { Zona } from '../zonas/entities/zona.entity';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
@@ -40,6 +43,8 @@ type VisitaScheduleSnapshot = {
 
 @Injectable()
 export class VisitasService {
+  private readonly logger = new Logger(VisitasService.name);
+
   constructor(
     @InjectRepository(Visita)
     private readonly visitasRepository: Repository<Visita>,
@@ -63,6 +68,10 @@ export class VisitasService {
     private readonly estadoHistorialRepository: Repository<VisitaEstadoHistorial>,
     @InjectRepository(VisitaPrestacion)
     private readonly visitaPrestacionesRepository: Repository<VisitaPrestacion>,
+    @InjectRepository(MotivoCancelacion)
+    private readonly motivosCancelacionRepository: Repository<MotivoCancelacion>,
+    @InjectRepository(MotivoReprogramacion)
+    private readonly motivosReprogramacionRepository: Repository<MotivoReprogramacion>,
     private readonly auditoriasService: AuditoriasService,
     private readonly googleCalendarSyncService: GoogleCalendarSyncService,
     private readonly analyticsService: AnalyticsService,
@@ -429,7 +438,14 @@ export class VisitasService {
     // Notificar reprogramación a paciente y profesional
     if (dto.estado === 'REPROGRAMADA') {
       const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
-      await this.notificacionesService.notificarVisitaReprogramada(saved, paciente, profesionalUsuario);
+      const motivo = await this.resolverMotivoReprogramacion(dto.motivoReprogramacionId, dto.observacion);
+      await this.notificacionesService.notificarVisitaReprogramada(saved, paciente, profesionalUsuario, motivo);
+    }
+
+    // Notificar al paciente que el profesional va en camino
+    if (dto.estado === 'EN_CAMINO') {
+      const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
+      await this.notificacionesService.notificarProfesionalEnCamino(saved, paciente, profesionalUsuario);
     }
 
     return saved;
@@ -487,9 +503,32 @@ export class VisitasService {
     await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
 
     const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
-    await this.notificacionesService.notificarVisitaCancelada(saved, paciente, profesionalUsuario);
+    const motivo = await this.resolverMotivoCancelacion(dto.motivoCancelacionId, dto.observacionCancelacion);
+    await this.notificacionesService.notificarVisitaCancelada(saved, paciente, profesionalUsuario, motivo);
 
     return saved;
+  }
+
+  // Arma el texto del motivo para el correo: nombre del motivo catalogado (si se
+  // envió uno) + observación libre, cuando existan. Ninguno es obligatorio.
+  private async resolverMotivoCancelacion(motivoCancelacionId?: string, observacion?: string): Promise<string | null> {
+    const partes: string[] = [];
+    if (motivoCancelacionId) {
+      const motivo = await this.motivosCancelacionRepository.findOne({ where: { id: motivoCancelacionId } });
+      if (motivo) partes.push(motivo.nombre);
+    }
+    if (observacion) partes.push(observacion);
+    return partes.length > 0 ? partes.join(' — ') : null;
+  }
+
+  private async resolverMotivoReprogramacion(motivoReprogramacionId?: string, observacion?: string): Promise<string | null> {
+    const partes: string[] = [];
+    if (motivoReprogramacionId) {
+      const motivo = await this.motivosReprogramacionRepository.findOne({ where: { id: motivoReprogramacionId } });
+      if (motivo) partes.push(motivo.nombre);
+    }
+    if (observacion) partes.push(observacion);
+    return partes.length > 0 ? partes.join(' — ') : null;
   }
 
   async remove(id: string, usuarioId?: string): Promise<Visita> {
@@ -643,6 +682,32 @@ export class VisitasService {
       const exists = await this.direccionesRepository.exist({ where: { id: dto.direccionPacienteId, deletedAt: IsNull() } });
       if (!exists) throw new NotFoundException('Dirección de paciente no encontrada');
     }
+  }
+
+  // Recordatorio "un día antes" de la cita (fase 2 de la integración con Grupo 6,
+  // ver docs/INTEGRACION-NOTIFICACIONES-GRUPO6.md). Corre todos los días a las 09:00,
+  // hora del servidor, y notifica a paciente y profesional de las visitas de mañana
+  // que sigan en un estado "activo" (no canceladas/reprogramadas/no realizadas).
+  @Cron('0 9 * * *')
+  async enviarRecordatoriosDelDiaSiguiente(): Promise<void> {
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 1);
+    const fecha = manana.toISOString().slice(0, 10);
+
+    const visitas = await this.visitasRepository.find({
+      where: { fechaProgramada: fecha, deletedAt: IsNull() },
+    });
+
+    const activas = visitas.filter(
+      v => !ESTADOS_SIN_CONFLICTO.includes(v.estado) && v.estado !== 'REPROGRAMADA',
+    );
+
+    for (const visita of activas) {
+      const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(visita);
+      await this.notificacionesService.notificarRecordatorioVisita(visita, paciente, profesionalUsuario);
+    }
+
+    this.logger.log(`Recordatorios del día siguiente (${fecha}): ${activas.length} visita(s) notificadas.`);
   }
 }
 

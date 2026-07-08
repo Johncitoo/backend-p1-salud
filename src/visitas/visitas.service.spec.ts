@@ -101,6 +101,8 @@ describe('VisitasService calendar flows', () => {
   let bloqueosRepo: ReturnType<typeof makeRepo<any>>;
   let estadoHistorialRepo: ReturnType<typeof makeRepo<any>>;
   let visitaPrestacionesRepo: ReturnType<typeof makeRepo<any>>;
+  let motivosCancelacionRepo: ReturnType<typeof makeRepo<any>>;
+  let motivosReprogramacionRepo: ReturnType<typeof makeRepo<any>>;
   let auditoriasService: { registrar: jest.Mock };
   let googleCalendarSyncService: Record<string, jest.Mock>;
   let analyticsService: Record<string, jest.Mock>;
@@ -136,6 +138,8 @@ describe('VisitasService calendar flows', () => {
     bloqueosRepo = makeRepo();
     estadoHistorialRepo = makeRepo();
     visitaPrestacionesRepo = makeRepo();
+    motivosCancelacionRepo = makeRepo();
+    motivosReprogramacionRepo = makeRepo();
     auditoriasService = { registrar: jest.fn() };
     googleCalendarSyncService = {
       syncCreatedVisit: jest.fn(async (visita) => visita),
@@ -174,6 +178,8 @@ describe('VisitasService calendar flows', () => {
       bloqueosRepo as any,
       estadoHistorialRepo as any,
       visitaPrestacionesRepo as any,
+      motivosCancelacionRepo as any,
+      motivosReprogramacionRepo as any,
       auditoriasService as any,
       googleCalendarSyncService as any,
       analyticsService as any,
@@ -295,7 +301,7 @@ describe('VisitasService calendar flows', () => {
     expect(saved.canceladaPorUsuarioId).toBe(ids.usuario);
     expect(googleCalendarSyncService.syncCanceledVisit).toHaveBeenCalledWith(expect.objectContaining({ estado: 'CANCELADA' }));
     expect(analyticsService.sendVisitUpsertEvent).toHaveBeenCalledWith(expect.objectContaining({ estado: 'CANCELADA' }), { visitType: 'ENFERMERIA' });
-    expect(notificacionesService.notificarVisitaCancelada).toHaveBeenCalledWith(expect.objectContaining({ id: visita.id }), paciente, usuarioProfesional);
+    expect(notificacionesService.notificarVisitaCancelada).toHaveBeenCalledWith(expect.objectContaining({ id: visita.id }), paciente, usuarioProfesional, 'Paciente no disponible');
     expect(estadoHistorialRepo.save).toHaveBeenCalledWith(expect.objectContaining({
       estadoAnterior: 'PROGRAMADA',
       estadoNuevo: 'CANCELADA',

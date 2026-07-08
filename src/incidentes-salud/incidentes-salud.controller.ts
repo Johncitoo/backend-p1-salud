@@ -119,7 +119,12 @@ export class IncidentesSaludController {
   @UseGuards(DevAuthGuard, RolesGuard)
   @Roles('ADMIN', 'COORDINADOR')
   create(@Body() dto: CreateIncidenteSaludDto, @Request() req: any) {
-    return this.incidentesSaludService.create(dto, req.user?.id);
+    // Alta MANUAL desde la web: marcamos origen WEB por defecto para que el flujo
+    // sí genere un ticket en CRM (CrmService.debeEnviarTicket filtra por origen).
+    return this.incidentesSaludService.create(
+      { ...dto, origen: dto.origen ?? 'WEB' },
+      req.user?.id,
+    );
   }
 
   @Patch(':id')

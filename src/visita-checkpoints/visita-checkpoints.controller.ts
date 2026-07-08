@@ -32,7 +32,7 @@ export class VisitaCheckpointsController {
   }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   create(@Body() dto: CreateVisitaCheckpointDto, @Request() req: any) {
     return this.visitaCheckpointsService.create(dto, req.user?.id);
   }

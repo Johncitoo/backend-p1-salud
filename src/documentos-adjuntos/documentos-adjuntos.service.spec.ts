@@ -24,7 +24,7 @@ describe('DocumentosAdjuntosService', () => {
   let documentosRepo: ReturnType<typeof makeRepo<DocumentoAdjunto>>;
   let fichasRepo: ReturnType<typeof makeRepo<any>>;
   let visitasRepo: ReturnType<typeof makeRepo<any>>;
-  let storage: jest.Mocked<Pick<R2StorageService, 'putEncryptedObject' | 'getBucket' | 'getEncryptedObject' | 'deleteObject'>>;
+  let storage: jest.Mocked<Pick<R2StorageService, 'putEncryptedObject' | 'getBucket' | 'getEncryptedObject' | 'deleteObject'>> & { providerName: string };
   let auditorias: { registrar: jest.Mock };
   let service: DocumentosAdjuntosService;
 
@@ -33,6 +33,7 @@ describe('DocumentosAdjuntosService', () => {
     fichasRepo = makeRepo();
     visitasRepo = makeRepo();
     storage = {
+      providerName: 'R2',
       putEncryptedObject: jest.fn(async () => undefined),
       getBucket: jest.fn(() => 'bucket-test'),
       getEncryptedObject: jest.fn(),

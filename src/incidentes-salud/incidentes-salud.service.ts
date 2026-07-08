@@ -5,6 +5,7 @@ import { AuditoriasService } from '../auditorias/auditorias.service';
 import { CrmService } from '../integrations/crm/crm.service';
 import { IncidentesService } from '../integrations/incidentes/incidentes.service';
 import { PacientesService } from '../pacientes/pacientes.service';
+import { Paciente } from '../pacientes/entities/paciente.entity';
 import { Visita } from '../pacientes/entities/visita.entity';
 import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -142,39 +143,41 @@ export class IncidentesSaludService {
       detalle: `Incidente ${saved.tipo} - ${saved.titulo} creado (severidad: ${saved.severidad})`,
     });
 
-    // DESHABILITADO TEMPORALMENTE (2026-07-07): todo incidente (incluyendo los automaticos
-    // de IoT y del cron de visitas atrasadas) disparaba un ticket a CRM sin distincion,
-    // inundandolos de tickets que su agente no puede resolver (ej. "bateria baja de sensor").
-    // Pendiente: reactivar filtrando por tipo de incidente (ej. solo 'VISITA_NO_REGISTRADA')
-    // antes de volver a habilitar este bloque.
-    //
-    // try {
-    //   let paciente: any = null;
-    //   if (saved.pacienteId) {
-    //     paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
-    //   }
-    //   const crmPayload = this.crmService.buildPayloadFromIncidente(saved, paciente);
-    //   this.crmService
-    //     .crearTicket(crmPayload)
-    //     .then(async (crmResponse) => {
-    //       const externalIncidentId = this.crmService.extractTicketId(crmResponse);
-    //       if (!externalIncidentId) return;
-    //
-    //       await this.repository.update(saved.id, { externalIncidentId });
-    //       saved.externalIncidentId = externalIncidentId;
-    //     })
-    //     .catch((err) => {
-    //       this.logger.error(`Error en promesa de CRM: ${err.message}`);
-    //     });
-    // } catch (err: any) {
-    //   this.logger.error(`Error preparando ticket CRM: ${err.message}`);
-    // }
+    // Solo enviamos a CRM (Proyecto 07) los incidentes creados MANUALMENTE por un
+    // profesional (origen WEB/APP), que es su caso de uso: soporte a situaciones de
+    // atención. Los automáticos del sistema (cron de visitas atrasadas + alertas de
+    // IoT, todos origen SISTEMA) NO van a CRM para no inundar su tiquetería; esos se
+    // reportan a Grupo 11 más abajo. El filtro vive en CrmService.debeEnviarTicket().
+    if (this.crmService.debeEnviarTicket(saved)) {
+      try {
+        let paciente: Paciente | null = null;
+        if (saved.pacienteId) {
+          paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
+        }
+        const crmPayload = this.crmService.buildPayloadFromIncidente(saved, paciente);
+        this.crmService
+          .crearTicket(crmPayload)
+          .then(async (crmResponse) => {
+            const externalIncidentId = this.crmService.extractTicketId(crmResponse);
+            if (!externalIncidentId) return;
 
-    if (saved.severidad === 'ALTA' || saved.severidad === 'CRITICA') {
-      this.incidentesService.enviarIncidente(saved).catch((err) => {
-        this.logger.error(`Error en promesa de Incidentes: ${err.message}`);
-      });
+            await this.repository.update(saved.id, { externalIncidentId });
+            saved.externalIncidentId = externalIncidentId;
+          })
+          .catch((err) => {
+            this.logger.error(`Error en promesa de CRM: ${err.message}`);
+          });
+      } catch (err: any) {
+        this.logger.error(`Error preparando ticket CRM: ${err.message}`);
+      }
     }
+
+    // Reportamos TODO incidente al Proyecto 11 (plataforma central de incidentes
+    // operacionales); ellos asignan el SLA según la prioridad, que mapeamos desde
+    // nuestra severidad (BAJA/MEDIA/ALTA/CRITICA -> baja/media/alta/critica).
+    this.incidentesService.enviarIncidente(saved).catch((err) => {
+      this.logger.error(`Error en promesa de Incidentes: ${err.message}`);
+    });
 
     return saved;
   }

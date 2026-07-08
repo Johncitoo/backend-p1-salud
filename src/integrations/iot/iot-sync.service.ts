@@ -25,9 +25,9 @@ export class IoTSyncService {
       let processedCount = 0;
 
       for (const sensor of activeSensors) {
-        // 1. Obtener Historial de Telemetría para el sensor específico
-        const readings = await this.iotService.getReadingsBySensor(sensor.sensorId);
-        
+        // 1. Obtener solo la lectura mas reciente del sensor (una consulta, un dato actual)
+        const readings = await this.iotService.getReadingsBySensor(sensor.sensorId, 1);
+
         if (readings && readings.length > 0) {
           for (const reading of readings) {
             // El IoTService se encargará de ignorar duplicados gracias a la validación en processTelemetryReading
@@ -36,8 +36,8 @@ export class IoTSyncService {
           }
         }
 
-        // 2. Obtener Alertas para el sensor específico
-        const alerts = await this.iotService.getAlertsBySensor(sensor.sensorId);
+        // 2. Obtener solo la alerta mas reciente del sensor
+        const alerts = await this.iotService.getAlertsBySensor(sensor.sensorId, 1);
         if (alerts && alerts.length > 0) {
           for (const alert of alerts) {
             await this.iotService.processAlertReading(alert);
