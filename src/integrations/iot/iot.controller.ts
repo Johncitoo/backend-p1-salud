@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { DevAuthGuard } from '../../auth/guards/dev-auth.guard';
 import { IoTService } from './iot.service';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -23,6 +23,24 @@ export class IoTController {
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
   getAllReadings() {
     return this.iotService.getAllReadings();
+  }
+
+  // Catálogo de dispositivos disponibles para vincular a un paciente (proxy a
+  // GET /sensors/devices del Grupo 8). Acepta page/limit/sensorType/search.
+  @Get('devices')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  getDeviceCatalog(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sensorType') sensorType?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.iotService.getDeviceCatalog({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      sensorType,
+      search,
+    });
   }
 
   @Get('sensors/latest')

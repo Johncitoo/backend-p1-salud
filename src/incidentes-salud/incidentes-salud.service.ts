@@ -143,34 +143,41 @@ export class IncidentesSaludService {
       detalle: `Incidente ${saved.tipo} - ${saved.titulo} creado (severidad: ${saved.severidad})`,
     });
 
-    // Crear ticket en CRM de forma asíncrona para no bloquear el flujo principal.
-    try {
-      let paciente: Paciente | null = null;
-      if (saved.pacienteId) {
-        paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
+    // Solo enviamos a CRM (Proyecto 07) los incidentes creados MANUALMENTE por un
+    // profesional (origen WEB/APP), que es su caso de uso: soporte a situaciones de
+    // atención. Los automáticos del sistema (cron de visitas atrasadas + alertas de
+    // IoT, todos origen SISTEMA) NO van a CRM para no inundar su tiquetería; esos se
+    // reportan a Grupo 11 más abajo. El filtro vive en CrmService.debeEnviarTicket().
+    if (this.crmService.debeEnviarTicket(saved)) {
+      try {
+        let paciente: Paciente | null = null;
+        if (saved.pacienteId) {
+          paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
+        }
+        const crmPayload = this.crmService.buildPayloadFromIncidente(saved, paciente);
+        this.crmService
+          .crearTicket(crmPayload)
+          .then(async (crmResponse) => {
+            const externalIncidentId = this.crmService.extractTicketId(crmResponse);
+            if (!externalIncidentId) return;
+
+            await this.repository.update(saved.id, { externalIncidentId });
+            saved.externalIncidentId = externalIncidentId;
+          })
+          .catch((err) => {
+            this.logger.error(`Error en promesa de CRM: ${err.message}`);
+          });
+      } catch (err: any) {
+        this.logger.error(`Error preparando ticket CRM: ${err.message}`);
       }
-      const crmPayload = this.crmService.buildPayloadFromIncidente(saved, paciente);
-      this.crmService
-        .crearTicket(crmPayload)
-        .then(async (crmResponse) => {
-          const externalIncidentId = this.crmService.extractTicketId(crmResponse);
-          if (!externalIncidentId) return;
-
-          await this.repository.update(saved.id, { externalIncidentId });
-          saved.externalIncidentId = externalIncidentId;
-        })
-        .catch((err) => {
-          this.logger.error(`Error en promesa de CRM: ${err.message}`);
-        });
-    } catch (err: any) {
-      this.logger.error(`Error preparando ticket CRM: ${err.message}`);
     }
 
-    if (saved.severidad === 'ALTA' || saved.severidad === 'CRITICA') {
-      this.incidentesService.enviarIncidente(saved).catch((err) => {
-        this.logger.error(`Error en promesa de Incidentes: ${err.message}`);
-      });
-    }
+    // Reportamos TODO incidente al Proyecto 11 (plataforma central de incidentes
+    // operacionales); ellos asignan el SLA según la prioridad, que mapeamos desde
+    // nuestra severidad (BAJA/MEDIA/ALTA/CRITICA -> baja/media/alta/critica).
+    this.incidentesService.enviarIncidente(saved).catch((err) => {
+      this.logger.error(`Error en promesa de Incidentes: ${err.message}`);
+    });
 
     return saved;
   }

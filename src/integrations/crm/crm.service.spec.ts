@@ -44,6 +44,20 @@ describe('CrmService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('debeEnviarTicket', () => {
+    it('envía a CRM los incidentes manuales (origen WEB/APP)', () => {
+      expect(service.debeEnviarTicket({ origen: 'WEB' } as IncidenteSalud)).toBe(true);
+      expect(service.debeEnviarTicket({ origen: 'APP' } as IncidenteSalud)).toBe(true);
+      expect(service.debeEnviarTicket({ origen: 'web' } as IncidenteSalud)).toBe(true);
+    });
+
+    it('NO envía a CRM los incidentes automáticos del sistema ni de integración', () => {
+      expect(service.debeEnviarTicket({ origen: 'SISTEMA' } as IncidenteSalud)).toBe(false);
+      expect(service.debeEnviarTicket({ origen: 'INTEGRACION' } as IncidenteSalud)).toBe(false);
+      expect(service.debeEnviarTicket({} as IncidenteSalud)).toBe(false);
+    });
+  });
+
   describe('crearTicket', () => {
     it('should create a ticket successfully', async () => {
       const payload = {

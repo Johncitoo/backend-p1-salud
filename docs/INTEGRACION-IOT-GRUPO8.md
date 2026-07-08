@@ -124,9 +124,35 @@ IOT_API_URL=https://iot-platform-backend-bm5b.onrender.com
 ## Estado implementado (ya no es "pendiente/futuro")
 
 Los 3 puntos que originalmente estaban listados como pendientes ya están resueltos:
-- **Vinculación sensor↔paciente**: tabla `paciente_sensores` (`UNIQUE(assetId, sensorId)`), gestionada desde el frontend (ficha del paciente → "Vincular Dispositivo IoT").
+- **Vinculación sensor↔paciente**: tabla `paciente_sensores` (`UNIQUE(assetId, sensorId)`), gestionada desde el frontend (ficha del paciente → "Vincular Dispositivo IoT"). El modal usa el catálogo `GET /iot/devices` (proxy de `GET /sensors/devices` del Grupo 8) para elegir el sensor de una lista, sin escribir IDs a mano.
 - **Guardado automático de mediciones**: `processTelemetryReading()` guarda en `mediciones_clinicas` con `origen = 'IOT'`, bajo demanda vía el botón "Sincronizar" (no hay cron periódico).
-- **Alertas clínicas automáticas**: `processAlertReading()` crea la alerta y, si la severidad es `CRITICAL`/`HIGH`, escala automáticamente a un incidente (`incidentes_salud`, severidad `CRITICA`). Falta el `alerta_upsert` hacia Grupo 9 (ver memoria del proyecto).
+- **Alertas → incidentes con criticidad en 2 dimensiones**: ver sección siguiente.
+
+## Alertas: criticidad en dos dimensiones (matriz 2×2)
+
+El `severity` que manda el Grupo 8 mide la **degradación del dispositivo**, no el riesgo clínico:
+marca como `critical` cosas técnicas (`sensor_offline`, `low_battery` muy baja) y como `warning`
+**todos** los signos vitales fuera de rango (por graves que sean). Por eso NO decidimos solo por su
+`severity`.
+
+`processAlertReading()` clasifica cada alerta por su `type` (clínica vs técnica) y usa el `severity`
+del Grupo 8 como modulador dentro de cada categoría:
+
+|                          | Grupo 8 `warning` | Grupo 8 `critical` |
+|--------------------------|-------------------|--------------------|
+| **Clínica** (signo vital)| ALTA              | CRITICA            |
+| **Técnica** (dispositivo)| BAJA              | MEDIA              |
+
+- Tipos **clínicos**: `oxygen_saturation_low`, `blood_pressure_high`, `glucose_out_of_range`,
+  `temperature_out_of_range` → incidente `SIGNO_VITAL_ANORMAL`.
+- Tipos **técnicos**: `sensor_offline` → `FALLA_SENSOR`; `low_battery` (y otros) → `FALLA_DISPOSITIVO`.
+- **Toda alerta** crea una fila en `alertas` (con esa prioridad) y un incidente en `incidentes_salud`
+  (con esa severidad), que se escala al Grupo 11 con la prioridad correspondiente.
+- La señal cruda del Grupo 8 se guarda en `incidentes_salud.metadata`
+  (`{ fuente, sensorId, tipoAlerta, severidadOrigen, categoria }`) para auditoría.
+- Deduplicación por `mensaje` + `tipo`, y la sync trae solo la última alerta por sensor (`limit=1`),
+  así que no se inunda de incidentes.
+- Falta el `alerta_upsert` hacia Grupo 9 (ver memoria del proyecto).
 
 Cobertura de tests unitarios (`iot.service.spec.ts`, 18 casos): mapeo de los 4 tipos de sensor,
 exclusión de campos ausentes/NaN, deduplicación de mediciones y alertas, el escalamiento

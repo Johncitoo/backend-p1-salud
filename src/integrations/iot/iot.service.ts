@@ -52,6 +52,34 @@ export type IoTHealthStatus = {
   timestamp: string;
 };
 
+// Dispositivo del catálogo del Grupo 8 (GET /sensors/devices): un sensor
+// distinto que ya tiene al menos una lectura. Sirve para elegir qué vincular
+// a un paciente sin escribir los IDs a mano.
+export type IoTDevice = {
+  sensorId: string;
+  assetId: string;
+  sensorType: SensorType;
+  batteryLevel?: number;
+  connectionStatus?: string;
+  lastReadingAt?: string;
+};
+
+// Respuesta paginada del catálogo de dispositivos.
+export type IoTDeviceCatalog = {
+  data: IoTDevice[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
+// Filtros/paginación aceptados por GET /sensors/devices.
+export type IoTDeviceCatalogParams = {
+  page?: number;
+  limit?: number;
+  sensorType?: string;
+  search?: string;
+};
+
 // Mapeo de campos de telemetría a nuestras variables clínicas
 export const IOT_VARIABLE_MAP: Record<string, string> = {
   oxygenSaturation: 'saturacion_oxigeno',
@@ -61,6 +89,18 @@ export const IOT_VARIABLE_MAP: Record<string, string> = {
   temperature: 'temperatura',
   glucoseLevel: 'glicemia_capilar',
 };
+
+// Tipos de alerta que representan un problema CLÍNICO del paciente (signo vital
+// fuera de rango). El resto (low_battery, sensor_offline) son problemas TÉCNICOS
+// del dispositivo. Clasificamos por tipo y NO por el campo `severity` del Grupo 8,
+// porque ellos marcan como "critical" cosas técnicas (batería, desconexión) y como
+// "warning" los signos vitales fuera de rango — al revés de lo que importa clínicamente.
+export const CLINICAL_ALERT_TYPES = new Set<string>([
+  'oxygen_saturation_low',
+  'blood_pressure_high',
+  'glucose_out_of_range',
+  'temperature_out_of_range',
+]);
 
 // Kit portátil simulado por el Grupo 8: un único asset ("PATIENT-001") con 3
 // sensores que el profesional "reclama" para el paciente que está atendiendo
@@ -176,6 +216,21 @@ export class IoTService {
     return this.fetchListFromIoT<IoTAlert>(`/alerts/sensor/${sensorId}${query}`);
   }
 
+  // Catálogo de dispositivos disponibles para vincular a un paciente. A
+  // diferencia de los otros métodos de lista, aquí devolvemos la respuesta
+  // paginada completa (data + page/limit/total) porque el frontend necesita
+  // esa metadata para paginar y buscar.
+  async getDeviceCatalog(params: IoTDeviceCatalogParams = {}): Promise<IoTDeviceCatalog | null> {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', String(params.page));
+    if (params.limit) query.set('limit', String(params.limit));
+    if (params.sensorType) query.set('sensorType', params.sensorType);
+    if (params.search) query.set('search', params.search);
+
+    const qs = query.toString();
+    return this.fetchFromIoT<IoTDeviceCatalog>(`/sensors/devices${qs ? `?${qs}` : ''}`);
+  }
+
   // =========================================================
   // Mapeo de telemetría a mediciones clínicas
   // Extrae los valores numéricos de una lectura IoT y los
@@ -266,13 +321,41 @@ export class IoTService {
         return;
       }
 
-      // Normalizamos a mayusculas: su API real usa minusculas (ej. "warning"),
-      // a diferencia de lo que asumimos inicialmente.
-      const severity = (alert.severity ?? '').toUpperCase();
-      let prioridad = 'MEDIA';
-      if (severity === 'CRITICAL' || severity === 'HIGH') prioridad = 'ALTA';
-      if (severity === 'LOW' || severity === 'INFO') prioridad = 'BAJA';
+      // Criticidad en dos dimensiones (matriz 2x2):
+      //  - Categoría por TIPO: clínica (signo vital) vs técnica (dispositivo).
+      //  - Severidad de Grupo 8 (warning/critical): la respetamos como modulador
+      //    DENTRO de cada categoría, porque su señal sí sirve para medir qué tan
+      //    degradado está el dispositivo o la lectura.
+      //
+      //                    | warning | critical
+      //   Clínica          |  ALTA   | CRITICA
+      //   Técnica          |  BAJA   | MEDIA
+      //
+      // Así lo clínico siempre pesa más que lo técnico al mismo nivel de Grupo 8.
+      const esClinica = CLINICAL_ALERT_TYPES.has(alert.type);
+      const severityG8 = (alert.severity ?? '').toLowerCase();
+      const esCriticaG8 = severityG8 === 'critical' || severityG8 === 'high';
 
+      let nivel: 'CRITICA' | 'ALTA' | 'MEDIA' | 'BAJA';
+      let tipoIncidente: string;
+      let titulo: string;
+
+      if (esClinica) {
+        nivel = esCriticaG8 ? 'CRITICA' : 'ALTA';
+        tipoIncidente = 'SIGNO_VITAL_ANORMAL';
+        titulo = `Signo vital fuera de rango (${alert.type})`;
+      } else if (alert.type === 'sensor_offline') {
+        nivel = esCriticaG8 ? 'MEDIA' : 'BAJA';
+        tipoIncidente = 'FALLA_SENSOR';
+        titulo = `Sensor IoT desconectado (${alert.sensorId})`;
+      } else {
+        // low_battery u otro evento técnico
+        nivel = esCriticaG8 ? 'MEDIA' : 'BAJA';
+        tipoIncidente = 'FALLA_DISPOSITIVO';
+        titulo = `Falla técnica de sensor IoT (${alert.type})`;
+      }
+
+      // Deduplicación: evita re-crear la misma alerta/incidente en cada sync.
       const existentes = await this.alertasService.findAll({ pacienteId: pacienteSensor.pacienteId });
       const duplicate = existentes.find(a =>
         a.mensaje === alert.message &&
@@ -286,22 +369,29 @@ export class IoTService {
         pacienteId: pacienteSensor.pacienteId,
         tipo: `IOT_${alert.type.toUpperCase()}`,
         mensaje: alert.message,
-        prioridad: prioridad,
+        prioridad: nivel,
       });
-      this.logger.log(`Alerta IoT creada para paciente ${pacienteSensor.pacienteId} desde sensor ${alert.sensorId}`);
+      this.logger.log(`Alerta IoT (${alert.type}, ${nivel}) creada para paciente ${pacienteSensor.pacienteId}`);
 
-      if (prioridad === 'ALTA') {
-        this.logger.log(`Alerta crítica IoT detectada. Generando Incidente Clínico para P11...`);
-        await this.incidentesSaludService.create({
-          titulo: `Falla Crítica de Sensor IoT (${alert.type})`,
-          descripcion: alert.message,
-          tipo: 'FALLA_CONEXION', // u otro que aplique
-          severidad: 'CRITICA',
-          estado: 'ABIERTO',
-          origen: 'SISTEMA',
-          pacienteId: pacienteSensor.pacienteId,
-        });
-      }
+      // Toda alerta genera un incidente (clínico o técnico) para dejar registro
+      // ordenado y escalarlo a Grupo 11 con la prioridad correspondiente. Guardamos
+      // en metadata la señal cruda de Grupo 8 para auditoría (no se pierde).
+      await this.incidentesSaludService.create({
+        titulo,
+        descripcion: alert.message,
+        tipo: tipoIncidente,
+        severidad: nivel,
+        estado: 'ABIERTO',
+        origen: 'SISTEMA',
+        pacienteId: pacienteSensor.pacienteId,
+        metadata: {
+          fuente: 'IOT',
+          sensorId: alert.sensorId,
+          tipoAlerta: alert.type,
+          severidadOrigen: alert.severity,
+          categoria: esClinica ? 'CLINICA' : 'TECNICA',
+        },
+      });
     } catch (error) {
       this.logger.error(`Error procesando alerta: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -365,17 +455,21 @@ export class IoTService {
   // Última lectura de cada sensor activo del paciente, mapeada a los códigos
   // de variable clínica (mismos nombres que IOT_VARIABLE_MAP) para que el
   // formulario de la ficha pueda auto-completarse directamente.
+  //
+  // Consultamos la última lectura de CADA sensor vinculado por separado
+  // (getReadingsBySensor con limit=1), en vez de /sensors global: ese endpoint
+  // solo trae las ~25 lecturas más recientes de toda la plataforma, y con
+  // cientos de sensores simulados los del paciente podían no aparecer, dejando
+  // los signos vitales vacíos.
   async getLatestVitalsForPatient(pacienteId: string): Promise<Record<string, number>> {
     const sensoresPaciente = await this.getSensorsByPatient(pacienteId);
     if (sensoresPaciente.length === 0) return {};
 
-    const sensorIds = new Set(sensoresPaciente.map(s => s.sensorId));
-    const lecturas = await this.getAllReadings();
-    if (!lecturas) return {};
-
     const vitales: Record<string, number> = {};
-    for (const lectura of lecturas) {
-      if (!sensorIds.has(lectura.sensorId)) continue;
+    for (const sensor of sensoresPaciente) {
+      const lecturas = await this.getReadingsBySensor(sensor.sensorId, 1);
+      const lectura = lecturas?.[0];
+      if (!lectura) continue;
       for (const [campoIot, valor] of Object.entries(this.extractMedicionesRaw(lectura))) {
         vitales[campoIot] = valor;
       }

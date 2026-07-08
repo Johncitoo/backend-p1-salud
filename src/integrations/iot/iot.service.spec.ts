@@ -227,22 +227,60 @@ describe('IoTService', () => {
       expect(mockAlertasService.create).not.toHaveBeenCalled();
     });
 
-    it('severidad LOW crea alerta prioridad BAJA y NO escala a incidente', async () => {
+    it('alerta técnica low_battery: alerta BAJA + incidente técnico severidad BAJA', async () => {
       mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
 
-      await service.processAlertReading(baseAlert);
+      await service.processAlertReading(baseAlert); // type: 'low_battery'
 
       expect(mockAlertasService.create).toHaveBeenCalledWith(
         expect.objectContaining({ pacienteId: 'pac-1', prioridad: 'BAJA' }),
       );
-      expect(mockIncidentesSaludService.create).not.toHaveBeenCalled();
+      expect(mockIncidentesSaludService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pacienteId: 'pac-1',
+          tipo: 'FALLA_DISPOSITIVO',
+          severidad: 'BAJA',
+          estado: 'ABIERTO',
+          origen: 'SISTEMA',
+        }),
+      );
     });
 
-    it('severidad CRITICAL/HIGH crea alerta prioridad ALTA y SI escala a incidente CRITICA', async () => {
+    it('alerta técnica sensor_offline con severity critical: sube a MEDIA (respeta Grupo 8)', async () => {
       mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
-      const criticalAlert: IoTAlert = { ...baseAlert, severity: 'CRITICAL', type: 'oxygen_low' };
+      const offlineAlert: IoTAlert = { ...baseAlert, type: 'sensor_offline', severity: 'critical', message: 'Sensor sin conexión' };
 
-      await service.processAlertReading(criticalAlert);
+      await service.processAlertReading(offlineAlert);
+
+      expect(mockAlertasService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ pacienteId: 'pac-1', prioridad: 'MEDIA' }),
+      );
+      expect(mockIncidentesSaludService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ tipo: 'FALLA_SENSOR', severidad: 'MEDIA' }),
+      );
+    });
+
+    it('alerta técnica low_battery con severity critical: sube a MEDIA (respeta Grupo 8)', async () => {
+      mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
+      const critBattery: IoTAlert = { ...baseAlert, type: 'low_battery', severity: 'critical', message: 'Battery level is low: 5%' };
+
+      await service.processAlertReading(critBattery);
+
+      expect(mockIncidentesSaludService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ tipo: 'FALLA_DISPOSITIVO', severidad: 'MEDIA' }),
+      );
+    });
+
+    it('alerta clínica con warning: alerta ALTA + incidente clínico severidad ALTA', async () => {
+      mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
+      const clinica: IoTAlert = {
+        ...baseAlert,
+        type: 'oxygen_saturation_low',
+        severity: 'warning',
+        message: 'Low oxygen saturation: 90%',
+      };
+
+      await service.processAlertReading(clinica);
 
       expect(mockAlertasService.create).toHaveBeenCalledWith(
         expect.objectContaining({ pacienteId: 'pac-1', prioridad: 'ALTA' }),
@@ -250,23 +288,31 @@ describe('IoTService', () => {
       expect(mockIncidentesSaludService.create).toHaveBeenCalledWith(
         expect.objectContaining({
           pacienteId: 'pac-1',
-          severidad: 'CRITICA',
+          tipo: 'SIGNO_VITAL_ANORMAL',
+          severidad: 'ALTA',
           estado: 'ABIERTO',
           origen: 'SISTEMA',
         }),
       );
     });
 
-    it('normaliza severity en minusculas (API real de Grupo 8 usa "critical", "warning", etc.)', async () => {
+    it('alerta clínica con critical: sube a CRITICA (respeta Grupo 8)', async () => {
       mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
-      const lowerCaseAlert: IoTAlert = { ...baseAlert, severity: 'critical', type: 'oxygen_low' };
+      const clinicaCritica: IoTAlert = {
+        ...baseAlert,
+        type: 'oxygen_saturation_low',
+        severity: 'critical',
+        message: 'Low oxygen saturation: 78%',
+      };
 
-      await service.processAlertReading(lowerCaseAlert);
+      await service.processAlertReading(clinicaCritica);
 
       expect(mockAlertasService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ pacienteId: 'pac-1', prioridad: 'ALTA' }),
+        expect.objectContaining({ pacienteId: 'pac-1', prioridad: 'CRITICA' }),
       );
-      expect(mockIncidentesSaludService.create).toHaveBeenCalled();
+      expect(mockIncidentesSaludService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ tipo: 'SIGNO_VITAL_ANORMAL', severidad: 'CRITICA' }),
+      );
     });
   });
 
@@ -317,6 +363,30 @@ describe('IoTService', () => {
       const reading = await service.getLatestReading();
 
       expect(reading).toEqual({ sensorId: 'GLUCO-192', glucoseLevel: 73 });
+    });
+
+    it('getDeviceCatalog devuelve la respuesta paginada completa (no solo el array)', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [{ sensorId: 'OXI-001', assetId: 'PATIENT-001', sensorType: 'pulse_oximeter' }],
+          page: 1,
+          limit: 25,
+          total: 250,
+        }),
+      }) as unknown as typeof fetch;
+
+      const catalog = await service.getDeviceCatalog({ page: 1, limit: 25, sensorType: 'pulse_oximeter', search: 'OXI' });
+
+      expect(catalog).toEqual(
+        expect.objectContaining({ page: 1, limit: 25, total: 250 }),
+      );
+      expect(catalog?.data).toHaveLength(1);
+
+      const calledUrl = (global.fetch as jest.Mock).mock.calls[0][0] as string;
+      expect(calledUrl).toContain('/sensors/devices?');
+      expect(calledUrl).toContain('sensorType=pulse_oximeter');
+      expect(calledUrl).toContain('search=OXI');
     });
   });
 });
