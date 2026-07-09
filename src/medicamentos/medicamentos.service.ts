@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { CreateMedicamentoDto } from './dto/create-medicamento.dto';
 import { CreateMedicamentoCatalogoDto } from './dto/create-medicamento-catalogo.dto';
@@ -98,9 +98,14 @@ export class MedicamentosService {
   }
 
   async createCatalogo(dto: CreateMedicamentoCatalogoDto, usuarioId?: string): Promise<MedicamentoCatalogo> {
-    const existente = await this.catalogoRepository.findOne({ where: { nombre: dto.nombre } });
+    // El duplicado es por (nombre, presentacion), no solo por nombre: un mismo
+    // medicamento en dosis distintas (ej. "Escitalopram 10 mg" vs "20 mg") son
+    // ítems de catálogo válidos y distintos.
+    const existente = await this.catalogoRepository.findOne({
+      where: { nombre: dto.nombre, presentacion: dto.presentacion ?? IsNull() },
+    });
     if (existente) {
-      throw new ConflictException('Ya existe un medicamento en el catálogo con ese nombre');
+      throw new ConflictException('Ya existe un medicamento en el catálogo con ese nombre y presentación');
     }
 
     const catalogo = this.catalogoRepository.create({
@@ -125,9 +130,13 @@ export class MedicamentosService {
     const catalogo = await this.catalogoRepository.findOne({ where: { id } });
     if (!catalogo) throw new NotFoundException('Medicamento de catálogo no encontrado');
 
-    if (dto.nombre && dto.nombre !== catalogo.nombre) {
-      const existente = await this.catalogoRepository.findOne({ where: { nombre: dto.nombre } });
-      if (existente) throw new ConflictException('Ya existe un medicamento en el catálogo con ese nombre');
+    const nombreFinal = dto.nombre ?? catalogo.nombre;
+    const presentacionFinal = dto.presentacion !== undefined ? dto.presentacion : catalogo.presentacion;
+    if (nombreFinal !== catalogo.nombre || presentacionFinal !== catalogo.presentacion) {
+      const existente = await this.catalogoRepository.findOne({
+        where: { nombre: nombreFinal, presentacion: presentacionFinal ?? IsNull(), id: Not(id) },
+      });
+      if (existente) throw new ConflictException('Ya existe un medicamento en el catálogo con ese nombre y presentación');
     }
 
     Object.assign(catalogo, dto);
