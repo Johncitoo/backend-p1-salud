@@ -27,7 +27,7 @@ export class UsuariosController {
   }
 
   @Get()
-  @Roles('ADMIN', 'SUPERVISOR')
+  @Roles('ADMIN', 'SUPERVISOR', 'COORDINADOR')
   findAll() {
     return this.usuariosService.findAll();
   }
