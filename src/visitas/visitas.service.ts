@@ -42,6 +42,7 @@ const ESTADOS_SIN_CONFLICTO = ['CANCELADA', 'REALIZADA', 'NO_REALIZADA'];
 // Dentro de ese umbral, si falta menos de CRITICA_MIN se considera ALTA (muy cerca).
 const CANCELACION_TARDIA_UMBRAL_MIN = 120; // 2 horas
 const CANCELACION_TARDIA_ALTA_MIN = 60; // 1 hora
+const VISITAS_TIME_ZONE = 'America/Santiago';
 
 type VisitaScheduleSnapshot = {
   profesionalSaludId: string;
@@ -625,7 +626,11 @@ export class VisitasService {
     try {
       if (!visita.fechaProgramada || !visita.horaProgramada) return;
 
-      const horaProgramada = new Date(`${visita.fechaProgramada}T${visita.horaProgramada}`);
+      const horaProgramada = buildDateInTimeZone(
+        normalizeVisitaDate(visita.fechaProgramada),
+        normalizeVisitaTime(visita.horaProgramada),
+        VISITAS_TIME_ZONE,
+      );
       if (Number.isNaN(horaProgramada.getTime())) return;
 
       const canceladaAt = visita.canceladaAt ?? new Date();
@@ -889,4 +894,44 @@ function addMinutesToDateTime(date: string, time: string, minutes: number): { da
 
 function toSqlTimestamp(date: string, time: string): string {
   return `${date} ${normalizeVisitaTime(time)}`;
+}
+
+function buildDateInTimeZone(date: string, time: string, timeZone: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hours, minutes, seconds] = normalizeVisitaTime(time).split(':').map(Number);
+  const utcGuess = Date.UTC(year, month - 1, day, hours, minutes, seconds ?? 0);
+  const offset = getTimeZoneOffsetMs(new Date(utcGuess), timeZone);
+  const firstPass = utcGuess - offset;
+  const correctedOffset = getTimeZoneOffsetMs(new Date(firstPass), timeZone);
+  return new Date(utcGuess - correctedOffset);
+}
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, Number(part.value)]),
+  );
+
+  const asUtc = Date.UTC(
+    values.year,
+    values.month - 1,
+    values.day,
+    values.hour,
+    values.minute,
+    values.second,
+  );
+
+  return asUtc - date.getTime();
 }

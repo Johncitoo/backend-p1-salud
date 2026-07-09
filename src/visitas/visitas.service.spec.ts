@@ -34,10 +34,24 @@ const baseVisita = (): Visita => ({
 // Genera fecha/hora programada relativas a "ahora" para probar cancelación tardía.
 const programadaDesdeAhora = (minutos: number) => {
   const d = new Date(Date.now() + minutos * 60_000);
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Santiago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(d);
+  const values = Object.fromEntries(
+    parts
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value]),
+  );
   return {
-    fechaProgramada: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-    horaProgramada: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,
+    fechaProgramada: `${values.year}-${values.month}-${values.day}`,
+    horaProgramada: `${values.hour}:${values.minute}:${values.second}`,
   };
 };
 
@@ -353,6 +367,34 @@ describe('VisitasService calendar flows', () => {
       }),
       ids.usuario,
     );
+  });
+
+  it('calcula la cancelación tardía usando hora Chile aunque el servidor corra en UTC', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-07-09T18:58:00Z')); // 14:58 en America/Santiago.
+
+    try {
+      const visita = {
+        ...baseVisita(),
+        fechaProgramada: '2026-07-09',
+        horaProgramada: '15:00:00',
+      } as Visita;
+      visitasRepo.findOne.mockResolvedValue({ ...visita });
+      visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
+
+      await service.cancelar(visita.id, { observacionCancelacion: 'Imprevisto' }, ids.usuario);
+
+      expect(incidentesSaludService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tipo: 'VISITA_CANCELADA_TARDIA',
+          severidad: 'ALTA',
+          descripcion: expect.stringContaining('faltando 2 minutos'),
+        }),
+        ids.usuario,
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('cancelación tardía moderada (1-2h) genera incidente MEDIA', async () => {
