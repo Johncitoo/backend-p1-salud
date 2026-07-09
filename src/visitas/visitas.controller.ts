@@ -11,6 +11,7 @@ import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
 import { ReprogramarVisitaDto } from './dto/reprogramar-visita.dto';
 import { FindCalendarioQueryDto } from './dto/find-calendario-query.dto';
 import { CompletarVisitaDto } from './dto/completar-visita.dto';
+import { InspeccionMantenimientoDto } from './dto/inspeccion-mantenimiento.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
 import { VisitasService } from './visitas.service';
 
@@ -25,19 +26,19 @@ export class VisitasController {
   constructor(private readonly visitasService: VisitasService) {}
 
   @Get()
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   findAll(@Query() query: FindVisitasQueryDto, @CurrentUser() user?: UsuarioPerfil) {
     return this.visitasService.findAllForUser(query, user);
   }
 
   @Get('calendario')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   calendario(@Query() query: FindCalendarioQueryDto, @CurrentUser() user?: UsuarioPerfil) {
     return this.visitasService.findCalendarForUser(query, user);
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.visitasService.findOne(id);
   }
@@ -71,13 +72,13 @@ export class VisitasController {
   }
 
   @Get(':id/google-calendar/logs')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   googleCalendarLogs(@Param('id', ParseUUIDPipe) id: string) {
     return this.visitasService.findGoogleCalendarLogs(id);
   }
 
   @Patch(':id/estado')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO')
   cambiarEstado(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CambiarEstadoVisitaDto,
@@ -87,13 +88,26 @@ export class VisitasController {
   }
 
   @Patch(':id/completar')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO')
   completar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompletarVisitaDto,
     @CurrentUser() user?: UsuarioPerfil,
   ) {
     return this.visitasService.completar(id, dto, uuidOrUndefined(user?.id));
+  }
+
+  // Paso 9 del UAT: el técnico registra la inspección de mantenimiento
+  // (diagnóstico + repuestos a reemplazar). Dispara el pedido de repuestos
+  // automáticamente a Proyecto 3.
+  @Post(':id/inspeccion-mantenimiento')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO')
+  registrarInspeccionMantenimiento(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: InspeccionMantenimientoDto,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
+    return this.visitasService.registrarInspeccionMantenimiento(id, dto, uuidOrUndefined(user?.id));
   }
 
   @Patch(':id/reprogramar')

@@ -129,6 +129,7 @@ describe('VisitasService calendar flows', () => {
   let motivosReprogramacionRepo: ReturnType<typeof makeRepo<any>>;
   let medicamentosRepo: ReturnType<typeof makeRepo<any>>;
   let medicamentosCatalogoRepo: ReturnType<typeof makeRepo<any>>;
+  let diagnosticosRepo: ReturnType<typeof makeRepo<any>>;
   let auditoriasService: { registrar: jest.Mock };
   let googleCalendarSyncService: Record<string, jest.Mock>;
   let analyticsService: Record<string, jest.Mock>;
@@ -170,6 +171,7 @@ describe('VisitasService calendar flows', () => {
     motivosReprogramacionRepo = makeRepo();
     medicamentosRepo = makeRepo();
     medicamentosCatalogoRepo = makeRepo();
+    diagnosticosRepo = makeRepo();
     auditoriasService = { registrar: jest.fn() };
     googleCalendarSyncService = {
       syncCreatedVisit: jest.fn(async (visita) => visita),
@@ -218,6 +220,7 @@ describe('VisitasService calendar flows', () => {
       motivosReprogramacionRepo as any,
       medicamentosRepo as any,
       medicamentosCatalogoRepo as any,
+      diagnosticosRepo as any,
       auditoriasService as any,
       googleCalendarSyncService as any,
       analyticsService as any,

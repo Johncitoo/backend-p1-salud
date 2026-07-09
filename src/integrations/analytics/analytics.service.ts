@@ -351,6 +351,26 @@ export class AnalyticsService {
     await this.sendEvent({ source: 'salud', event_type: 'visita_fin', payload });
   }
 
+  // Paso 9 del UAT (MaintenanceInspectionCompleted): el técnico terminó la
+  // inspección del equipo y registró los repuestos a reemplazar. Alimenta los
+  // indicadores de mantenimiento y consumo de repuestos en Proyecto 9 (BI).
+  async sendInspeccionMantenimientoEvent(
+    visita: Visita,
+    options: { repuestosCount?: number } = {},
+  ): Promise<void> {
+    const payload = {
+      visita_id: visita.id,
+      fecha_inspeccion: this.formatDateTime(new Date()) ?? new Date().toISOString(),
+      repuestos_detectados: String(options.repuestosCount ?? 0),
+    };
+
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'mantenimiento_inspeccion_completada',
+      payload,
+    });
+  }
+
   async sendFichaUpsertEvent(ficha: FichaClinica, adjuntosCount: number): Promise<void> {
     const payload: FichaUpsertPayload = {
       ficha_id: ficha.id,

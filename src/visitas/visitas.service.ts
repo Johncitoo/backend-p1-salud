@@ -5,7 +5,7 @@ import { In, IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { AnalyticsService, VisitAnalyticsOptions } from '../integrations/analytics/analytics.service';
 import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
-import { PedidosService } from '../integrations/pedidos/pedidos.service';
+import { PedidosService, PrescripcionItem } from '../integrations/pedidos/pedidos.service';
 import { BloqueoAgenda } from '../bloqueos-agenda/entities/bloqueo-agenda.entity';
 import { CreateVisitaDto } from '../pacientes/dto/create-visita.dto';
 import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
@@ -22,6 +22,7 @@ import { ReprogramacionVisita } from '../reprogramaciones-visita/entities/reprog
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { MotivoCancelacion } from '../motivos-cancelacion/entities/motivo-cancelacion.entity';
 import { MotivoReprogramacion } from '../motivos-reprogramacion/entities/motivo-reprogramacion.entity';
+import { Diagnostico } from '../diagnosticos/entities/diagnostico.entity';
 import { VisitaEstadoHistorial } from '../visita-estado-historial/entities/visita-estado-historial.entity';
 import { Zona } from '../zonas/entities/zona.entity';
 import { CancelarVisitaDto } from './dto/cancelar-visita.dto';
@@ -29,6 +30,7 @@ import { CambiarEstadoVisitaDto } from './dto/cambiar-estado-visita.dto';
 import { ReprogramarVisitaDto } from './dto/reprogramar-visita.dto';
 import { FindCalendarioQueryDto } from './dto/find-calendario-query.dto';
 import { CompletarVisitaDto } from './dto/completar-visita.dto';
+import { InspeccionMantenimientoDto } from './dto/inspeccion-mantenimiento.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
 import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { GoogleCalendarSyncService } from '../google-calendar/services/google-calendar-sync.service';
@@ -88,6 +90,8 @@ export class VisitasService {
     private readonly medicamentosRepository: Repository<Medicamento>,
     @InjectRepository(MedicamentoCatalogo)
     private readonly medicamentosCatalogoRepository: Repository<MedicamentoCatalogo>,
+    @InjectRepository(Diagnostico)
+    private readonly diagnosticosRepository: Repository<Diagnostico>,
     private readonly auditoriasService: AuditoriasService,
     private readonly googleCalendarSyncService: GoogleCalendarSyncService,
     private readonly analyticsService: AnalyticsService,
@@ -579,6 +583,88 @@ export class VisitasService {
 
     const payload = this.pedidosService.buildPayload(visita, paciente, direccion, items);
     await this.pedidosService.enviarPedido(payload);
+  }
+
+  // Envía un pedido a Proyecto 3 con una lista explícita de ítems (repuestos o
+  // medicamentos). Mismo patrón tolerante a fallos: si el cliente no tiene email
+  // (CustomerID) se omite el envío sin bloquear el flujo — solo se loguea.
+  private async enviarPedidoRepuestos(visita: Visita, items: PrescripcionItem[]): Promise<void> {
+    if (items.length === 0) return;
+
+    const paciente = await this.pacientesRepository.findOne({ where: { id: visita.pacienteId } });
+    if (!paciente?.email) {
+      this.logger.warn(`No se envía pedido de repuestos a Proyecto 3 para visita ${visita.id}: cliente sin email.`);
+      return;
+    }
+
+    const direccion = visita.direccionPacienteId
+      ? await this.direccionesRepository.findOne({ where: { id: visita.direccionPacienteId } })
+      : null;
+
+    const payload = this.pedidosService.buildPayload(visita, paciente, direccion, items);
+    await this.pedidosService.enviarPedido(payload);
+  }
+
+  // Paso 9 del UAT: el técnico registra la inspección de mantenimiento del
+  // equipo. Guarda el diagnóstico (informe técnico), deja la visita EN_ATENCION,
+  // emite MaintenanceInspectionCompleted (Analytics → BI, Proyecto 9) y dispara
+  // automáticamente el pedido de repuestos a Proyecto 3 (Paso 10, sin
+  // intervención manual). Un fallo en las integraciones no revierte el
+  // diagnóstico ya guardado.
+  async registrarInspeccionMantenimiento(
+    id: string,
+    dto: InspeccionMantenimientoDto,
+    usuarioId?: string,
+  ): Promise<Diagnostico> {
+    const visita = await this.findOne(id);
+
+    if (visita.estado === 'CANCELADA' || visita.estado === 'REALIZADA') {
+      throw new BadRequestException(
+        `No se puede registrar una inspección sobre una visita ${visita.estado}`,
+      );
+    }
+
+    // El técnico llegó y está atendiendo el equipo en terreno.
+    if (visita.estado === 'PROGRAMADA' || visita.estado === 'EN_CAMINO') {
+      const estadoAnterior = visita.estado;
+      visita.estado = 'EN_ATENCION';
+      if (!visita.fechaHoraInicioReal) visita.fechaHoraInicioReal = new Date();
+      await this.visitasRepository.save(visita);
+      await this.registrarEstadoHistorial(
+        visita,
+        estadoAnterior,
+        visita.estado,
+        usuarioId,
+        'Inicio de inspección de mantenimiento',
+      );
+    }
+
+    const diagnostico = await this.diagnosticosRepository.save(
+      this.diagnosticosRepository.create({
+        visitaId: visita.id,
+        descripcion: dto.diagnostico,
+        creadoPorUsuarioId: usuarioId,
+      }),
+    );
+
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'diagnosticos',
+      entidadId: diagnostico.id,
+      accion: 'INSPECCION_MANTENIMIENTO',
+      detalle: `Inspección de mantenimiento con ${dto.repuestos.length} repuesto(s) para visita ${visita.id}`,
+    });
+
+    await this.analyticsService.sendInspeccionMantenimientoEvent(visita, {
+      repuestosCount: dto.repuestos.length,
+    });
+
+    await this.enviarPedidoRepuestos(
+      visita,
+      dto.repuestos.map(r => ({ nombre: r.nombre, cantidad: r.cantidad })),
+    );
+
+    return diagnostico;
   }
 
   async cancelar(id: string, dto: CancelarVisitaDto, usuarioId?: string): Promise<Visita> {
