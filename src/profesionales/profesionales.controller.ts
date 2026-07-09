@@ -15,7 +15,7 @@ export class ProfesionalesController {
   constructor(private readonly service: ProfesionalesService) {}
 
   @Get()
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   findAll() { return this.service.findAll(); }
 
   @Get('especialidades')

@@ -71,7 +71,7 @@ export class ProfesionalesService {
       ])
       .where('usuario.deleted_at IS NULL')
       .andWhere('usuario.activo = TRUE')
-      .andWhere('rol.nombre = :rol', { rol: 'PROFESIONAL' })
+      .andWhere('rol.nombre IN (:...roles)', { roles: ['PROFESIONAL', 'TECNICO'] })
       .andWhere(`usuario.id NOT IN (${subquery.getQuery()})`)
       .orderBy('usuario.nombres', 'ASC')
       .addOrderBy('usuario.apellidos', 'ASC')
@@ -227,7 +227,9 @@ export class ProfesionalesService {
 
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
     if (!usuario.activo) throw new BadRequestException('El usuario seleccionado esta inactivo');
-    if (usuario.rol !== 'PROFESIONAL') throw new BadRequestException('El usuario seleccionado debe tener rol PROFESIONAL');
+    if (!['PROFESIONAL', 'TECNICO'].includes(usuario.rol)) {
+      throw new BadRequestException('El usuario seleccionado debe tener rol PROFESIONAL o TECNICO');
+    }
 
     const existing = await this.profesionales.findOne({
       where: { usuarioId, deletedAt: IsNull() },
