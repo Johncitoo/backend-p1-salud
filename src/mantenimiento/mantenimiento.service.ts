@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { PedidosService } from '../integrations/pedidos/pedidos.service';
+import { IncidentesSaludService } from '../incidentes-salud/incidentes-salud.service';
+import { CreateIncidenteSaludDto } from '../incidentes-salud/dto/create-incidente-salud.dto';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
 import { Paciente } from '../pacientes/entities/paciente.entity';
 import { CreateInspeccionMantenimientoDto } from './dto/create-inspeccion-mantenimiento.dto';
@@ -24,6 +26,7 @@ export class MantenimientoService {
     private readonly direccionesRepository: Repository<DireccionPaciente>,
     private readonly pedidosService: PedidosService,
     private readonly auditoriasService: AuditoriasService,
+    private readonly incidentesSaludService: IncidentesSaludService,
   ) {}
 
   getCatalogoRepuestos() {
@@ -84,7 +87,55 @@ export class MantenimientoService {
     // Coordinación vea si Proyecto 3 lo aceptó o hubo que reintentar.
     saved = await this.enviarPedido(saved, paciente);
 
+    // Genera el ticket en CRM (Grupo 7) + Incidentes (Grupo 11) con los datos de
+    // la inspección. No bloquea: si falla, la inspección igual queda registrada.
+    saved = await this.crearTicketsAsociados(saved, usuarioId);
+
     return saved;
+  }
+
+  // Crea un incidente MANUAL (origen WEB) a partir de la inspección. Ese incidente
+  // dispara, vía IncidentesSaludService, el ticket en CRM (Grupo 7) y el envío a la
+  // plataforma de Incidentes (Grupo 11), ambos con los datos asociados.
+  private async crearTicketsAsociados(
+    inspeccion: InspeccionMantenimiento,
+    usuarioId?: string,
+  ): Promise<InspeccionMantenimiento> {
+    try {
+      const repuestosTxt = inspeccion.repuestos.map((r) => `${r.nombre} x${r.cantidad}`).join(', ');
+      const dto: CreateIncidenteSaludDto = {
+        tipo: 'INSPECCION_MANTENIMIENTO',
+        severidad: this.mapPrioridadASeveridad(inspeccion.prioridad),
+        titulo: `Inspección de mantenimiento: ${inspeccion.equipo}`,
+        descripcion:
+          `${inspeccion.diagnostico ?? 'Inspección técnica de mantenimiento preventivo.'} ` +
+          `Repuestos requeridos: ${repuestosTxt || 'ninguno'}.`,
+        pacienteId: inspeccion.pacienteId,
+        visitaId: inspeccion.visitaId ?? undefined,
+        origen: 'WEB', // manual -> CrmService.debeEnviarTicket = true (CRM + Grupo 11)
+        metadata: {
+          inspeccionId: inspeccion.id,
+          equipo: inspeccion.equipo,
+          repuestos: inspeccion.repuestos,
+          pedidoExternoId: inspeccion.pedidoExternoId ?? null,
+          pedidoEstadoExterno: inspeccion.pedidoEstadoExterno ?? null,
+        },
+      };
+
+      const incidente = await this.incidentesSaludService.create(dto, usuarioId);
+      inspeccion.incidenteId = incidente.id;
+      return await this.repository.save(inspeccion);
+    } catch (err: any) {
+      this.logger.error(
+        `No se pudo generar el incidente/ticket (CRM + Grupo 11) para la inspección ${inspeccion.id}: ${err.message}`,
+      );
+      return inspeccion;
+    }
+  }
+
+  private mapPrioridadASeveridad(prioridad?: string): string {
+    const map: Record<string, string> = { baja: 'BAJA', media: 'MEDIA', alta: 'ALTA', urgente: 'CRITICA' };
+    return map[(prioridad ?? '').toLowerCase()] ?? 'MEDIA';
   }
 
   // Paso 19 del UAT: corrección del informe técnico. Guarda la versión actual en
