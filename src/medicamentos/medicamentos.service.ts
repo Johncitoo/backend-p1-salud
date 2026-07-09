@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { CreateMedicamentoDto } from './dto/create-medicamento.dto';
+import { CreateMedicamentoCatalogoDto } from './dto/create-medicamento-catalogo.dto';
+import { UpdateMedicamentoCatalogoDto } from './dto/update-medicamento-catalogo.dto';
 import { Medicamento } from './entities/medicamento.entity';
 import { MedicamentoCatalogo } from './entities/medicamento-catalogo.entity';
 
@@ -84,9 +86,62 @@ export class MedicamentosService {
     return saved;
   }
 
-  // Catálogo de medicamentos disponibles (solo lectura desde la app; se
-  // administra vía seed/migración, no hay endpoint de escritura todavía).
-  async findCatalogo(): Promise<MedicamentoCatalogo[]> {
-    return this.catalogoRepository.find({ where: { activo: true }, order: { nombre: 'ASC' } });
+  // Catálogo de medicamentos disponibles para elegir al registrar un
+  // medicamento en una visita. `incluirInactivos` es para la pantalla de
+  // administración del catálogo, que también necesita ver (y reactivar) los
+  // medicamentos desactivados.
+  async findCatalogo(incluirInactivos = false): Promise<MedicamentoCatalogo[]> {
+    return this.catalogoRepository.find({
+      where: incluirInactivos ? {} : { activo: true },
+      order: { nombre: 'ASC' },
+    });
+  }
+
+  async createCatalogo(dto: CreateMedicamentoCatalogoDto, usuarioId?: string): Promise<MedicamentoCatalogo> {
+    const existente = await this.catalogoRepository.findOne({ where: { nombre: dto.nombre } });
+    if (existente) {
+      throw new ConflictException('Ya existe un medicamento en el catálogo con ese nombre');
+    }
+
+    const catalogo = this.catalogoRepository.create({
+      nombre: dto.nombre,
+      presentacion: dto.presentacion,
+      activo: dto.activo ?? true,
+    });
+    const saved = await this.catalogoRepository.save(catalogo);
+
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'medicamentos_catalogo',
+      entidadId: saved.id,
+      accion: 'CREAR',
+      detalle: `Medicamento de catálogo "${saved.nombre}" creado`,
+    });
+
+    return saved;
+  }
+
+  async updateCatalogo(id: string, dto: UpdateMedicamentoCatalogoDto, usuarioId?: string): Promise<MedicamentoCatalogo> {
+    const catalogo = await this.catalogoRepository.findOne({ where: { id } });
+    if (!catalogo) throw new NotFoundException('Medicamento de catálogo no encontrado');
+
+    if (dto.nombre && dto.nombre !== catalogo.nombre) {
+      const existente = await this.catalogoRepository.findOne({ where: { nombre: dto.nombre } });
+      if (existente) throw new ConflictException('Ya existe un medicamento en el catálogo con ese nombre');
+    }
+
+    Object.assign(catalogo, dto);
+    catalogo.updatedAt = new Date();
+    const saved = await this.catalogoRepository.save(catalogo);
+
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'medicamentos_catalogo',
+      entidadId: saved.id,
+      accion: 'ACTUALIZAR',
+      detalle: `Medicamento de catálogo "${saved.nombre}" actualizado`,
+    });
+
+    return saved;
   }
 }
