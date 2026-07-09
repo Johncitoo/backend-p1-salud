@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
+import { createHmac, randomUUID } from 'crypto';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { safeEqual } from '../lib/safe-compare.util';
 import { ProfesionalSalud } from '../profesionales/entities/profesional-salud.entity';
 import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { ProfesionalGoogleCalendarConnection } from './entities/profesional-google-calendar-connection.entity';
@@ -184,12 +185,17 @@ export class GoogleCalendarService {
   }
 
   private getStateSecret(): string {
-    return this.configService.get<string>('GOOGLE_CALENDAR_STATE_SECRET') ?? this.configService.get<string>('JWT_SECRET') ?? 'dev-secret';
-  }
-}
+    const secret =
+      this.configService.get<string>('GOOGLE_CALENDAR_STATE_SECRET') ?? this.configService.get<string>('JWT_SECRET');
 
-function safeEqual(value: string, expected: string): boolean {
-  const valueBuffer = Buffer.from(value);
-  const expectedBuffer = Buffer.from(expected);
-  return valueBuffer.length === expectedBuffer.length && timingSafeEqual(valueBuffer, expectedBuffer);
+    // Nada de fallback a un valor hardcodeado: si nadie configuró un secreto, cualquiera
+    // que lea este repo puede forjar un `state` válido y colarse en el callback OAuth.
+    if (!secret) {
+      throw new Error(
+        'GOOGLE_CALENDAR_STATE_SECRET (o JWT_SECRET) debe estar configurado para firmar el state de Google Calendar.',
+      );
+    }
+
+    return secret;
+  }
 }
