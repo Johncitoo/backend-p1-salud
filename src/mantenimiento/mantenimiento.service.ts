@@ -15,6 +15,7 @@ import { FinalizarIntervencionDto } from './dto/finalizar-intervencion.dto';
 import { CorregirInformeDto } from './dto/corregir-informe.dto';
 import { InspeccionMantenimiento, RepuestoSolicitado } from './entities/inspeccion-mantenimiento.entity';
 import { REPUESTOS_CATALOGO, REPUESTOS_POR_SKU } from './repuestos.catalog';
+import { Visita } from '../pacientes/entities/visita.entity';
 
 interface InventarioProducto {
   sku: string;
@@ -40,6 +41,8 @@ export class MantenimientoService {
     private readonly pacientesRepository: Repository<Paciente>,
     @InjectRepository(DireccionPaciente)
     private readonly direccionesRepository: Repository<DireccionPaciente>,
+    @InjectRepository(Visita)
+    private readonly visitasRepository: Repository<Visita>,
     private readonly pedidosService: PedidosService,
     private readonly auditoriasService: AuditoriasService,
     private readonly incidentesSaludService: IncidentesSaludService,
@@ -75,8 +78,19 @@ export class MantenimientoService {
 
   // Paso 9 (registra el informe) + Paso 10 (dispara el pedido de repuestos a P3).
   async create(dto: CreateInspeccionMantenimientoDto, usuarioId?: string): Promise<InspeccionMantenimiento> {
+    const visita = dto.visitaId
+      ? await this.visitasRepository.findOne({ where: { id: dto.visitaId, deletedAt: IsNull() } })
+      : null;
+
+    if (dto.visitaId && !visita) throw new NotFoundException('Visita no encontrada');
+
+    const pacienteId = visita?.pacienteId ?? dto.pacienteId;
+    if (!pacienteId) {
+      throw new BadRequestException('Selecciona una cita o un paciente para registrar la inspección.');
+    }
+
     const paciente = await this.pacientesRepository.findOne({
-      where: { id: dto.pacienteId, deletedAt: IsNull() },
+      where: { id: pacienteId, deletedAt: IsNull() },
     });
     if (!paciente) throw new NotFoundException('Paciente no encontrado');
 
@@ -93,8 +107,8 @@ export class MantenimientoService {
     });
 
     const inspeccion = this.repository.create({
-      pacienteId: dto.pacienteId,
-      visitaId: dto.visitaId ?? null,
+      pacienteId,
+      visitaId: visita?.id ?? dto.visitaId ?? null,
       equipo: dto.equipo,
       diagnostico: dto.diagnostico ?? null,
       prioridad: dto.prioridad ?? 'media',
@@ -115,7 +129,7 @@ export class MantenimientoService {
 
     // Paso 10: pedido automático de repuestos. Se persiste el resultado para que
     // Coordinación vea si Proyecto 3 lo aceptó o hubo que reintentar.
-    saved = await this.enviarPedido(saved, paciente);
+    saved = await this.enviarPedido(saved, paciente, visita);
 
     // Genera el ticket en CRM (Grupo 7) + Incidentes (Grupo 11) con los datos de
     // la inspección. No bloquea: si falla, la inspección igual queda registrada.
@@ -247,6 +261,7 @@ export class MantenimientoService {
   private async enviarPedido(
     inspeccion: InspeccionMantenimiento,
     pacienteConocido?: Paciente,
+    visitaConocida?: Visita | null,
   ): Promise<InspeccionMantenimiento> {
     const paciente =
       pacienteConocido ??
@@ -259,7 +274,7 @@ export class MantenimientoService {
       return this.repository.save(inspeccion);
     }
 
-    const direccion = await this.obtenerDireccion(inspeccion.pacienteId);
+    const direccion = await this.obtenerDireccionParaPedido(inspeccion, visitaConocida);
     const payload = this.pedidosService.buildMantenimientoPayload(inspeccion, paciente, direccion);
     const resultado = await this.pedidosService.enviarPedidoMantenimiento(payload);
 
@@ -284,6 +299,26 @@ export class MantenimientoService {
     });
     if (principal) return principal;
     return this.direccionesRepository.findOne({ where: { pacienteId, deletedAt: IsNull() } });
+  }
+
+  private async obtenerDireccionParaPedido(
+    inspeccion: InspeccionMantenimiento,
+    visitaConocida?: Visita | null,
+  ): Promise<DireccionPaciente | null> {
+    const visita = visitaConocida ?? (
+      inspeccion.visitaId
+        ? await this.visitasRepository.findOne({ where: { id: inspeccion.visitaId, deletedAt: IsNull() } })
+        : null
+    );
+
+    if (visita?.direccionPacienteId) {
+      const direccionVisita = await this.direccionesRepository.findOne({
+        where: { id: visita.direccionPacienteId, deletedAt: IsNull() },
+      });
+      if (direccionVisita) return direccionVisita;
+    }
+
+    return this.obtenerDireccion(inspeccion.pacienteId);
   }
 
   private async obtenerProductosInventario(): Promise<InventarioProducto[]> {

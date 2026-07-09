@@ -23,8 +23,9 @@ export class RepuestoSolicitadoDto {
 }
 
 export class CreateInspeccionMantenimientoDto {
+  @IsOptional()
   @IsUUID()
-  pacienteId: string;
+  pacienteId?: string;
 
   @IsOptional()
   @IsUUID()

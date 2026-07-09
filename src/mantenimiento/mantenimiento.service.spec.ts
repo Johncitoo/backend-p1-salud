@@ -10,6 +10,7 @@ import { PedidosService } from '../integrations/pedidos/pedidos.service';
 import { IncidentesSaludService } from '../incidentes-salud/incidentes-salud.service';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
 import { Paciente } from '../pacientes/entities/paciente.entity';
+import { Visita } from '../pacientes/entities/visita.entity';
 import { InspeccionMantenimiento } from './entities/inspeccion-mantenimiento.entity';
 import { MantenimientoService } from './mantenimiento.service';
 import { REPUESTOS_CATALOGO } from './repuestos.catalog';
@@ -24,6 +25,8 @@ describe('MantenimientoService', () => {
   let service: MantenimientoService;
   let repository: MockRepository<InspeccionMantenimiento>;
   let pacientesRepository: MockRepository<Paciente>;
+  let direccionesRepository: MockRepository<DireccionPaciente>;
+  let visitasRepository: MockRepository<Visita>;
   let pedidosServiceMock: any;
   let auditoriasMock: any;
   let incidentesSaludMock: any;
@@ -46,6 +49,8 @@ describe('MantenimientoService', () => {
       createQueryBuilder: jest.fn(),
     };
     pacientesRepository = { findOne: jest.fn().mockResolvedValue(paciente) };
+    direccionesRepository = { findOne: jest.fn().mockResolvedValue(null) };
+    visitasRepository = { findOne: jest.fn().mockResolvedValue(null) };
     pedidosServiceMock = {
       buildMantenimientoPayload: jest.fn().mockReturnValue({ orderId: 'MANT-x' }),
       enviarPedidoMantenimiento: jest.fn().mockResolvedValue({
@@ -66,7 +71,8 @@ describe('MantenimientoService', () => {
         MantenimientoService,
         { provide: getRepositoryToken(InspeccionMantenimiento), useValue: repository },
         { provide: getRepositoryToken(Paciente), useValue: pacientesRepository },
-        { provide: getRepositoryToken(DireccionPaciente), useValue: { findOne: jest.fn().mockResolvedValue(null) } },
+        { provide: getRepositoryToken(DireccionPaciente), useValue: direccionesRepository },
+        { provide: getRepositoryToken(Visita), useValue: visitasRepository },
         { provide: PedidosService, useValue: pedidosServiceMock },
         { provide: AuditoriasService, useValue: auditoriasMock },
         { provide: IncidentesSaludService, useValue: incidentesSaludMock },
@@ -138,6 +144,39 @@ describe('MantenimientoService', () => {
       cantidad: 1,
     });
     expect(pedidosServiceMock.enviarPedidoMantenimiento).toHaveBeenCalledTimes(1);
+  });
+
+  it('create con visitaId deriva paciente y dirección desde la visita', async () => {
+    visitasRepository.findOne!.mockResolvedValue({
+      id: 'v-1',
+      pacienteId: 'p-1',
+      direccionPacienteId: 'dir-1',
+      deletedAt: null,
+    } as Visita);
+    direccionesRepository.findOne!.mockResolvedValue({
+      id: 'dir-1',
+      pacienteId: 'p-1',
+      calle: 'Av. Vitacura',
+      numero: '5950',
+      comuna: 'Santiago',
+      region: 'Metropolitana',
+      deletedAt: null,
+    } as DireccionPaciente);
+
+    const result = await service.create({
+      visitaId: 'v-1',
+      equipo: 'Monitor de presión',
+      diagnostico: 'Batería con baja capacidad',
+      repuestos: [{ sku: 'FILTRO-HEPA-01', cantidad: 1 }],
+    } as any, 'u-1');
+
+    expect(result.pacienteId).toBe('p-1');
+    expect(result.visitaId).toBe('v-1');
+    expect(pedidosServiceMock.buildMantenimientoPayload).toHaveBeenCalledWith(
+      expect.objectContaining({ pacienteId: 'p-1', visitaId: 'v-1' }),
+      paciente,
+      expect.objectContaining({ id: 'dir-1', calle: 'Av. Vitacura' }),
+    );
   });
 
   it('create genera un incidente MANUAL (origen WEB) para disparar CRM + Grupo 11 con los datos asociados', async () => {
