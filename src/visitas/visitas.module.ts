@@ -9,6 +9,7 @@ import { PedidosModule } from '../integrations/pedidos/pedidos.module';
 import { BloqueoAgenda } from '../bloqueos-agenda/entities/bloqueo-agenda.entity';
 import { MotivoCancelacion } from '../motivos-cancelacion/entities/motivo-cancelacion.entity';
 import { MotivoReprogramacion } from '../motivos-reprogramacion/entities/motivo-reprogramacion.entity';
+import { Diagnostico } from '../diagnosticos/entities/diagnostico.entity';
 import { Medicamento } from '../medicamentos/entities/medicamento.entity';
 import { MedicamentoCatalogo } from '../medicamentos/entities/medicamento-catalogo.entity';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
@@ -53,6 +54,7 @@ import { IncidentesSaludModule } from '../incidentes-salud/incidentes-salud.modu
       VisitaPrestacion,
       MotivoCancelacion,
       MotivoReprogramacion,
+      Diagnostico,
       Medicamento,
       MedicamentoCatalogo,
     ]),

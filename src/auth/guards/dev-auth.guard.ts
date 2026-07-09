@@ -93,30 +93,48 @@ export class DevAuthGuard implements CanActivate {
     return user;
   }
 
-  // Extrae el rol de aplicación desde resource_access.p1.roles del JWT
-  // y lo mapea a nuestro sistema (admin → ADMIN, coordinator → COORDINADOR, etc.)
+  // Mapa rol Keycloak -> rol de la app. Las claves están en minúscula porque
+  // comparamos con role.toLowerCase(), así que cubren cualquier combinación de
+  // mayúsculas (p.ej. 'tecnico' cubre 'tecnico', 'TECNICO', 'Tecnico').
+  // Aceptamos el nombre en inglés y en español porque en producción el Proyecto 12
+  // (Identidad/Keycloak) puede nombrar los roles en cualquiera de los dos idiomas.
+  private static readonly KEYCLOAK_ROLE_MAP: Record<string, AppRole> = {
+    admin: 'ADMIN',
+    administrador: 'ADMIN',
+    coordinator: 'COORDINADOR',
+    coordinador: 'COORDINADOR',
+    professional: 'PROFESIONAL',
+    profesional: 'PROFESIONAL',
+    supervisor: 'SUPERVISOR',
+    technician: 'TECNICO',
+    tecnico: 'TECNICO',
+  };
+
+  // Extrae el rol de aplicación del JWT. Reúne los roles desde el cliente
+  // configurado como audience, desde cualquier otro cliente en resource_access y
+  // desde los realm roles; así el rol se detecta sin importar si en Keycloak se
+  // creó como client role o como realm role. Devuelve el primer rol que
+  // corresponda a un rol de la app, ignorando los roles técnicos de Keycloak
+  // (default-roles-*, offline_access, uma_authorization, etc.).
   private extractAppRoleFromPayload(payload: JWTPayload): AppRole | null {
     const clientId = this.configService.get<string>('KEYCLOAK_AUDIENCE') ?? 'p1';
     const resourceAccess = payload.resource_access as
       | Record<string, { roles?: string[] }>
       | undefined;
-    const roles = resourceAccess?.[clientId]?.roles ?? [];
-    const firstRole = roles[0];
+    const realmAccess = payload.realm_access as { roles?: string[] } | undefined;
 
-    if (!firstRole) return null;
+    const candidateRoles: string[] = [
+      ...(resourceAccess?.[clientId]?.roles ?? []),
+      ...Object.values(resourceAccess ?? {}).flatMap((entry) => entry?.roles ?? []),
+      ...(realmAccess?.roles ?? []),
+    ];
 
-    return this.mapKeycloakRoleToAppRole(firstRole);
-  }
+    for (const role of candidateRoles) {
+      const mapped = DevAuthGuard.KEYCLOAK_ROLE_MAP[role.toLowerCase()];
+      if (mapped) return mapped;
+    }
 
-  private mapKeycloakRoleToAppRole(keycloakRole: string): AppRole {
-    const map: Record<string, AppRole> = {
-      admin: 'ADMIN',
-      coordinator: 'COORDINADOR',
-      professional: 'PROFESIONAL',
-      supervisor: 'SUPERVISOR',
-    };
-
-    return map[keycloakRole.toLowerCase()] ?? 'PROFESIONAL';
+    return null;
   }
 
   private extractBearerToken(request: Request): string {
@@ -158,7 +176,7 @@ export class DevAuthGuard implements CanActivate {
 
   private normalizeMockRole(role?: string): AppRole | null {
     const normalized = role?.trim().toUpperCase();
-    const allowedRoles: AppRole[] = ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR'];
+    const allowedRoles: AppRole[] = ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO'];
 
     return allowedRoles.includes(normalized as AppRole) ? (normalized as AppRole) : null;
   }
