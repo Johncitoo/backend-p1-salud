@@ -1,7 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { PacienteAccessService } from '../auth/services/paciente-access.service';
+import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { CreateMedicamentoDto } from './dto/create-medicamento.dto';
 import { CreateMedicamentoCatalogoDto } from './dto/create-medicamento-catalogo.dto';
 import { UpdateMedicamentoCatalogoDto } from './dto/update-medicamento-catalogo.dto';
@@ -16,12 +18,20 @@ export class MedicamentosService {
     @InjectRepository(MedicamentoCatalogo)
     private readonly catalogoRepository: Repository<MedicamentoCatalogo>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly pacienteAccessService: PacienteAccessService,
   ) {}
 
   // Lista de medicamentos activos (no eliminados) para una visita. Una visita
   // puede tener múltiples fichas y múltiples medicamentos: no hay límite de 1,
   // a diferencia de FichaClinica.
-  async findAll(filtros?: { visitaId?: string }): Promise<Medicamento[]> {
+  async findAll(filtros?: { visitaId?: string }, user?: UsuarioPerfil): Promise<Medicamento[]> {
+    if (user?.rol === 'PROFESIONAL') {
+      if (!filtros?.visitaId) {
+        throw new ForbiddenException('Debes especificar una visita para consultar sus medicamentos.');
+      }
+      await this.pacienteAccessService.assertAccesoVisita(user, filtros.visitaId);
+    }
+
     const qb = this.repository.createQueryBuilder('m').where('m.deleted_at IS NULL');
 
     if (filtros?.visitaId)
@@ -30,11 +40,12 @@ export class MedicamentosService {
     return qb.orderBy('m.created_at', 'ASC').getMany();
   }
 
-  async findOne(id: string): Promise<Medicamento> {
+  async findOne(id: string, user?: UsuarioPerfil): Promise<Medicamento> {
     const medicamento = await this.repository.findOne({ where: { id } });
     if (!medicamento || medicamento.deletedAt) {
       throw new NotFoundException('Medicamento no encontrado');
     }
+    await this.pacienteAccessService.assertAccesoVisita(user, medicamento.visitaId);
     return medicamento;
   }
 

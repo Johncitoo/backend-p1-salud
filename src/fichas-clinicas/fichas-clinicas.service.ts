@@ -1,10 +1,12 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { OptimisticLockVersionMismatchError } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { PacienteAccessService } from '../auth/services/paciente-access.service';
 import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { PlantillasFichaService } from '../plantillas-ficha/plantillas-ficha.service';
+import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { VariablesClinicasService } from '../variables-clinicas/variables-clinicas.service';
 import { CreateFichaClinicaDto, UpdateFichaClinicaDto } from './dto/create-ficha-clinica.dto';
 import { FichaClinica } from './entities/ficha-clinica.entity';
@@ -21,6 +23,7 @@ export class FichasClinicasService {
     private readonly variablesService: VariablesClinicasService,
     private readonly auditoriasService: AuditoriasService,
     private readonly analyticsService: AnalyticsService,
+    private readonly pacienteAccessService: PacienteAccessService,
   ) {}
 
   // Cuenta adjuntos activos de la ficha y emite el evento ficha_upsert a Analítica.
@@ -38,7 +41,17 @@ export class FichasClinicasService {
     await this.analyticsService.sendFichaUpsertEvent(ficha, adjuntosCount);
   }
 
-  async findAll(filtros?: { visitaId?: string; pacienteId?: string; estado?: string }) {
+  async findAll(filtros?: { visitaId?: string; pacienteId?: string; estado?: string }, user?: UsuarioPerfil) {
+    if (user?.rol === 'PROFESIONAL') {
+      // Sin un filtro de visita concreto no hay forma de acotar el resultado
+      // a "solo lo que este profesional atendió" — se exige el filtro en vez
+      // de devolver (o barrer) las fichas de todo el sistema.
+      if (!filtros?.visitaId) {
+        throw new ForbiddenException('Debes especificar una visita para consultar sus fichas clínicas.');
+      }
+      await this.pacienteAccessService.assertAccesoVisita(user, filtros.visitaId);
+    }
+
     const qb = this.fichasRepo.createQueryBuilder('fc').where('fc.deleted_at IS NULL');
 
     if (filtros?.visitaId) qb.andWhere('fc.visita_id = :visitaId', { visitaId: filtros.visitaId });
@@ -47,9 +60,10 @@ export class FichasClinicasService {
     return qb.orderBy('fc.created_at', 'DESC').getMany();
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: UsuarioPerfil) {
     const ficha = await this.fichasRepo.findOne({ where: { id, deletedAt: IsNull() } });
     if (!ficha) throw new NotFoundException('Ficha clínica no encontrada');
+    await this.pacienteAccessService.assertAccesoVisita(user, ficha.visitaId);
     return ficha;
   }
 

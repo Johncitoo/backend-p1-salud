@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -43,6 +45,12 @@ const isTest = process.env.NODE_ENV === 'test';
       isGlobal: true,
       load: [authConfig],
     }),
+    // Sin esto, cualquier endpoint (incluida la API key de integraciones y el
+    // upload de documentos-adjuntos, hasta 15MB por request) aceptaba tráfico
+    // ilimitado: fuerza bruta y DoS de carga masiva sin ningún freno. Límite
+    // global generoso (alcanza para uso normal de la app); los endpoints más
+    // sensibles tienen su propio límite más estricto vía @Throttle().
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     TypeOrmModule.forRootAsync(
       isTest
         ? {
@@ -89,6 +97,9 @@ const isTest = process.env.NODE_ENV === 'test';
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

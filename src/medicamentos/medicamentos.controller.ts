@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseG
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { MedicamentosService } from './medicamentos.service';
 import { CreateMedicamentoDto } from './dto/create-medicamento.dto';
 import { CreateMedicamentoCatalogoDto } from './dto/create-medicamento-catalogo.dto';
@@ -14,8 +16,8 @@ export class MedicamentosController {
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
-  findAll(@Query('visitaId') visitaId?: string) {
-    return this.medicamentosService.findAll({ visitaId });
+  findAll(@Query('visitaId') visitaId?: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.medicamentosService.findAll({ visitaId }, user);
   }
 
   // Nota de rutas: estos métodos deben ir antes de "@Get(':id')" / "@Patch(':id')"
@@ -44,8 +46,8 @@ export class MedicamentosController {
 
   @Get(':id')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
-  findOne(@Param('id') id: string) {
-    return this.medicamentosService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.medicamentosService.findOne(id, user);
   }
 
   @Post()

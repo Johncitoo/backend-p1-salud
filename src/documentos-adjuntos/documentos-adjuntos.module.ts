@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditoriasModule } from '../auditorias/auditorias.module';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PacienteAccessModule } from '../auth/services/paciente-access.module';
 import { FichaClinica } from '../fichas-clinicas/entities/ficha-clinica.entity';
 import { Visita } from '../pacientes/entities/visita.entity';
 import { UsuariosModule } from '../usuarios/usuarios.module';
@@ -21,6 +22,7 @@ import { STORAGE_SERVICE } from './services/storage.interface';
   imports: [
     UsuariosModule,
     AuditoriasModule,
+    PacienteAccessModule,
     TypeOrmModule.forFeature([DocumentoAdjunto, FichaClinica, Visita]),
   ],
   controllers: [DocumentosAdjuntosController],

@@ -162,6 +162,41 @@ describe('DevAuthGuard', () => {
     );
   });
 
+  it('valida el audience por defecto cuando KEYCLOAK_VALIDATE_AUDIENCE no está seteada', async () => {
+    jest.mocked(jwtVerify).mockResolvedValue({
+      payload: {
+        sub: usuarioPerfil.identityUserId,
+        email: usuarioPerfil.email,
+        resource_access: { p1: { roles: ['professional'] } },
+      },
+      protectedHeader: { alg: 'RS256' },
+      key: new Uint8Array(),
+    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+
+    const guard = new DevAuthGuard(
+      createConfigService({
+        AUTH_MODE: 'keycloak',
+        KEYCLOAK_ISSUER: 'http://localhost/realms/sistema-centralizado',
+        KEYCLOAK_JWKS_URI:
+          'http://localhost/realms/sistema-centralizado/protocol/openid-connect/certs',
+        KEYCLOAK_AUDIENCE: 'p1',
+        // KEYCLOAK_VALIDATE_AUDIENCE deliberadamente ausente: el realm es
+        // compartido entre ~10 proyectos del curso, así que sin esto un
+        // token válido de OTRO proyecto también sería aceptado acá.
+      }),
+      createUsuariosService(),
+    );
+    const { context } = createContext({ authorization: 'Bearer access-token' });
+
+    await guard.canActivate(context);
+
+    expect(jwtVerify).toHaveBeenCalledWith(
+      'access-token',
+      'remote-jwks',
+      expect.objectContaining({ audience: 'p1' }),
+    );
+  });
+
   it('maps coordinator JWT role to COORDINADOR', async () => {
     jest.mocked(jwtVerify).mockResolvedValue({
       payload: {

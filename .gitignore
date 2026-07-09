@@ -16,11 +16,11 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# dotenv environment variable files
-.env
-.env.development
-.env.test
-.env.production
+# dotenv environment variable files (cualquier .env*, incluye .env.grupo12,
+# .env.local, etc. — antes solo se ignoraban 4 nombres exactos y quedaban
+# afuera variantes como esa, que terminaron committeadas con credenciales reales)
+.env*
+!.env.example
 
 # temp directory
 .temp

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditoriasModule } from '../auditorias/auditorias.module';
+import { PacienteAccessModule } from '../auth/services/paciente-access.module';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { Diagnostico } from './entities/diagnostico.entity';
 import { DiagnosticosController } from './diagnosticos.controller';
@@ -10,6 +11,7 @@ import { DiagnosticosService } from './diagnosticos.service';
   imports: [
     UsuariosModule,
     AuditoriasModule,
+    PacienteAccessModule,
     TypeOrmModule.forFeature([Diagnostico]),
   ],
   controllers: [DiagnosticosController],

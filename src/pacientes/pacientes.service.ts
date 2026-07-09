@@ -2,6 +2,8 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { PacienteAccessService } from '../auth/services/paciente-access.service';
+import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
 import { CreatePacienteDto } from './dto/create-paciente.dto';
@@ -36,6 +38,7 @@ export class PacientesService {
     private readonly auditoriasService: AuditoriasService,
     private readonly analyticsService: AnalyticsService,
     private readonly notificacionesService: NotificacionesService,
+    private readonly pacienteAccessService: PacienteAccessService,
   ) {}
 
   async findAll(): Promise<Paciente[]> {
@@ -45,7 +48,7 @@ export class PacientesService {
     });
   }
 
-  async findOne(id: string): Promise<Paciente> {
+  async findOne(id: string, user?: UsuarioPerfil): Promise<Paciente> {
     const pac = await this.pacientesRepository.findOne({
       where: { id, deletedAt: IsNull() },
     });
@@ -53,6 +56,8 @@ export class PacientesService {
     if (!pac) {
       throw new NotFoundException('Paciente no encontrado');
     }
+
+    await this.pacienteAccessService.assertAccesoPaciente(user, pac.id);
 
     return pac;
   }

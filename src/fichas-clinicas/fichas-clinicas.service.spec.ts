@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { PacienteAccessService } from '../auth/services/paciente-access.service';
 import { PlantillasFichaService } from '../plantillas-ficha/plantillas-ficha.service';
 import { VariablesClinicasService } from '../variables-clinicas/variables-clinicas.service';
 import { MedicionClinica } from '../mediciones-clinicas/entities/medicion-clinica.entity';
@@ -46,6 +47,9 @@ const mockPlantillas = () =>
 const mockVariables = () =>
   ({ findAll: jest.fn(), findOne: jest.fn(), findByCodigo: jest.fn() }) as unknown as VariablesClinicasService;
 
+const mockPacienteAccess = () =>
+  ({ assertAccesoPaciente: jest.fn(), assertAccesoVisita: jest.fn() }) as unknown as PacienteAccessService;
+
 describe('FichasClinicasService', () => {
   let service: FichasClinicasService;
   let fichasRepo: ReturnType<typeof _createRepo>;
@@ -70,6 +74,7 @@ describe('FichasClinicasService', () => {
         { provide: PlantillasFichaService, useValue: plantillas },
         { provide: VariablesClinicasService, useValue: variables },
         { provide: AnalyticsService, useValue: { sendFichaUpsertEvent: jest.fn() } },
+        { provide: PacienteAccessService, useValue: mockPacienteAccess() },
       ],
     }).compile();
 

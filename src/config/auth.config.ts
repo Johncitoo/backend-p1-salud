@@ -19,14 +19,19 @@ export interface AuthConfig {
   frontendUrl: string;
 }
 
-const isAuthMode = (value: string): value is AuthMode =>
+const isAuthMode = (value: string | undefined): value is AuthMode =>
   value === 'mock' || value === 'keycloak';
 
 export const authConfig = registerAs('auth', (): AuthConfig => {
-  const authMode = process.env.AUTH_MODE ?? 'mock';
+  // Sin fallback a 'mock' aquí tampoco: main.ts (validateAuthMode) ya impide
+  // arrancar sin AUTH_MODE seteada explícitamente. Este objeto de config no
+  // se usa hoy en runtime (DevAuthGuard lee la variable de entorno directo),
+  // pero no debe modelar un default inseguro si en el futuro alguien empieza
+  // a inyectarlo.
+  const authMode = process.env.AUTH_MODE;
 
   return {
-    mode: isAuthMode(authMode) ? authMode : 'mock',
+    mode: isAuthMode(authMode) ? authMode : 'keycloak',
     jwt: {
       secret: process.env.JWT_SECRET,
       issuer: process.env.JWT_ISSUER,
@@ -41,7 +46,9 @@ export const authConfig = registerAs('auth', (): AuthConfig => {
         process.env.KEYCLOAK_JWKS_URI ??
         'http://localhost/realms/sistema-centralizado/protocol/openid-connect/certs',
       audience: process.env.KEYCLOAK_AUDIENCE ?? 'salud-domiciliaria-api',
-      validateAudience: process.env.KEYCLOAK_VALIDATE_AUDIENCE === 'true',
+      // Seguro por defecto (ver dev-auth.guard.ts): se valida el "aud" salvo
+      // que se desactive explícitamente con 'false'.
+      validateAudience: process.env.KEYCLOAK_VALIDATE_AUDIENCE !== 'false',
     },
     frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:5173',
   };

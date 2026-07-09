@@ -19,7 +19,11 @@ export class DevAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const authMode = this.configService.get<string>('AUTH_MODE') ?? 'mock';
+    // Sin fallback a 'mock': main.ts ya valida al arrancar que AUTH_MODE esté
+    // seteada explícitamente, pero este guard no debe volver a introducir un
+    // default inseguro si algo cambia en el futuro (ej. un test que instancia
+    // el guard sin pasar por bootstrap()).
+    const authMode = this.configService.get<string>('AUTH_MODE');
     const request = context.switchToHttp().getRequest<RequestWithUser>();
 
     if (authMode === 'mock') {
@@ -152,7 +156,11 @@ export class DevAuthGuard implements CanActivate {
     const issuer = this.configService.get<string>('KEYCLOAK_ISSUER');
     const jwksUri = this.configService.get<string>('KEYCLOAK_JWKS_URI');
     const audience = this.configService.get<string>('KEYCLOAK_AUDIENCE');
-    const validateAudience = this.configService.get<string>('KEYCLOAK_VALIDATE_AUDIENCE') === 'true';
+    // Seguro por defecto: se valida el "aud" salvo que se desactive
+    // explícitamente con 'false'. El realm de Keycloak es compartido entre
+    // ~10 proyectos del curso — sin esto, un token válido emitido para OTRO
+    // proyecto del mismo realm también sería aceptado acá.
+    const validateAudience = this.configService.get<string>('KEYCLOAK_VALIDATE_AUDIENCE') !== 'false';
 
     if (!issuer || !jwksUri) {
       throw new UnauthorizedException('Configuracion Keycloak incompleta');

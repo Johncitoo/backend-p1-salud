@@ -3,6 +3,29 @@ import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+// AUTH_MODE ya no tiene un default implícito: sin esta validación, si alguien
+// olvidaba setear la variable en un despliegue nuevo, DevAuthGuard caía
+// silenciosamente a 'mock' (confía en el header x-mock-role que manda el
+// cliente, sin verificar nada) — un bypass total de autenticación. Ahora el
+// backend se niega a arrancar en vez de arrancar inseguro por defecto.
+function validateAuthMode(): void {
+  const authMode = process.env.AUTH_MODE;
+
+  if (authMode !== 'mock' && authMode !== 'keycloak') {
+    throw new Error(
+      `AUTH_MODE debe estar seteada explícitamente a 'mock' o 'keycloak' (valor actual: ${authMode === undefined ? 'no seteada' : JSON.stringify(authMode)}). ` +
+      'No hay un valor por defecto: sin esto, el backend arrancaría confiando en el header x-mock-role sin autenticar a nadie.',
+    );
+  }
+
+  if (authMode === 'mock' && process.env.NODE_ENV === 'production') {
+    throw new Error(
+      "AUTH_MODE=mock no está permitido con NODE_ENV=production. El modo mock confía en el header x-mock-role sin verificar identidad; " +
+      'está pensado solo para desarrollo local. Usa AUTH_MODE=keycloak en producción.',
+    );
+  }
+}
+
 async function checkExternalDependencies(configService: ConfigService) {
   const logger = new Logger('StartupHealthCheck');
   logger.log('Comprobando estado de proyectos externos integrados...');
@@ -39,6 +62,8 @@ async function checkExternalDependencies(configService: ConfigService) {
 }
 
 async function bootstrap() {
+  validateAuthMode();
+
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const frontendUrl =

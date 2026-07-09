@@ -23,14 +23,15 @@ export class FichasClinicasController {
     @Query('visitaId') visitaId?: string,
     @Query('pacienteId') pacienteId?: string,
     @Query('estado') estado?: string,
+    @CurrentUser() user?: UsuarioPerfil,
   ) {
-    return this.service.findAll({ visitaId, pacienteId, estado });
+    return this.service.findAll({ visitaId, pacienteId, estado }, user);
   }
 
   @Get(':id')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.service.findOne(id, user);
   }
 
   @Post()

@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,6 +22,9 @@ export class DocumentosAdjuntosController {
 
   @Post()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
+  // Límite propio, más estricto que el global: hasta 15MB por request, sin
+  // esto un cliente podía mandar carga masiva de archivos sin ningún freno.
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_MULTIPART_BYTES } }))
   upload(
     @UploadedFile() file: UploadedClinicalFile,
@@ -32,8 +36,8 @@ export class DocumentosAdjuntosController {
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
-  findAll(@Query('fichaClinicaId') fichaClinicaId?: string) {
-    return this.service.findAll({ fichaClinicaId });
+  findAll(@Query('fichaClinicaId') fichaClinicaId?: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.service.findAll({ fichaClinicaId }, user);
   }
 
   @Get(':id/download')
@@ -43,7 +47,7 @@ export class DocumentosAdjuntosController {
     @CurrentUser() user: UsuarioPerfil | undefined,
     @Res() response: Response,
   ) {
-    const file = await this.service.download(id, uuidOrUndefined(user?.id));
+    const file = await this.service.download(id, uuidOrUndefined(user?.id), user);
     response.setHeader('Content-Type', file.mimeType);
     response.setHeader('Content-Length', file.buffer.length);
     response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"`);

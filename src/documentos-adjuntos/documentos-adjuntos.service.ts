@@ -1,10 +1,12 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'crypto';
 import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { PacienteAccessService } from '../auth/services/paciente-access.service';
 import { FichaClinica } from '../fichas-clinicas/entities/ficha-clinica.entity';
 import { Visita } from '../pacientes/entities/visita.entity';
+import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { UploadDocumentoAdjuntoDto } from './dto/upload-documento-adjunto.dto';
 import { DocumentoAdjunto } from './entities/documento-adjunto.entity';
 import { FileEncryptionService } from './services/file-encryption.service';
@@ -34,7 +36,21 @@ export class DocumentosAdjuntosService {
     private readonly encryption: FileEncryptionService,
     @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
     private readonly auditoriasService: AuditoriasService,
+    private readonly pacienteAccessService: PacienteAccessService,
   ) {}
+
+  /** Resuelve el pacienteId de un documento: viene denormalizado en metadata
+   * (ver upload()), con fallback vía ficha→visita para filas viejas que no
+   * lo tengan. */
+  private async pacienteIdDeDocumento(documento: DocumentoAdjunto): Promise<string> {
+    const metadataPacienteId = (documento.metadata as Record<string, unknown> | null)?.pacienteId;
+    if (typeof metadataPacienteId === 'string') return metadataPacienteId;
+
+    const ficha = await this.findFicha(documento.fichaClinicaId);
+    const visita = await this.visitasRepo.findOne({ where: { id: ficha.visitaId, deletedAt: IsNull() } });
+    if (!visita) throw new NotFoundException('Visita asociada al documento no encontrada');
+    return visita.pacienteId;
+  }
 
   async upload(dto: UploadDocumentoAdjuntoDto, file: UploadedClinicalFile, usuarioId?: string) {
     const ficha = await this.findFicha(dto.fichaClinicaId);
@@ -128,7 +144,15 @@ export class DocumentosAdjuntosService {
     return this.toResponse(saved);
   }
 
-  async findAll(filtros: { fichaClinicaId?: string }) {
+  async findAll(filtros: { fichaClinicaId?: string }, user?: UsuarioPerfil) {
+    if (user?.rol === 'PROFESIONAL') {
+      if (!filtros.fichaClinicaId) {
+        throw new ForbiddenException('Debes especificar una ficha clínica para consultar sus adjuntos.');
+      }
+      const ficha = await this.findFicha(filtros.fichaClinicaId);
+      await this.pacienteAccessService.assertAccesoVisita(user, ficha.visitaId);
+    }
+
     const where: FindOptionsWhere<DocumentoAdjunto> = { deletedAt: IsNull() };
     if (filtros.fichaClinicaId) where.fichaClinicaId = filtros.fichaClinicaId;
 
@@ -140,8 +164,9 @@ export class DocumentosAdjuntosService {
     return rows.map(row => this.toResponse(row));
   }
 
-  async download(id: string, usuarioId?: string): Promise<DownloadDocumentoAdjunto> {
+  async download(id: string, usuarioId?: string, user?: UsuarioPerfil): Promise<DownloadDocumentoAdjunto> {
     const documento = await this.findOneActive(id);
+    await this.pacienteAccessService.assertAccesoPaciente(user, await this.pacienteIdDeDocumento(documento));
     if (!documento.objectKey || !documento.encryptionIv || !documento.encryptionTag) {
       throw new BadRequestException('Documento sin informacion de almacenamiento cifrado.');
     }

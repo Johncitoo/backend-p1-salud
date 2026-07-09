@@ -43,8 +43,8 @@ export class PacientesController {
 
   @Get(':id')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
-  findOne(@Param('id') id: string) {
-    return this.pacientesService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user?: UsuarioPerfil) {
+    return this.pacientesService.findOne(id, user);
   }
 
   @Post()

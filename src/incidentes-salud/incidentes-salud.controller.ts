@@ -11,6 +11,7 @@ import {
   UseGuards,
 
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -30,6 +31,9 @@ export class IncidentesSaludController {
 
   @Get('externo/:id')
   @UseGuards(ApiKeyGuard)
+  // Límite estricto: sin esto, la API key se podía probar por fuerza bruta
+  // sin ningún freno (este endpoint además expone PII de pacientes).
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async findOneExterno(@Param('id') id: string) {
     const incidente = await this.incidentesSaludService.findOne(id);
     let paciente: Paciente | null = null;

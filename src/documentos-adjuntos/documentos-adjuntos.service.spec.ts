@@ -52,6 +52,8 @@ describe('DocumentosAdjuntosService', () => {
       ),
     } as any);
 
+    const pacienteAccess = { assertAccesoPaciente: jest.fn(), assertAccesoVisita: jest.fn() };
+
     service = new DocumentosAdjuntosService(
       documentosRepo as any,
       fichasRepo as any,
@@ -61,6 +63,7 @@ describe('DocumentosAdjuntosService', () => {
       encryption,
       storage as any,
       auditorias as any,
+      pacienteAccess as any,
     );
   });
 

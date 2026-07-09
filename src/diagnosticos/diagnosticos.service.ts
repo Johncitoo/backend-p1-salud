@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
+import { PacienteAccessService } from '../auth/services/paciente-access.service';
+import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { CreateDiagnosticoDto } from './dto/create-diagnostico.dto';
 import { Diagnostico } from './entities/diagnostico.entity';
 
@@ -11,11 +13,19 @@ export class DiagnosticosService {
     @InjectRepository(Diagnostico)
     private readonly repository: Repository<Diagnostico>,
     private readonly auditoriasService: AuditoriasService,
+    private readonly pacienteAccessService: PacienteAccessService,
   ) {}
 
   // Una visita puede tener múltiples diagnósticos a lo largo de varias fichas
   // clínicas (a diferencia de FichaClinica, que solo admite una por visita).
-  async findAll(filtros?: { visitaId?: string }): Promise<Diagnostico[]> {
+  async findAll(filtros?: { visitaId?: string }, user?: UsuarioPerfil): Promise<Diagnostico[]> {
+    if (user?.rol === 'PROFESIONAL') {
+      if (!filtros?.visitaId) {
+        throw new ForbiddenException('Debes especificar una visita para consultar sus diagnósticos.');
+      }
+      await this.pacienteAccessService.assertAccesoVisita(user, filtros.visitaId);
+    }
+
     const qb = this.repository.createQueryBuilder('d').where('d.deleted_at IS NULL');
 
     if (filtros?.visitaId)
@@ -24,11 +34,12 @@ export class DiagnosticosService {
     return qb.orderBy('d.created_at', 'DESC').getMany();
   }
 
-  async findOne(id: string): Promise<Diagnostico> {
+  async findOne(id: string, user?: UsuarioPerfil): Promise<Diagnostico> {
     const diagnostico = await this.repository.findOne({ where: { id } });
     if (!diagnostico || diagnostico.deletedAt) {
       throw new NotFoundException('Diagnóstico no encontrado');
     }
+    await this.pacienteAccessService.assertAccesoVisita(user, diagnostico.visitaId);
     return diagnostico;
   }
 
