@@ -26,13 +26,13 @@ export class PlantillasFichaController {
   }
 
   @Post()
-  @Roles('ADMIN', 'COORDINADOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   create(@Body() dto: CreatePlantillaFichaDto) {
     return this.service.create(dto);
   }
 
   @Patch(':id')
-  @Roles('ADMIN', 'COORDINADOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   update(@Param('id') id: string, @Body() dto: UpdatePlantillaFichaDto) {
     return this.service.update(id, dto);
   }
@@ -52,13 +52,13 @@ export class PlantillasFichaController {
   }
 
   @Post(':id/campos')
-  @Roles('ADMIN', 'COORDINADOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   createCampo(@Param('id') id: string, @Body() dto: CreatePlantillaFichaCampoDto) {
     return this.service.createCampo({ ...dto, plantillaFichaId: id });
   }
 
   @Patch('campos/:id')
-  @Roles('ADMIN', 'COORDINADOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
   updateCampo(@Param('id') id: string, @Body() dto: UpdatePlantillaFichaCampoDto) {
     return this.service.updateCampo(id, dto);
   }
