@@ -21,20 +21,20 @@ export class MantenimientoController {
 
   // Catálogo de repuestos que el técnico puede elegir en la web.
   @Get('repuestos')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   getCatalogoRepuestos() {
     return this.mantenimientoService.getCatalogoRepuestos();
   }
 
   // Paso 9 + 10: el técnico registra la inspección y se genera el pedido a P3.
   @Post('inspecciones')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO')
   create(@Body() dto: CreateInspeccionMantenimientoDto, @Request() req: any) {
     return this.mantenimientoService.create(dto, req.user?.id);
   }
 
   @Get('inspecciones')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   findAll(
     @Query('pacienteId') pacienteId?: string,
     @Query('estado') estado?: string,
@@ -43,7 +43,7 @@ export class MantenimientoController {
   }
 
   @Get('inspecciones/:id')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   findOne(@Param('id') id: string) {
     return this.mantenimientoService.findOne(id);
   }
