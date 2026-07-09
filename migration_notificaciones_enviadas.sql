@@ -1,16 +1,8 @@
--- =====================================================================
--- Migración: tabla notificaciones_enviadas (tracking de Grupo 6)
--- =====================================================================
--- La entidad NotificacionEnviada (integración con Grupo 6) guarda un registro
--- local por cada notificación aceptada, para poder consultar su estado de
--- entrega vía /tracking/:notificationId. La tabla existe en dev pero faltaba en
--- producción (y en init.sql) → al enviar una notificación el insert fallaba con:
---   relation "notificaciones_enviadas" does not exist
--- Nota: el envío a Grupo 6 SÍ ocurre; lo único que fallaba era guardar el tracking.
---
--- Idempotente (IF NOT EXISTS): seguro de re-correr.
--- =====================================================================
+BEGIN;
 
+-- Registro local de cada notificación aceptada por el Grupo 6 (HTTP 202), para
+-- poder consultar su estado de entrega despues via /tracking/:notificationId.
+-- Ver src/integrations/notificaciones/entities/notificacion-enviada.entity.ts
 CREATE TABLE IF NOT EXISTS notificaciones_enviadas (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     evento VARCHAR(60) NOT NULL,
@@ -21,9 +13,11 @@ CREATE TABLE IF NOT EXISTS notificaciones_enviadas (
     notification_id VARCHAR(100) NOT NULL,
     job_id VARCHAR(100),
     estado VARCHAR(30) NOT NULL DEFAULT 'enviado',
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_notificaciones_enviadas_visita_id ON notificaciones_enviadas(visita_id);
 CREATE INDEX IF NOT EXISTS idx_notificaciones_enviadas_paciente_id ON notificaciones_enviadas(paciente_id);
+
+COMMIT;
