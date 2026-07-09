@@ -36,13 +36,13 @@ export class PacientesController {
   ) {}
 
   @Get()
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   findAll() {
     return this.pacientesService.findAll();
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   findOne(@Param('id') id: string) {
     return this.pacientesService.findOne(id);
   }
