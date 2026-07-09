@@ -7,6 +7,7 @@ import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.enti
 import { Paciente } from '../pacientes/entities/paciente.entity';
 import { CreateInspeccionMantenimientoDto } from './dto/create-inspeccion-mantenimiento.dto';
 import { FinalizarIntervencionDto } from './dto/finalizar-intervencion.dto';
+import { CorregirInformeDto } from './dto/corregir-informe.dto';
 import { InspeccionMantenimiento, RepuestoSolicitado } from './entities/inspeccion-mantenimiento.entity';
 import { REPUESTOS_CATALOGO, REPUESTOS_POR_SKU } from './repuestos.catalog';
 
@@ -82,6 +83,46 @@ export class MantenimientoService {
     // Paso 10: pedido automático de repuestos. Se persiste el resultado para que
     // Coordinación vea si Proyecto 3 lo aceptó o hubo que reintentar.
     saved = await this.enviarPedido(saved, paciente);
+
+    return saved;
+  }
+
+  // Paso 19 del UAT: corrección del informe técnico. Guarda la versión actual en
+  // el historial, incrementa el número de versión y actualiza el diagnóstico
+  // (y el equipo, si se corrige). El pedido de repuestos NO se re-dispara: esto
+  // solo corrige el documento, no vuelve a solicitar repuestos.
+  async corregirInforme(
+    id: string,
+    dto: CorregirInformeDto,
+    usuarioId?: string,
+  ): Promise<InspeccionMantenimiento> {
+    const inspeccion = await this.findOne(id);
+
+    // Snapshot de la versión vigente antes de sobrescribirla.
+    const historial = inspeccion.historialVersiones ?? [];
+    historial.push({
+      version: inspeccion.version,
+      equipo: inspeccion.equipo,
+      diagnostico: inspeccion.diagnostico ?? null,
+      motivo: dto.motivo ?? null,
+      corregidoPorUsuarioId: usuarioId ?? null,
+      fecha: new Date().toISOString(),
+    });
+
+    inspeccion.historialVersiones = historial;
+    inspeccion.version = inspeccion.version + 1;
+    inspeccion.diagnostico = dto.diagnostico;
+    if (dto.equipo) inspeccion.equipo = dto.equipo;
+
+    const saved = await this.repository.save(inspeccion);
+
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'inspecciones_mantenimiento',
+      entidadId: saved.id,
+      accion: 'CORREGIR_INFORME',
+      detalle: `Informe corregido a la versión ${saved.version}${dto.motivo ? `. Motivo: ${dto.motivo}` : ''}`,
+    });
 
     return saved;
   }

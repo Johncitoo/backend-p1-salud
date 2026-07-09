@@ -9,6 +9,17 @@ export interface RepuestoSolicitado {
   cantidad: number;
 }
 
+// Versión anterior del informe técnico, guardada al corregirlo (Paso 19).
+// Permite trazar el documento desde la versión original hasta la corregida.
+export interface VersionInforme {
+  version: number;
+  equipo: string;
+  diagnostico?: string | null;
+  motivo?: string | null;
+  corregidoPorUsuarioId?: string | null;
+  fecha: string;
+}
+
 // Informe técnico de una inspección de mantenimiento preventivo (Paso 9). Al
 // crearse, dispara el pedido automático de repuestos al Proyecto 3 (Paso 10);
 // el resultado del webhook se guarda en estado / pedido_externo_id.
@@ -42,6 +53,14 @@ export class InspeccionMantenimiento {
   // FINALIZADA = se instalaron los componentes y se cerró la orden de trabajo (Paso 14).
   @Column({ type: 'varchar', length: 30, default: 'REGISTRADA' })
   estado: string;
+
+  // Versión del informe técnico. Arranca en 1 y se incrementa cada corrección
+  // (Paso 19). El historial de versiones anteriores queda en historialVersiones.
+  @Column({ type: 'integer', default: 1 })
+  version: number;
+
+  @Column({ name: 'historial_versiones', type: 'jsonb', default: '[]' })
+  historialVersiones: VersionInforme[];
 
   // ID del pedido generado por Proyecto 3 (pedido_id de la respuesta 201).
   @Column({ name: 'pedido_externo_id', type: 'varchar', length: 150, nullable: true })

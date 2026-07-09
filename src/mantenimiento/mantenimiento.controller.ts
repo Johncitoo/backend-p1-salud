@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Request,
@@ -13,6 +14,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateInspeccionMantenimientoDto } from './dto/create-inspeccion-mantenimiento.dto';
 import { FinalizarIntervencionDto } from './dto/finalizar-intervencion.dto';
+import { CorregirInformeDto } from './dto/corregir-informe.dto';
 import { MantenimientoService } from './mantenimiento.service';
 
 @Controller('mantenimiento')
@@ -47,6 +49,17 @@ export class MantenimientoController {
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
   findOne(@Param('id') id: string) {
     return this.mantenimientoService.findOne(id);
+  }
+
+  // Paso 19: corrige el informe técnico y emite una nueva versión del documento.
+  @Patch('inspecciones/:id/corregir')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO')
+  corregirInforme(
+    @Param('id') id: string,
+    @Body() dto: CorregirInformeDto,
+    @Request() req: any,
+  ) {
+    return this.mantenimientoService.corregirInforme(id, dto, req.user?.id);
   }
 
   // Reintenta el pedido a Proyecto 3 si el primer intento falló.
