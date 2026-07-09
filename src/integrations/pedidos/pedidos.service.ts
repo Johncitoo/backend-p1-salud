@@ -165,13 +165,13 @@ export class PedidosService {
         telefono: paciente.telefono ?? undefined,
       },
       direccion_envio: {
-        calle: direccion?.calle ?? '',
-        numero: direccion?.numero ?? '',
-        ciudad: direccion?.comuna ?? '',
-        region: direccion?.region ?? '',
+        calle: firstNonEmpty(direccion?.calle, paciente.direccion, 'Dirección no informada'),
+        numero: firstNonEmpty(direccion?.numero, 'S/N'),
+        ciudad: firstNonEmpty(direccion?.comuna, 'Santiago'),
+        region: firstNonEmpty(direccion?.region, 'Metropolitana'),
         codigo_postal: '',
         pais: 'Chile',
-        notas_adicionales: direccion?.referencia ?? '',
+        notas_adicionales: firstNonEmpty(direccion?.referencia, paciente.direccion, ''),
       },
       // precio_unitario 0: mantenimiento preventivo cubierto por contrato (exento).
       items: inspeccion.repuestos.map((r) => ({
@@ -257,4 +257,8 @@ export class PedidosService {
       return { ok: false, error: mensaje, tipo: data?.tipo };
     }
   }
+}
+
+function firstNonEmpty(...values: Array<string | null | undefined>): string {
+  return values.find((value) => value?.trim())?.trim() ?? '';
 }
