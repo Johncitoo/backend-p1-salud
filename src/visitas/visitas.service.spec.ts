@@ -103,10 +103,13 @@ describe('VisitasService calendar flows', () => {
   let visitaPrestacionesRepo: ReturnType<typeof makeRepo<any>>;
   let motivosCancelacionRepo: ReturnType<typeof makeRepo<any>>;
   let motivosReprogramacionRepo: ReturnType<typeof makeRepo<any>>;
+  let medicamentosRepo: ReturnType<typeof makeRepo<any>>;
+  let medicamentosCatalogoRepo: ReturnType<typeof makeRepo<any>>;
   let auditoriasService: { registrar: jest.Mock };
   let googleCalendarSyncService: Record<string, jest.Mock>;
   let analyticsService: Record<string, jest.Mock>;
   let notificacionesService: Record<string, jest.Mock>;
+  let pedidosService: Record<string, jest.Mock>;
 
   const wireDefaults = () => {
     visitasRepo.createQueryBuilder.mockReturnValue(makeQueryBuilder());
@@ -140,6 +143,8 @@ describe('VisitasService calendar flows', () => {
     visitaPrestacionesRepo = makeRepo();
     motivosCancelacionRepo = makeRepo();
     motivosReprogramacionRepo = makeRepo();
+    medicamentosRepo = makeRepo();
+    medicamentosCatalogoRepo = makeRepo();
     auditoriasService = { registrar: jest.fn() };
     googleCalendarSyncService = {
       syncCreatedVisit: jest.fn(async (visita) => visita),
@@ -163,8 +168,13 @@ describe('VisitasService calendar flows', () => {
       notificarVisitaCancelada: jest.fn(),
       notificarVisitaReprogramada: jest.fn(),
     };
+    pedidosService = {
+      buildPayload: jest.fn(() => ({})),
+      enviarPedido: jest.fn(),
+    };
 
     wireDefaults();
+    medicamentosRepo.find.mockResolvedValue([]);
 
     service = new VisitasService(
       visitasRepo as any,
@@ -180,10 +190,13 @@ describe('VisitasService calendar flows', () => {
       visitaPrestacionesRepo as any,
       motivosCancelacionRepo as any,
       motivosReprogramacionRepo as any,
+      medicamentosRepo as any,
+      medicamentosCatalogoRepo as any,
       auditoriasService as any,
       googleCalendarSyncService as any,
       analyticsService as any,
       notificacionesService as any,
+      pedidosService as any,
     );
   });
 

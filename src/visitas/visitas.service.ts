@@ -1,14 +1,17 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { AnalyticsService, VisitAnalyticsOptions } from '../integrations/analytics/analytics.service';
 import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
+import { PedidosService } from '../integrations/pedidos/pedidos.service';
 import { BloqueoAgenda } from '../bloqueos-agenda/entities/bloqueo-agenda.entity';
 import { CreateVisitaDto } from '../pacientes/dto/create-visita.dto';
 import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
+import { Medicamento } from '../medicamentos/entities/medicamento.entity';
+import { MedicamentoCatalogo } from '../medicamentos/entities/medicamento-catalogo.entity';
 import { Paciente } from '../pacientes/entities/paciente.entity';
 import { PlanCuidado } from '../pacientes/entities/plan-cuidado.entity';
 import { Visita } from '../pacientes/entities/visita.entity';
@@ -73,10 +76,15 @@ export class VisitasService {
     private readonly motivosCancelacionRepository: Repository<MotivoCancelacion>,
     @InjectRepository(MotivoReprogramacion)
     private readonly motivosReprogramacionRepository: Repository<MotivoReprogramacion>,
+    @InjectRepository(Medicamento)
+    private readonly medicamentosRepository: Repository<Medicamento>,
+    @InjectRepository(MedicamentoCatalogo)
+    private readonly medicamentosCatalogoRepository: Repository<MedicamentoCatalogo>,
     private readonly auditoriasService: AuditoriasService,
     private readonly googleCalendarSyncService: GoogleCalendarSyncService,
     private readonly analyticsService: AnalyticsService,
     private readonly notificacionesService: NotificacionesService,
+    private readonly pedidosService: PedidosService,
   ) {}
 
   // Obtiene el paciente y el usuario del profesional de una visita, para enviar notificaciones.
@@ -521,8 +529,46 @@ export class VisitasService {
 
     await this.sincronizarVisitaAnalytics(saved, { puntual: dto.puntual, visitType: await this.obtenerVisitType(saved) });
     await this.analyticsService.sendVisitaFinEvent(saved, { puntual: dto.puntual });
+    await this.enviarPedidoKitSiCorresponde(saved);
 
     return saved;
+  }
+
+  // Proyecto 3 (Gestión de Pedidos): al completar una visita, si quedaron
+  // medicamentos registrados se le arma un pedido de kit clínico domiciliario.
+  // Requiere email del paciente (Proyecto 3 lo usa como CustomerID); si no hay
+  // email, se omite el envío sin bloquear el flujo clínico — solo se loguea
+  // para que Coordinación lo note después. Ver CONTRATO_API_PRESCRIPCIONES.md.
+  private async enviarPedidoKitSiCorresponde(visita: Visita): Promise<void> {
+    const medicamentos = await this.medicamentosRepository.find({
+      where: { visitaId: visita.id, deletedAt: IsNull() },
+    });
+    if (medicamentos.length === 0) return;
+
+    const paciente = await this.pacientesRepository.findOne({ where: { id: visita.pacienteId } });
+    if (!paciente?.email) {
+      this.logger.warn(`No se envía pedido de kit a Proyecto 3 para visita ${visita.id}: paciente sin email.`);
+      return;
+    }
+
+    const direccion = visita.direccionPacienteId
+      ? await this.direccionesRepository.findOne({ where: { id: visita.direccionPacienteId } })
+      : null;
+
+    const catalogoIds = [...new Set(medicamentos.map(m => m.medicamentoCatalogoId).filter((id): id is string => !!id))];
+    const catalogos = catalogoIds.length
+      ? await this.medicamentosCatalogoRepository.findBy({ id: In(catalogoIds) })
+      : [];
+    const catalogoPorId = new Map(catalogos.map(c => [c.id, c]));
+
+    const items = medicamentos.map(m => {
+      const catalogo = m.medicamentoCatalogoId ? catalogoPorId.get(m.medicamentoCatalogoId) : undefined;
+      const nombre = catalogo?.presentacion ? `${m.nombre} ${catalogo.presentacion}` : m.nombre;
+      return { nombre, cantidad: m.cantidadCajas };
+    });
+
+    const payload = this.pedidosService.buildPayload(visita, paciente, direccion, items);
+    await this.pedidosService.enviarPedido(payload);
   }
 
   async cancelar(id: string, dto: CancelarVisitaDto, usuarioId?: string): Promise<Visita> {
