@@ -31,6 +31,16 @@ const baseVisita = (): Visita => ({
   deletedAt: null,
 } as Visita);
 
+// Genera fecha/hora programada relativas a "ahora" para probar cancelación tardía.
+const programadaDesdeAhora = (minutos: number) => {
+  const d = new Date(Date.now() + minutos * 60_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    fechaProgramada: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    horaProgramada: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,
+  };
+};
+
 const paciente = {
   id: ids.paciente,
   rut: '12.345.678-9',
@@ -109,6 +119,7 @@ describe('VisitasService calendar flows', () => {
   let googleCalendarSyncService: Record<string, jest.Mock>;
   let analyticsService: Record<string, jest.Mock>;
   let notificacionesService: Record<string, jest.Mock>;
+  let incidentesSaludService: { create: jest.Mock };
   let pedidosService: Record<string, jest.Mock>;
 
   const wireDefaults = () => {
@@ -168,6 +179,7 @@ describe('VisitasService calendar flows', () => {
       notificarVisitaCancelada: jest.fn(),
       notificarVisitaReprogramada: jest.fn(),
     };
+    incidentesSaludService = { create: jest.fn() };
     pedidosService = {
       buildPayload: jest.fn(() => ({})),
       enviarPedido: jest.fn(),
@@ -196,6 +208,7 @@ describe('VisitasService calendar flows', () => {
       googleCalendarSyncService as any,
       analyticsService as any,
       notificacionesService as any,
+      incidentesSaludService as any,
       pedidosService as any,
     );
   });
@@ -320,6 +333,49 @@ describe('VisitasService calendar flows', () => {
       estadoNuevo: 'CANCELADA',
       observacion: 'Paciente no disponible',
     }));
+  });
+
+  it('cancelación tardía muy cercana (<1h) genera incidente ALTA VISITA_CANCELADA_TARDIA', async () => {
+    const visita = { ...baseVisita(), ...programadaDesdeAhora(30) } as Visita;
+    visitasRepo.findOne.mockResolvedValue({ ...visita });
+    visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
+
+    await service.cancelar(visita.id, { observacionCancelacion: 'Imprevisto' }, ids.usuario);
+
+    expect(incidentesSaludService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tipo: 'VISITA_CANCELADA_TARDIA',
+        severidad: 'ALTA',
+        origen: 'SISTEMA',
+        pacienteId: visita.pacienteId,
+        visitaId: visita.id,
+        profesionalSaludId: visita.profesionalSaludId,
+      }),
+      ids.usuario,
+    );
+  });
+
+  it('cancelación tardía moderada (1-2h) genera incidente MEDIA', async () => {
+    const visita = { ...baseVisita(), ...programadaDesdeAhora(90) } as Visita;
+    visitasRepo.findOne.mockResolvedValue({ ...visita });
+    visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
+
+    await service.cancelar(visita.id, {}, ids.usuario);
+
+    expect(incidentesSaludService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: 'VISITA_CANCELADA_TARDIA', severidad: 'MEDIA' }),
+      ids.usuario,
+    );
+  });
+
+  it('cancelación con suficiente anticipación (>2h) NO genera incidente', async () => {
+    const visita = { ...baseVisita(), ...programadaDesdeAhora(180) } as Visita;
+    visitasRepo.findOne.mockResolvedValue({ ...visita });
+    visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
+
+    await service.cancelar(visita.id, {}, ids.usuario);
+
+    expect(incidentesSaludService.create).not.toHaveBeenCalled();
   });
 
   it('marca inicio y fin reales en cambios de estado y envia eventos de ciclo de vida a analitica', async () => {

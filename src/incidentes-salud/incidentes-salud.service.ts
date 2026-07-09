@@ -143,12 +143,15 @@ export class IncidentesSaludService {
       detalle: `Incidente ${saved.tipo} - ${saved.titulo} creado (severidad: ${saved.severidad})`,
     });
 
-    // Solo enviamos a CRM (Proyecto 07) los incidentes creados MANUALMENTE por un
-    // profesional (origen WEB/APP), que es su caso de uso: soporte a situaciones de
-    // atención. Los automáticos del sistema (cron de visitas atrasadas + alertas de
-    // IoT, todos origen SISTEMA) NO van a CRM para no inundar su tiquetería; esos se
-    // reportan a Grupo 11 más abajo. El filtro vive en CrmService.debeEnviarTicket().
-    if (this.crmService.debeEnviarTicket(saved)) {
+    // Un incidente es MANUAL cuando lo crea un profesional desde la web/app
+    // (origen WEB/APP). Ese es el caso de uso de CRM (soporte a situaciones de
+    // atención) y también el único que reportamos "forzado" a Grupo 11 más abajo.
+    const esManual = this.crmService.debeEnviarTicket(saved);
+
+    // Solo enviamos a CRM (Proyecto 07) los incidentes MANUALES. Los automáticos
+    // del sistema (cron de visitas atrasadas + alertas de IoT, todos origen SISTEMA)
+    // NO van a CRM para no inundar su tiquetería.
+    if (esManual) {
       try {
         let paciente: Paciente | null = null;
         if (saved.pacienteId) {
@@ -172,10 +175,13 @@ export class IncidentesSaludService {
       }
     }
 
-    // Reportamos TODO incidente al Proyecto 11 (plataforma central de incidentes
-    // operacionales); ellos asignan el SLA según la prioridad, que mapeamos desde
-    // nuestra severidad (BAJA/MEDIA/ALTA/CRITICA -> baja/media/alta/critica).
-    this.incidentesService.enviarIncidente(saved).catch((err) => {
+    // Reportamos a Grupo 11 (plataforma central de incidentes operacionales):
+    //  - Automáticos (atraso de visita, cancelación tardía): se filtran por
+    //    eventType; solo se envían los que mapean al catálogo (VISITA_*).
+    //  - Manuales (los que además abren un ticket de CRM): los FORZAMOS para que
+    //    también queden registrados en Grupo 11, como estaba antes. Su cierre NO
+    //    se re-propaga: eso solo aplica a los operacionales de atraso (ver update()).
+    this.incidentesService.enviarIncidente(saved, { forzar: esManual }).catch((err) => {
       this.logger.error(`Error en promesa de Incidentes: ${err.message}`);
     });
 
@@ -212,6 +218,17 @@ export class IncidentesSaludService {
         titulo: saved.titulo,
       },
     });
+
+    // Si cambió el ESTADO, re-enviamos el incidente a Grupo 11 con el status nuevo
+    // (mismo eventId = nuestro id) para que actualicen/cierren su ticket al pasar a
+    // RESUELTO/CERRADO. OJO: aquí NO forzamos, así que el filtro por eventType solo
+    // deja pasar los operacionales de atraso (VISITA_*). Los tickets manuales de CRM
+    // NO se re-propagan aquí: su ciclo de vida lo lleva el CRM, no Grupo 11.
+    if (oldValues.estado !== saved.estado) {
+      this.incidentesService.enviarIncidente(saved).catch((err) => {
+        this.logger.error(`Error al actualizar estado en Proyecto 11: ${err.message}`);
+      });
+    }
 
     return saved;
   }

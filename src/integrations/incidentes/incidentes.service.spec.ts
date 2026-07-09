@@ -10,20 +10,22 @@ describe('IncidentesService (Proyecto 11 Integration)', () => {
   let httpServiceMock: any;
   let configServiceMock: any;
 
-  const mockIncidente: IncidenteSalud = {
+  // Incidente operacional que SÍ mapea al catálogo de Grupo 11.
+  const incidenteOperacional: IncidenteSalud = {
     id: 'inc-123',
-    titulo: 'Paciente sin conexión',
-    descripcion: 'Se perdió telemetría del paciente',
+    titulo: 'Visita No Registrada en Tiempo',
+    descripcion: 'El profesional no realizó check-in. Excedió el umbral de 60 min.',
     severidad: 'ALTA',
     estado: 'ABIERTO',
-    tipo: 'FALLA_CONEXION',
+    tipo: 'VISITA_NO_REGISTRADA',
     pacienteId: 'paciente-456',
+    visitaId: 'visita-789',
+    createdAt: new Date('2026-07-08T05:33:29.000Z'),
+    metadata: {},
   } as IncidenteSalud;
 
   beforeEach(async () => {
-    httpServiceMock = {
-      post: jest.fn(),
-    };
+    httpServiceMock = { post: jest.fn() };
 
     configServiceMock = {
       get: jest.fn((key: string) => {
@@ -42,42 +44,106 @@ describe('IncidentesService (Proyecto 11 Integration)', () => {
     }).compile();
 
     service = module.get<IncidentesService>(IncidentesService);
+    // Evita esperas reales del backoff en los tests.
+    jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
   });
 
   it('debería estar definido', () => {
     expect(service).toBeDefined();
   });
 
-  it('debería formatear y enviar correctamente un incidente al webhook externo', async () => {
+  it('envía el incidente operacional en el formato acordado con Grupo 11', async () => {
     httpServiceMock.post.mockReturnValue(of({ data: 'ok' }));
 
-    await service.enviarIncidente(mockIncidente);
+    await service.enviarIncidente(incidenteOperacional);
+
+    expect(httpServiceMock.post).toHaveBeenCalledTimes(1);
+    expect(httpServiceMock.post).toHaveBeenCalledWith(
+      'http://mock.incidentes.api',
+      {
+        sistema_id: 'P1',
+        creado_en: '2026-07-08T05:33:29.000Z',
+        payload: expect.objectContaining({
+          // Obligatorios oficiales de Grupo 11
+          titulo: 'Visita No Registrada en Tiempo',
+          descripcion: 'El profesional no realizó check-in. Excedió el umbral de 60 min.',
+          prioridad: 'alta', // ALTA -> alta
+          // Extras propios (mapeados por ellos)
+          eventId: 'inc-123',
+          source: 'salud-domiciliaria',
+          eventType: 'visit_not_registered',
+          occurredAt: '2026-07-08T05:33:29.000Z',
+          severity: 'high', // ALTA -> high
+          status: 'pending', // ABIERTO -> pending
+          patientId: 'paciente-456',
+          visitId: 'visita-789',
+        }),
+      },
+      expect.objectContaining({
+        headers: { 'Content-Type': 'application/json', 'x-api-key': 'mock_secret_key' },
+        timeout: 20_000,
+      }),
+    );
+  });
+
+  it('NO envía incidentes cuyo tipo no está en el catálogo (ej. IoT)', async () => {
+    const incidenteIot = { ...incidenteOperacional, tipo: 'SIGNO_VITAL_ANORMAL' } as IncidenteSalud;
+
+    await service.enviarIncidente(incidenteIot);
+
+    expect(httpServiceMock.post).not.toHaveBeenCalled();
+  });
+
+  it('con forzar=true envía un ticket manual (tipo no mapeado) con eventType genérico y tipo real en metadata', async () => {
+    httpServiceMock.post.mockReturnValue(of({ data: 'ok' }));
+    const ticketManual = {
+      ...incidenteOperacional,
+      tipo: 'SOLICITUD_SOPORTE',
+      metadata: { canal: 'web' },
+    } as IncidenteSalud;
+
+    await service.enviarIncidente(ticketManual, { forzar: true });
 
     expect(httpServiceMock.post).toHaveBeenCalledTimes(1);
     expect(httpServiceMock.post).toHaveBeenCalledWith(
       'http://mock.incidentes.api',
       expect.objectContaining({
-        sistema_id: 'P01',
         payload: expect.objectContaining({
-          titulo: 'Paciente sin conexión',
-          descripcion: 'Se perdió telemetría del paciente',
-          prioridad: 'alta', // Mapeado de ALTA
-          incidente_interno_id: 'inc-123',
+          eventType: 'follow_up_required', // eventType genérico del catálogo
+          metadata: expect.objectContaining({
+            canal: 'web', // se conserva la metadata original
+            tipoInterno: 'SOLICITUD_SOPORTE', // + el tipo real del ticket
+            origenTicket: 'crm',
+          }),
         }),
       }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': 'mock_secret_key',
-        },
-      }
+      expect.anything(),
     );
   });
 
-  it('no debería lanzar excepción si la petición HTTP falla (manejo silencioso)', async () => {
+  it('sin forzar, un ticket manual (tipo no mapeado) NO se envía', async () => {
+    const ticketManual = { ...incidenteOperacional, tipo: 'SOLICITUD_SOPORTE' } as IncidenteSalud;
+
+    await service.enviarIncidente(ticketManual);
+
+    expect(httpServiceMock.post).not.toHaveBeenCalled();
+  });
+
+  it('reintenta ante fallos y no lanza excepción (manejo silencioso)', async () => {
     httpServiceMock.post.mockReturnValue(throwError(() => new Error('Network error')));
 
-    // No debe hacer throw de error, debe atraparlo y hacer log
-    await expect(service.enviarIncidente(mockIncidente)).resolves.not.toThrow();
+    await expect(service.enviarIncidente(incidenteOperacional)).resolves.not.toThrow();
+    // 3 intentos con backoff (mockeado)
+    expect(httpServiceMock.post).toHaveBeenCalledTimes(3);
+  });
+
+  it('deja de reintentar apenas un intento tiene éxito', async () => {
+    httpServiceMock.post
+      .mockReturnValueOnce(throwError(() => new Error('cold start')))
+      .mockReturnValueOnce(of({ data: 'ok' }));
+
+    await service.enviarIncidente(incidenteOperacional);
+
+    expect(httpServiceMock.post).toHaveBeenCalledTimes(2);
   });
 });

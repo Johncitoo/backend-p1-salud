@@ -91,22 +91,22 @@ describe('IncidentesSaludService', () => {
     await expect(service.create(dto as any, 'u-1111')).resolves.toEqual(savedMock);
   });
 
-  it('create reporta TODO incidente al Proyecto 11 (sin importar la severidad)', async () => {
-    const dto = { tipo: 'CAIDA', titulo: 'Test grave', pacienteId: 'p-2222', severidad: 'CRITICA' };
-    const incidenteCritico = { ...incidente, severidad: 'CRITICA' };
+  it('create reporta TODO incidente MANUAL al Proyecto 11 forzado (sin importar la severidad)', async () => {
+    const dto = { tipo: 'CAIDA', titulo: 'Test grave', pacienteId: 'p-2222', severidad: 'CRITICA', origen: 'WEB' };
+    const incidenteCritico = { ...incidente, severidad: 'CRITICA', origen: 'WEB' };
     repository.create!.mockReturnValue(incidenteCritico);
     repository.save!.mockResolvedValue(incidenteCritico);
     await service.create(dto as any, 'u-1111');
-    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteCritico);
+    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteCritico, { forzar: true });
   });
 
-  it('create también reporta a Proyecto 11 los incidentes de baja severidad', async () => {
-    const dto = { tipo: 'FALLA_DISPOSITIVO', titulo: 'Batería baja', pacienteId: 'p-2222', severidad: 'BAJA' };
-    const incidenteBajo = { ...incidente, severidad: 'BAJA', tipo: 'FALLA_DISPOSITIVO' };
+  it('create también reporta a Proyecto 11 los incidentes MANUALES de baja severidad (forzado)', async () => {
+    const dto = { tipo: 'FALLA_DISPOSITIVO', titulo: 'Batería baja', pacienteId: 'p-2222', severidad: 'BAJA', origen: 'WEB' };
+    const incidenteBajo = { ...incidente, severidad: 'BAJA', tipo: 'FALLA_DISPOSITIVO', origen: 'WEB' };
     repository.create!.mockReturnValue(incidenteBajo);
     repository.save!.mockResolvedValue(incidenteBajo);
     await service.create(dto as any, 'u-1111');
-    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteBajo);
+    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteBajo, { forzar: true });
   });
 
   it('crea ticket en CRM para incidentes MANUALES (origen WEB)', async () => {
@@ -127,8 +127,9 @@ describe('IncidentesSaludService', () => {
     await service.create(dto as any, 'u-1111');
     await new Promise((r) => setImmediate(r));
     expect(crmServiceMock.crearTicket).not.toHaveBeenCalled();
-    // Pero sí se escala a Grupo 11 (incidentes operacionales)
-    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteSistema);
+    // Pero sí se escala a Grupo 11 (incidentes operacionales), SIN forzar: el
+    // filtro por eventType decide si se envía (solo los VISITA_* del catálogo).
+    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(incidenteSistema, { forzar: false });
   });
 
   it('findCrmStatus consulta el estado externo si existe externalIncidentId', async () => {
@@ -154,6 +155,22 @@ describe('IncidentesSaludService', () => {
     repository.save!.mockResolvedValue(updated);
     const result = await service.update('inc-1111', { estado: 'EN_REVISION' } as any);
     expect(result.estado).toBe('EN_REVISION');
+  });
+
+  it('update que CAMBIA el estado re-envía a Proyecto 11 (para cerrar/actualizar el ticket)', async () => {
+    repository.findOne!.mockResolvedValue({ ...incidente, estado: 'ABIERTO' });
+    const resuelto = { ...incidente, estado: 'RESUELTO' };
+    repository.save!.mockResolvedValue(resuelto);
+    await service.update('inc-1111', { estado: 'RESUELTO' } as any);
+    expect(incidentesServiceMock.enviarIncidente).toHaveBeenCalledWith(resuelto);
+  });
+
+  it('update que NO cambia el estado no re-envía a Proyecto 11', async () => {
+    repository.findOne!.mockResolvedValue({ ...incidente, estado: 'ABIERTO' });
+    const soloTitulo = { ...incidente, estado: 'ABIERTO', titulo: 'Nuevo título' };
+    repository.save!.mockResolvedValue(soloTitulo);
+    await service.update('inc-1111', { titulo: 'Nuevo título' } as any);
+    expect(incidentesServiceMock.enviarIncidente).not.toHaveBeenCalled();
   });
 
   it('remove marca deletedAt', async () => {
