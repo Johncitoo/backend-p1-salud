@@ -74,6 +74,11 @@ export class InspeccionMantenimiento {
   @Column({ name: 'pedido_error', type: 'text', nullable: true })
   pedidoError?: string | null;
 
+  // Incidente de salud generado al registrar la inspección. Ese incidente dispara
+  // el ticket en CRM (Grupo 7) y en la plataforma de Incidentes (Grupo 11).
+  @Column({ name: 'incidente_id', type: 'uuid', nullable: true })
+  incidenteId?: string | null;
+
   // Paso 14 (reemplazo de componentes): cuándo se registró la intervención y qué
   // se instaló. Al setearse, la orden de trabajo queda FINALIZADA.
   @Column({ name: 'intervencion_at', type: 'timestamp', nullable: true })

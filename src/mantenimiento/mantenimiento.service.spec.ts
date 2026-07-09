@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { PedidosService } from '../integrations/pedidos/pedidos.service';
+import { IncidentesSaludService } from '../incidentes-salud/incidentes-salud.service';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
 import { Paciente } from '../pacientes/entities/paciente.entity';
 import { InspeccionMantenimiento } from './entities/inspeccion-mantenimiento.entity';
@@ -22,6 +23,7 @@ describe('MantenimientoService', () => {
   let pacientesRepository: MockRepository<Paciente>;
   let pedidosServiceMock: any;
   let auditoriasMock: any;
+  let incidentesSaludMock: any;
 
   const dtoBase = {
     pacienteId: 'p-1',
@@ -46,6 +48,7 @@ describe('MantenimientoService', () => {
       }),
     };
     auditoriasMock = { registrar: jest.fn() };
+    incidentesSaludMock = { create: jest.fn().mockResolvedValue({ id: 'inc-1' }) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,6 +58,7 @@ describe('MantenimientoService', () => {
         { provide: getRepositoryToken(DireccionPaciente), useValue: { findOne: jest.fn().mockResolvedValue(null) } },
         { provide: PedidosService, useValue: pedidosServiceMock },
         { provide: AuditoriasService, useValue: auditoriasMock },
+        { provide: IncidentesSaludService, useValue: incidentesSaludMock },
       ],
     }).compile();
 
@@ -78,6 +82,31 @@ describe('MantenimientoService', () => {
     expect(result.estado).toBe('PEDIDO_ENVIADO');
     expect(result.pedidoExternoId).toBe('ped-123');
     expect(result.pedidoEstadoExterno).toBe('pendiente_preparacion');
+  });
+
+  it('create genera un incidente MANUAL (origen WEB) para disparar CRM + Grupo 11 con los datos asociados', async () => {
+    const result = await service.create(dtoBase as any, 'u-1');
+
+    expect(incidentesSaludMock.create).toHaveBeenCalledTimes(1);
+    const [dtoIncidente, usuarioId] = incidentesSaludMock.create.mock.calls[0];
+    expect(dtoIncidente).toMatchObject({
+      tipo: 'INSPECCION_MANTENIMIENTO',
+      origen: 'WEB', // manual -> CRM + Grupo 11
+      pacienteId: 'p-1',
+      severidad: 'MEDIA',
+    });
+    expect(dtoIncidente.titulo).toContain('Concentrador de oxígeno');
+    expect(dtoIncidente.metadata).toMatchObject({ equipo: 'Concentrador de oxígeno' });
+    expect(usuarioId).toBe('u-1');
+    // El id del incidente queda enlazado en la inspección.
+    expect(result.incidenteId).toBe('inc-1');
+  });
+
+  it('create sigue registrando la inspección aunque falle la creación del incidente/ticket', async () => {
+    incidentesSaludMock.create.mockRejectedValueOnce(new Error('CRM caído'));
+    const result = await service.create(dtoBase as any, 'u-1');
+    expect(result.estado).toBe('PEDIDO_ENVIADO'); // el flujo no se rompe
+    expect(result.incidenteId).toBeUndefined();
   });
 
   it('create rechaza un SKU que no está en el catálogo (400) y NO llama a Proyecto 3', async () => {
