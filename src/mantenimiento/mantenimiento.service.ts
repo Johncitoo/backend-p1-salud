@@ -6,6 +6,7 @@ import { PedidosService } from '../integrations/pedidos/pedidos.service';
 import { DireccionPaciente } from '../pacientes/entities/direccion-paciente.entity';
 import { Paciente } from '../pacientes/entities/paciente.entity';
 import { CreateInspeccionMantenimientoDto } from './dto/create-inspeccion-mantenimiento.dto';
+import { FinalizarIntervencionDto } from './dto/finalizar-intervencion.dto';
 import { InspeccionMantenimiento, RepuestoSolicitado } from './entities/inspeccion-mantenimiento.entity';
 import { REPUESTOS_CATALOGO, REPUESTOS_POR_SKU } from './repuestos.catalog';
 
@@ -92,6 +93,35 @@ export class MantenimientoService {
     return this.enviarPedido(inspeccion);
   }
 
+  // Paso 14 (reemplazo de componentes): el técnico instaló los repuestos y registra
+  // la intervención. La orden de trabajo queda FINALIZADA.
+  async finalizarIntervencion(
+    id: string,
+    dto: FinalizarIntervencionDto,
+    usuarioId?: string,
+  ): Promise<InspeccionMantenimiento> {
+    const inspeccion = await this.findOne(id);
+
+    if (inspeccion.estado === 'FINALIZADA') {
+      throw new BadRequestException('La intervención de esta inspección ya fue finalizada.');
+    }
+
+    inspeccion.estado = 'FINALIZADA';
+    inspeccion.intervencionAt = new Date();
+    inspeccion.intervencionNotas = dto.notas ?? null;
+    const saved = await this.repository.save(inspeccion);
+
+    this.auditoriasService.registrar({
+      usuarioId,
+      entidad: 'inspecciones_mantenimiento',
+      entidadId: saved.id,
+      accion: 'FINALIZAR_INTERVENCION',
+      detalle: `Intervención finalizada (componentes instalados) para el equipo "${saved.equipo}"`,
+    });
+
+    return saved;
+  }
+
   private async enviarPedido(
     inspeccion: InspeccionMantenimiento,
     pacienteConocido?: Paciente,
@@ -112,9 +142,11 @@ export class MantenimientoService {
     const resultado = await this.pedidosService.enviarPedidoMantenimiento(payload);
 
     if (resultado.ok) {
-      inspeccion.estado = resultado.mock ? 'REGISTRADA' : 'PEDIDO_ENVIADO';
+      inspeccion.estado = 'PEDIDO_ENVIADO';
       inspeccion.pedidoExternoId = resultado.pedidoId ?? null;
-      inspeccion.pedidoEstadoExterno = resultado.mock ? 'mock' : resultado.estado ?? null;
+      inspeccion.pedidoEstadoExterno = resultado.mock
+        ? `${resultado.estado ?? 'pendiente_preparacion'} (simulado)`
+        : resultado.estado ?? null;
       inspeccion.pedidoError = null;
     } else {
       inspeccion.estado = 'PEDIDO_RECHAZADO';

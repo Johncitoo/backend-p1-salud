@@ -12,6 +12,7 @@ import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateInspeccionMantenimientoDto } from './dto/create-inspeccion-mantenimiento.dto';
+import { FinalizarIntervencionDto } from './dto/finalizar-intervencion.dto';
 import { MantenimientoService } from './mantenimiento.service';
 
 @Controller('mantenimiento')
@@ -53,5 +54,16 @@ export class MantenimientoController {
   @Roles('ADMIN', 'COORDINADOR')
   reintentarPedido(@Param('id') id: string) {
     return this.mantenimientoService.reintentarPedido(id);
+  }
+
+  // Paso 14: el técnico instaló los componentes y cierra la orden de trabajo.
+  @Post('inspecciones/:id/finalizar')
+  @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'TECNICO')
+  finalizarIntervencion(
+    @Param('id') id: string,
+    @Body() dto: FinalizarIntervencionDto,
+    @Request() req: any,
+  ) {
+    return this.mantenimientoService.finalizarIntervencion(id, dto, req.user?.id);
   }
 }

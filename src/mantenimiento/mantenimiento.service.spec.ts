@@ -100,11 +100,14 @@ describe('MantenimientoService', () => {
     expect(pedidosServiceMock.enviarPedidoMantenimiento).not.toHaveBeenCalled();
   });
 
-  it('create en modo mock deja estado REGISTRADA y pedido_estado_externo "mock"', async () => {
-    pedidosServiceMock.enviarPedidoMantenimiento.mockResolvedValue({ ok: true, mock: true });
+  it('create en modo mock simula un pedido enviado (PEDIDO_ENVIADO + "simulado")', async () => {
+    pedidosServiceMock.enviarPedidoMantenimiento.mockResolvedValue({
+      ok: true, mock: true, pedidoId: 'MOCK-MANT-x', estado: 'pendiente_preparacion',
+    });
     const result = await service.create(dtoBase as any, 'u-1');
-    expect(result.estado).toBe('REGISTRADA');
-    expect(result.pedidoEstadoExterno).toBe('mock');
+    expect(result.estado).toBe('PEDIDO_ENVIADO');
+    expect(result.pedidoExternoId).toBe('MOCK-MANT-x');
+    expect(result.pedidoEstadoExterno).toContain('simulado');
   });
 
   it('create marca PEDIDO_RECHAZADO con el error cuando Proyecto 3 responde falla (ej. 409 sin stock)', async () => {
@@ -125,5 +128,23 @@ describe('MantenimientoService', () => {
     const result = await service.reintentarPedido('insp-1');
     expect(pedidosServiceMock.enviarPedidoMantenimiento).toHaveBeenCalledTimes(1);
     expect(result.estado).toBe('PEDIDO_ENVIADO');
+  });
+
+  it('finalizarIntervencion cierra la orden de trabajo (FINALIZADA + fecha + notas)', async () => {
+    repository.findOne!.mockResolvedValue({
+      id: 'insp-1', pacienteId: 'p-1', equipo: 'Concentrador', estado: 'PEDIDO_ENVIADO', deletedAt: null,
+    });
+    const result = await service.finalizarIntervencion('insp-1', { notas: 'Filtro y batería instalados' }, 'u-1');
+    expect(result.estado).toBe('FINALIZADA');
+    expect(result.intervencionAt).toBeInstanceOf(Date);
+    expect(result.intervencionNotas).toBe('Filtro y batería instalados');
+    expect(auditoriasMock.registrar).toHaveBeenCalled();
+  });
+
+  it('finalizarIntervencion rechaza si ya estaba FINALIZADA', async () => {
+    repository.findOne!.mockResolvedValue({
+      id: 'insp-1', pacienteId: 'p-1', equipo: 'Concentrador', estado: 'FINALIZADA', deletedAt: null,
+    });
+    await expect(service.finalizarIntervencion('insp-1', {}, 'u-1')).rejects.toBeInstanceOf(BadRequestException);
   });
 });

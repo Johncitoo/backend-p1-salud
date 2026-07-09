@@ -222,8 +222,11 @@ export class PedidosService {
     payload: PrescripcionPedidoPayload,
   ): Promise<ResultadoPedidoMantenimiento> {
     if (!this.enabled) {
+      // Modo simulación: mientras Proyecto 5 (inventario) no tenga cargados
+      // nuestros SKUs, no llamamos a P3 (daría 404 al reservar stock). Devolvemos
+      // un pedido "exitoso" ficticio para poder simular el flujo end-to-end.
       this.logger.log(`[Pedidos mantenimiento mock] ${payload.orderId} → ${payload.cliente.email}:\n${JSON.stringify(payload, null, 2)}`);
-      return { ok: true, mock: true };
+      return { ok: true, mock: true, pedidoId: `MOCK-${payload.orderId}`, estado: 'pendiente_preparacion' };
     }
 
     if (!this.apiToken) {

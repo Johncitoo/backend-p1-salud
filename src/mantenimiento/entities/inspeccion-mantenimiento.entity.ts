@@ -38,7 +38,8 @@ export class InspeccionMantenimiento {
   @Column({ type: 'jsonb', default: '[]' })
   repuestos: RepuestoSolicitado[];
 
-  // REGISTRADA | PEDIDO_ENVIADO | PEDIDO_RECHAZADO
+  // REGISTRADA | PEDIDO_ENVIADO | PEDIDO_RECHAZADO | FINALIZADA
+  // FINALIZADA = se instalaron los componentes y se cerró la orden de trabajo (Paso 14).
   @Column({ type: 'varchar', length: 30, default: 'REGISTRADA' })
   estado: string;
 
@@ -53,6 +54,14 @@ export class InspeccionMantenimiento {
   // Mensaje de error si el webhook falló (400/409/red).
   @Column({ name: 'pedido_error', type: 'text', nullable: true })
   pedidoError?: string | null;
+
+  // Paso 14 (reemplazo de componentes): cuándo se registró la intervención y qué
+  // se instaló. Al setearse, la orden de trabajo queda FINALIZADA.
+  @Column({ name: 'intervencion_at', type: 'timestamp', nullable: true })
+  intervencionAt?: Date | null;
+
+  @Column({ name: 'intervencion_notas', type: 'text', nullable: true })
+  intervencionNotas?: string | null;
 
   @Column({ name: 'creado_por_usuario_id', type: 'uuid', nullable: true })
   creadoPorUsuarioId?: string | null;
