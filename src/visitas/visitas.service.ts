@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
@@ -28,9 +28,16 @@ import { CompletarVisitaDto } from './dto/completar-visita.dto';
 import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
 import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { GoogleCalendarSyncService } from '../google-calendar/services/google-calendar-sync.service';
+import { IncidentesSaludService } from '../incidentes-salud/incidentes-salud.service';
 
 const ESTADOS_VISITA = ['PROGRAMADA', 'EN_CAMINO', 'EN_ATENCION', 'REALIZADA', 'CANCELADA', 'REPROGRAMADA', 'NO_REALIZADA'];
 const ESTADOS_SIN_CONFLICTO = ['CANCELADA', 'REALIZADA', 'NO_REALIZADA'];
+
+// Cancelación "tardía": se cancela faltando menos de este umbral para la hora
+// programada → genera un incidente operacional (visit_cancelled_late en Grupo 11).
+// Dentro de ese umbral, si falta menos de CRITICA_MIN se considera ALTA (muy cerca).
+const CANCELACION_TARDIA_UMBRAL_MIN = 120; // 2 horas
+const CANCELACION_TARDIA_ALTA_MIN = 60; // 1 hora
 
 type VisitaScheduleSnapshot = {
   profesionalSaludId: string;
@@ -76,6 +83,8 @@ export class VisitasService {
     private readonly googleCalendarSyncService: GoogleCalendarSyncService,
     private readonly analyticsService: AnalyticsService,
     private readonly notificacionesService: NotificacionesService,
+    @Inject(forwardRef(() => IncidentesSaludService))
+    private readonly incidentesSaludService: IncidentesSaludService,
   ) {}
 
   // Obtiene el paciente y el usuario del profesional de una visita, para enviar notificaciones.
@@ -506,7 +515,60 @@ export class VisitasService {
     const motivo = await this.resolverMotivoCancelacion(dto.motivoCancelacionId, dto.observacionCancelacion);
     await this.notificacionesService.notificarVisitaCancelada(saved, paciente, profesionalUsuario, motivo);
 
+    await this.registrarCancelacionTardiaSiCorresponde(saved, motivo, usuarioId);
+
     return saved;
+  }
+
+  // Si la visita se cancela faltando poco para su hora programada, genera un
+  // incidente operacional (que se escala a Grupo 11 como visit_cancelled_late).
+  // Tolerante a fallos: nunca interrumpe la cancelación.
+  private async registrarCancelacionTardiaSiCorresponde(
+    visita: Visita,
+    motivo: string | null,
+    usuarioId?: string,
+  ): Promise<void> {
+    try {
+      if (!visita.fechaProgramada || !visita.horaProgramada) return;
+
+      const horaProgramada = new Date(`${visita.fechaProgramada}T${visita.horaProgramada}`);
+      if (Number.isNaN(horaProgramada.getTime())) return;
+
+      const canceladaAt = visita.canceladaAt ?? new Date();
+      const minutosRestantes = Math.round((horaProgramada.getTime() - canceladaAt.getTime()) / 60_000);
+
+      // Solo es "tardía" si falta menos del umbral (incluye visitas ya vencidas).
+      if (minutosRestantes >= CANCELACION_TARDIA_UMBRAL_MIN) return;
+
+      const severidad = minutosRestantes < CANCELACION_TARDIA_ALTA_MIN ? 'ALTA' : 'MEDIA';
+      const detalleTiempo =
+        minutosRestantes >= 0
+          ? `faltando ${minutosRestantes} minutos para su hora programada`
+          : `cuando ya habían pasado ${Math.abs(minutosRestantes)} minutos de su hora programada`;
+
+      await this.incidentesSaludService.create(
+        {
+          titulo: 'Visita cancelada con poca anticipación',
+          descripcion: `La visita ${visita.id} fue cancelada ${detalleTiempo}.${motivo ? ` Motivo: ${motivo}.` : ''}`,
+          tipo: 'VISITA_CANCELADA_TARDIA',
+          severidad,
+          estado: 'ABIERTO',
+          origen: 'SISTEMA',
+          pacienteId: visita.pacienteId,
+          visitaId: visita.id,
+          profesionalSaludId: visita.profesionalSaludId,
+        },
+        usuarioId,
+      );
+
+      this.logger.log(
+        `Incidente VISITA_CANCELADA_TARDIA (${severidad}) generado para la visita ${visita.id} (${minutosRestantes} min).`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `No se pudo registrar incidente de cancelación tardía para la visita ${visita.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   // Arma el texto del motivo para el correo: nombre del motivo catalogado (si se
