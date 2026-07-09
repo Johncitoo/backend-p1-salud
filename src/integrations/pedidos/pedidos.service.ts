@@ -183,6 +183,39 @@ export class PedidosService {
     };
   }
 
+  // Variante para el flujo de inspección DENTRO de una visita: arma el pedido de
+  // repuestos a partir de la visita + ítems (por nombre) y lo manda al webhook de
+  // MANTENIMIENTO (no al de prescripciones). Devuelve el resultado igual que el
+  // método base. Se usa desde VisitasService.registrarInspeccionMantenimiento.
+  async enviarRepuestosMantenimiento(
+    visita: Visita,
+    paciente: Paciente,
+    direccion: DireccionPaciente | null,
+    items: PrescripcionItem[],
+  ): Promise<ResultadoPedidoMantenimiento> {
+    const payload: PrescripcionPedidoPayload = {
+      orderId: `MANT-${visita.id}`,
+      prioridad: PRIORIDAD_MAP[visita.prioridad] ?? 'media',
+      cliente: {
+        nombre: `${paciente.nombres} ${paciente.apellidos}`.trim(),
+        email: paciente.email!,
+        telefono: paciente.telefono ?? undefined,
+      },
+      direccion_envio: {
+        calle: direccion?.calle ?? '',
+        numero: direccion?.numero ?? '',
+        ciudad: direccion?.comuna ?? '',
+        region: direccion?.region ?? '',
+        codigo_postal: '',
+        pais: 'Chile',
+        notas_adicionales: direccion?.referencia ?? '',
+      },
+      // sku = nombre del repuesto (el flujo de visita no usa catálogo de SKU).
+      items: items.map((i) => ({ sku: i.nombre, cantidad: i.cantidad, precio_unitario: 0, descuento: 0 })),
+    };
+    return this.enviarPedidoMantenimiento(payload);
+  }
+
   // Envía el pedido de repuestos y DEVUELVE el resultado (no lanza) para que el
   // caller persista el estado: 201 → pedido_id; 400/409/red → error + tipo.
   async enviarPedidoMantenimiento(

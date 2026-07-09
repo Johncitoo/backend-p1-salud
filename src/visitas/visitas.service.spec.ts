@@ -199,6 +199,7 @@ describe('VisitasService calendar flows', () => {
     pedidosService = {
       buildPayload: jest.fn(() => ({})),
       enviarPedido: jest.fn(),
+      enviarRepuestosMantenimiento: jest.fn(),
     };
 
     wireDefaults();

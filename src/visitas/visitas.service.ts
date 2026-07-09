@@ -585,9 +585,11 @@ export class VisitasService {
     await this.pedidosService.enviarPedido(payload);
   }
 
-  // Envía un pedido a Proyecto 3 con una lista explícita de ítems (repuestos o
-  // medicamentos). Mismo patrón tolerante a fallos: si el cliente no tiene email
-  // (CustomerID) se omite el envío sin bloquear el flujo — solo se loguea.
+  // Envía el pedido de repuestos de una inspección de mantenimiento a Proyecto 3,
+  // al webhook de MANTENIMIENTO (/maintenance) — que marca el pedido como exento y
+  // lo libera automáticamente. Antes iba por error al webhook de prescripciones.
+  // Mismo patrón tolerante a fallos: si el cliente no tiene email (CustomerID) se
+  // omite el envío sin bloquear el flujo — solo se loguea.
   private async enviarPedidoRepuestos(visita: Visita, items: PrescripcionItem[]): Promise<void> {
     if (items.length === 0) return;
 
@@ -601,8 +603,7 @@ export class VisitasService {
       ? await this.direccionesRepository.findOne({ where: { id: visita.direccionPacienteId } })
       : null;
 
-    const payload = this.pedidosService.buildPayload(visita, paciente, direccion, items);
-    await this.pedidosService.enviarPedido(payload);
+    await this.pedidosService.enviarRepuestosMantenimiento(visita, paciente, direccion, items);
   }
 
   // Paso 9 del UAT: el técnico registra la inspección de mantenimiento del
