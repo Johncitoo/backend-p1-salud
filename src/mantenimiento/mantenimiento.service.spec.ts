@@ -1,6 +1,9 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
+import { of } from 'rxjs';
 import { Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { PedidosService } from '../integrations/pedidos/pedidos.service';
@@ -24,6 +27,8 @@ describe('MantenimientoService', () => {
   let pedidosServiceMock: any;
   let auditoriasMock: any;
   let incidentesSaludMock: any;
+  let httpServiceMock: any;
+  let configServiceMock: any;
 
   const dtoBase = {
     pacienteId: 'p-1',
@@ -49,6 +54,12 @@ describe('MantenimientoService', () => {
     };
     auditoriasMock = { registrar: jest.fn() };
     incidentesSaludMock = { create: jest.fn().mockResolvedValue({ id: 'inc-1' }) };
+    httpServiceMock = {
+      get: jest.fn().mockReturnValue(of({ data: { success: true, data: [] } })),
+    };
+    configServiceMock = {
+      get: jest.fn().mockReturnValue('https://inventario.test'),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -59,15 +70,35 @@ describe('MantenimientoService', () => {
         { provide: PedidosService, useValue: pedidosServiceMock },
         { provide: AuditoriasService, useValue: auditoriasMock },
         { provide: IncidentesSaludService, useValue: incidentesSaludMock },
+        { provide: HttpService, useValue: httpServiceMock },
+        { provide: ConfigService, useValue: configServiceMock },
       ],
     }).compile();
 
     service = module.get<MantenimientoService>(MantenimientoService);
   });
 
-  it('getCatalogoRepuestos devuelve el catálogo fijo', () => {
-    expect(service.getCatalogoRepuestos()).toEqual(REPUESTOS_CATALOGO);
-    expect(service.getCatalogoRepuestos().length).toBeGreaterThanOrEqual(2);
+  it('getCatalogoRepuestos devuelve el catálogo fijo si Inventario no trae productos', async () => {
+    await expect(service.getCatalogoRepuestos()).resolves.toEqual(REPUESTOS_CATALOGO);
+  });
+
+  it('getCatalogoRepuestos devuelve productos reales desde Inventario si existen', async () => {
+    httpServiceMock.get.mockReturnValueOnce(of({
+      data: {
+        success: true,
+        data: [
+          { sku: 'MON-PRES-002', name: 'Monitor de Presión Arterial', stocks: [{ quantity: 150, reserved: 0 }] },
+        ],
+      },
+    }));
+
+    await expect(service.getCatalogoRepuestos()).resolves.toEqual([
+      {
+        sku: 'MON-PRES-002',
+        nombre: 'Monitor de Presión Arterial',
+        descripcion: 'Stock total: 150; reservado: 0',
+      },
+    ]);
   });
 
   it('create persiste la inspección, enriquece los repuestos y dispara el pedido a Proyecto 3', async () => {
@@ -82,6 +113,31 @@ describe('MantenimientoService', () => {
     expect(result.estado).toBe('PEDIDO_ENVIADO');
     expect(result.pedidoExternoId).toBe('ped-123');
     expect(result.pedidoEstadoExterno).toBe('pendiente_preparacion');
+  });
+
+  it('create acepta SKUs reales del catálogo de Inventario', async () => {
+    httpServiceMock.get.mockReturnValue(of({
+      data: {
+        success: true,
+        data: [
+          { sku: 'MON-PRES-002', name: 'Monitor de Presión Arterial', stocks: [{ quantity: 150, reserved: 0 }] },
+        ],
+      },
+    }));
+
+    const result = await service.create({
+      pacienteId: 'p-1',
+      equipo: 'Monitor de presión',
+      diagnostico: 'Equipo requiere reemplazo',
+      repuestos: [{ sku: 'MON-PRES-002', cantidad: 1 }],
+    } as any, 'u-1');
+
+    expect(result.repuestos[0]).toEqual({
+      sku: 'MON-PRES-002',
+      nombre: 'Monitor de Presión Arterial',
+      cantidad: 1,
+    });
+    expect(pedidosServiceMock.enviarPedidoMantenimiento).toHaveBeenCalledTimes(1);
   });
 
   it('create genera un incidente MANUAL (origen WEB) para disparar CRM + Grupo 11 con los datos asociados', async () => {

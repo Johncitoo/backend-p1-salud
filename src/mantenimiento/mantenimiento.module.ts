@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditoriasModule } from '../auditorias/auditorias.module';
 import { UsuariosModule } from '../usuarios/usuarios.module';
@@ -12,6 +13,7 @@ import { MantenimientoService } from './mantenimiento.service';
 
 @Module({
   imports: [
+    HttpModule,
     UsuariosModule, // DevAuthGuard depende de UsuariosService
     AuditoriasModule,
     PedidosModule,

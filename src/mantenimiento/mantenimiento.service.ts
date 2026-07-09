@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import { firstValueFrom } from 'rxjs';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { PedidosService } from '../integrations/pedidos/pedidos.service';
@@ -12,6 +15,19 @@ import { FinalizarIntervencionDto } from './dto/finalizar-intervencion.dto';
 import { CorregirInformeDto } from './dto/corregir-informe.dto';
 import { InspeccionMantenimiento, RepuestoSolicitado } from './entities/inspeccion-mantenimiento.entity';
 import { REPUESTOS_CATALOGO, REPUESTOS_POR_SKU } from './repuestos.catalog';
+
+interface InventarioProducto {
+  sku: string;
+  name: string;
+  category?: string | null;
+  unit?: string | null;
+  stocks?: Array<{ quantity?: number; reserved?: number }>;
+}
+
+interface InventarioProductosResponse {
+  success?: boolean;
+  data?: InventarioProducto[];
+}
 
 @Injectable()
 export class MantenimientoService {
@@ -27,10 +43,21 @@ export class MantenimientoService {
     private readonly pedidosService: PedidosService,
     private readonly auditoriasService: AuditoriasService,
     private readonly incidentesSaludService: IncidentesSaludService,
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService,
   ) {}
 
-  getCatalogoRepuestos() {
-    return REPUESTOS_CATALOGO;
+  async getCatalogoRepuestos() {
+    const productos = await this.obtenerProductosInventario();
+    if (productos.length === 0) return REPUESTOS_CATALOGO;
+
+    return productos
+      .filter((p) => p.sku && p.name)
+      .map((p) => ({
+        sku: p.sku,
+        nombre: p.name.trim(),
+        descripcion: this.describirProductoInventario(p),
+      }));
   }
 
   async findAll(filtros?: { pacienteId?: string; estado?: string }): Promise<InspeccionMantenimiento[]> {
@@ -54,8 +81,11 @@ export class MantenimientoService {
     if (!paciente) throw new NotFoundException('Paciente no encontrado');
 
     // Validar repuestos contra el catálogo y enriquecer con el nombre canónico.
+    const catalogoActual = await this.getCatalogoRepuestos();
+    const repuestosPorSku = new Map(catalogoActual.map((r) => [r.sku, r]));
+
     const repuestos: RepuestoSolicitado[] = dto.repuestos.map((r) => {
-      const catalogo = REPUESTOS_POR_SKU.get(r.sku);
+      const catalogo = repuestosPorSku.get(r.sku) ?? REPUESTOS_POR_SKU.get(r.sku);
       if (!catalogo) {
         throw new BadRequestException(`SKU de repuesto no reconocido: ${r.sku}`);
       }
@@ -254,5 +284,33 @@ export class MantenimientoService {
     });
     if (principal) return principal;
     return this.direccionesRepository.findOne({ where: { pacienteId, deletedAt: IsNull() } });
+  }
+
+  private async obtenerProductosInventario(): Promise<InventarioProducto[]> {
+    const baseUrl = this.configService.get<string>('INVENTARIO_API_URL')
+      || 'https://proyectogestordeinventario-production.up.railway.app';
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get<InventarioProductosResponse>(`${baseUrl}/api/v1/products`, {
+          headers: { accept: 'application/json' },
+          timeout: 10_000,
+        }),
+      );
+      return Array.isArray(response.data?.data) ? response.data.data : [];
+    } catch (err: any) {
+      this.logger.warn(
+        `No se pudo obtener catálogo de Inventario (Grupo 5); usando catálogo local. ${err.message}`,
+      );
+      return [];
+    }
+  }
+
+  private describirProductoInventario(producto: InventarioProducto): string {
+    const total = (producto.stocks ?? []).reduce((sum, stock) => sum + (stock.quantity ?? 0), 0);
+    const reservado = (producto.stocks ?? []).reduce((sum, stock) => sum + (stock.reserved ?? 0), 0);
+    const stockTxt = producto.stocks?.length ? `Stock total: ${total}; reservado: ${reservado}` : 'Sin stock informado';
+    const detalles = [producto.category, producto.unit].filter(Boolean).join(' · ');
+    return detalles ? `${detalles}. ${stockTxt}` : stockTxt;
   }
 }
