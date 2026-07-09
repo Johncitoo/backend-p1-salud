@@ -34,6 +34,7 @@ import { IncidenteEstadoHistorialModule } from './incidente-estado-historial/inc
 import { IncidentesModule } from './integrations/incidentes/incidentes.module';
 import { DiagnosticosModule } from './diagnosticos/diagnosticos.module';
 import { MedicamentosModule } from './medicamentos/medicamentos.module';
+import { MantenimientoModule } from './mantenimiento/mantenimiento.module';
 
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -86,6 +87,7 @@ const isTest = process.env.NODE_ENV === 'test';
     IncidentesModule,
     DiagnosticosModule,
     MedicamentosModule,
+    MantenimientoModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
