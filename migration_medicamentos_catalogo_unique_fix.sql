@@ -14,20 +14,20 @@ DECLARE
 BEGIN
     SELECT conname INTO constraint_name
     FROM pg_constraint
-    WHERE conrelid = 'medicamentos_catalogo'::regclass
+    WHERE conrelid = 'public.medicamentos_catalogo'::regclass
       AND contype = 'u'
       AND array_length(conkey, 1) = 1
       AND conkey[1] = (
           SELECT attnum FROM pg_attribute
-          WHERE attrelid = 'medicamentos_catalogo'::regclass AND attname = 'nombre'
+          WHERE attrelid = 'public.medicamentos_catalogo'::regclass AND attname = 'nombre'
       );
 
     IF constraint_name IS NOT NULL THEN
-        EXECUTE format('ALTER TABLE medicamentos_catalogo DROP CONSTRAINT %I', constraint_name);
+        EXECUTE format('ALTER TABLE public.medicamentos_catalogo DROP CONSTRAINT %I', constraint_name);
     END IF;
 END $$;
 
-ALTER TABLE medicamentos_catalogo
+ALTER TABLE public.medicamentos_catalogo
     ADD CONSTRAINT medicamentos_catalogo_nombre_presentacion_key UNIQUE (nombre, presentacion);
 
 COMMIT;
