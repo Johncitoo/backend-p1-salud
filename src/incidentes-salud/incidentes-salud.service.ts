@@ -45,9 +45,13 @@ export class IncidentesSaludService {
     if (filtros?.estado)
       qb.andWhere('is.estado = :estado', { estado: filtros.estado });
     if (filtros?.severidad)
-      qb.andWhere('is.severidad = :severidad', { severidad: filtros.severidad });
+      qb.andWhere('is.severidad = :severidad', {
+        severidad: filtros.severidad,
+      });
     if (filtros?.pacienteId)
-      qb.andWhere('is.paciente_id = :pacienteId', { pacienteId: filtros.pacienteId });
+      qb.andWhere('is.paciente_id = :pacienteId', {
+        pacienteId: filtros.pacienteId,
+      });
     if (filtros?.visitaId)
       qb.andWhere('is.visita_id = :visitaId', { visitaId: filtros.visitaId });
 
@@ -58,7 +62,8 @@ export class IncidentesSaludService {
     const incidente = await this.repository.findOne({
       where: { id, deletedAt: IsNull() },
     });
-    if (!incidente) throw new NotFoundException('Incidente de salud no encontrado');
+    if (!incidente)
+      throw new NotFoundException('Incidente de salud no encontrado');
     return incidente;
   }
 
@@ -109,12 +114,18 @@ export class IncidentesSaludService {
     let profesionalUsuario: Usuario | null = null;
 
     if (incidente.visitaId) {
-      visita = await this.visitaRepository.findOne({ where: { id: incidente.visitaId } });
+      visita = await this.visitaRepository.findOne({
+        where: { id: incidente.visitaId },
+      });
     }
     if (incidente.profesionalSaludId) {
-      profesional = await this.profesionalRepository.findOne({ where: { id: incidente.profesionalSaludId } });
+      profesional = await this.profesionalRepository.findOne({
+        where: { id: incidente.profesionalSaludId },
+      });
       if (profesional?.usuarioId) {
-        profesionalUsuario = await this.usuarioRepository.findOne({ where: { id: profesional.usuarioId } });
+        profesionalUsuario = await this.usuarioRepository.findOne({
+          where: { id: profesional.usuarioId },
+        });
       }
     }
     return { visita, profesional, profesionalUsuario };
@@ -155,13 +166,19 @@ export class IncidentesSaludService {
       try {
         let paciente: Paciente | null = null;
         if (saved.pacienteId) {
-          paciente = await this.pacientesService.findOne(saved.pacienteId).catch(() => null);
+          paciente = await this.pacientesService
+            .findOne(saved.pacienteId)
+            .catch(() => null);
         }
-        const crmPayload = this.crmService.buildPayloadFromIncidente(saved, paciente);
+        const crmPayload = this.crmService.buildPayloadFromIncidente(
+          saved,
+          paciente,
+        );
         this.crmService
           .crearTicket(crmPayload)
           .then(async (crmResponse) => {
-            const externalIncidentId = this.crmService.extractTicketId(crmResponse);
+            const externalIncidentId =
+              this.crmService.extractTicketId(crmResponse);
             if (!externalIncidentId) return;
 
             await this.repository.update(saved.id, { externalIncidentId });
@@ -181,9 +198,11 @@ export class IncidentesSaludService {
     //  - Manuales (los que además abren un ticket de CRM): los FORZAMOS para que
     //    también queden registrados en Grupo 11, como estaba antes. Su cierre NO
     //    se re-propaga: eso solo aplica a los operacionales de atraso (ver update()).
-    this.incidentesService.enviarIncidente(saved, { forzar: esManual }).catch((err) => {
-      this.logger.error(`Error en promesa de Incidentes: ${err.message}`);
-    });
+    this.incidentesService
+      .enviarIncidente(saved, { forzar: esManual })
+      .catch((err) => {
+        this.logger.error(`Error en promesa de Incidentes: ${err.message}`);
+      });
 
     return saved;
   }
@@ -226,7 +245,9 @@ export class IncidentesSaludService {
     // NO se re-propagan aquí: su ciclo de vida lo lleva el CRM, no Grupo 11.
     if (oldValues.estado !== saved.estado) {
       this.incidentesService.enviarIncidente(saved).catch((err) => {
-        this.logger.error(`Error al actualizar estado en Proyecto 11: ${err.message}`);
+        this.logger.error(
+          `Error al actualizar estado en Proyecto 11: ${err.message}`,
+        );
       });
     }
 

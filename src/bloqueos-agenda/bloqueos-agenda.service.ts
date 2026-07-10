@@ -24,8 +24,7 @@ export class BloqueosAgendaService {
       .createQueryBuilder('ba')
       .where('ba.deleted_at IS NULL');
 
-    if (filtros?.tipo)
-      qb.andWhere('ba.tipo = :tipo', { tipo: filtros.tipo });
+    if (filtros?.tipo) qb.andWhere('ba.tipo = :tipo', { tipo: filtros.tipo });
     if (filtros?.profesionalSaludId)
       qb.andWhere('ba.profesional_salud_id = :profesionalSaludId', {
         profesionalSaludId: filtros.profesionalSaludId,
@@ -42,7 +41,8 @@ export class BloqueosAgendaService {
     const bloqueo = await this.repository.findOne({
       where: { id, deletedAt: IsNull() },
     });
-    if (!bloqueo) throw new NotFoundException('Bloqueo de agenda no encontrado');
+    if (!bloqueo)
+      throw new NotFoundException('Bloqueo de agenda no encontrado');
     return bloqueo;
   }
 

@@ -2,7 +2,10 @@ import { ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { DevAuthGuard } from './dev-auth.guard';
-import { UsuarioPerfil, UsuariosService } from '../../usuarios/usuarios.service';
+import {
+  UsuarioPerfil,
+  UsuariosService,
+} from '../../usuarios/usuarios.service';
 
 jest.mock('jose', () => ({
   createRemoteJWKSet: jest.fn(() => 'remote-jwks'),
@@ -130,7 +133,7 @@ describe('DevAuthGuard', () => {
       },
       protectedHeader: { alg: 'RS256' },
       key: new Uint8Array(),
-    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+    });
 
     const usuariosService = createUsuariosService();
     const guard = new DevAuthGuard(
@@ -171,7 +174,7 @@ describe('DevAuthGuard', () => {
       },
       protectedHeader: { alg: 'RS256' },
       key: new Uint8Array(),
-    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+    });
 
     const guard = new DevAuthGuard(
       createConfigService({
@@ -206,7 +209,7 @@ describe('DevAuthGuard', () => {
       },
       protectedHeader: { alg: 'RS256' },
       key: new Uint8Array(),
-    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+    });
 
     const usuariosService = createUsuariosService();
     const guard = new DevAuthGuard(
@@ -234,7 +237,7 @@ describe('DevAuthGuard', () => {
       payload: {},
       protectedHeader: { alg: 'RS256' },
       key: new Uint8Array(),
-    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+    });
 
     const guard = new DevAuthGuard(
       createConfigService({

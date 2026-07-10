@@ -14,7 +14,12 @@ export class PlantillaFicha {
   @Column({ type: 'text', nullable: true })
   descripcion?: string | null;
 
-  @Column({ name: 'tipo_atencion', type: 'varchar', length: 80, nullable: true })
+  @Column({
+    name: 'tipo_atencion',
+    type: 'varchar',
+    length: 80,
+    nullable: true,
+  })
   tipoAtencion?: string | null;
 
   @Column({ default: true })

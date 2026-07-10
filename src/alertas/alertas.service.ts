@@ -30,7 +30,11 @@ export class AlertasService {
       // podría quedar desactualizada. Alertas sin visita asociada (visitaId
       // opcional) simplemente no tienen especialidad.
       .leftJoin('visitas', 'visita', 'visita.id = alerta.visita_id')
-      .leftJoin('profesionales_salud', 'profesional', 'profesional.id = visita.profesional_salud_id')
+      .leftJoin(
+        'profesionales_salud',
+        'profesional',
+        'profesional.id = visita.profesional_salud_id',
+      )
       .addSelect('profesional.profesion', 'especialidad')
       .where('alerta.deleted_at IS NULL');
 
@@ -67,10 +71,7 @@ export class AlertasService {
     return alerta;
   }
 
-  async create(
-    dto: CreateAlertaDto,
-    usuarioId?: string,
-  ): Promise<Alerta> {
+  async create(dto: CreateAlertaDto, usuarioId?: string): Promise<Alerta> {
     const alerta = this.alertasRepository.create({
       ...dto,
       prioridad: dto.prioridad ?? 'MEDIA',

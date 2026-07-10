@@ -7,7 +7,11 @@ import { DisponibilidadesController } from './disponibilidades.controller';
 import { DisponibilidadesService } from './disponibilidades.service';
 
 @Module({
-  imports: [UsuariosModule, AuditoriasModule, TypeOrmModule.forFeature([DisponibilidadProfesional])],
+  imports: [
+    UsuariosModule,
+    AuditoriasModule,
+    TypeOrmModule.forFeature([DisponibilidadProfesional]),
+  ],
   controllers: [DisponibilidadesController],
   providers: [DisponibilidadesService],
   exports: [DisponibilidadesService],

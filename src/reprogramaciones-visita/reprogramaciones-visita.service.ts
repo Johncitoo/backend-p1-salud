@@ -28,7 +28,8 @@ export class ReprogramacionesVisitaService {
     const reprogramacion = await this.repository.findOne({
       where: { id },
     });
-    if (!reprogramacion) throw new NotFoundException('Reprogramacion de visita no encontrada');
+    if (!reprogramacion)
+      throw new NotFoundException('Reprogramacion de visita no encontrada');
     return reprogramacion;
   }
 

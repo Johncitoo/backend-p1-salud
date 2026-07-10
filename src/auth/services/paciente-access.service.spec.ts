@@ -35,7 +35,10 @@ describe('PacienteAccessService', () => {
       providers: [
         PacienteAccessService,
         { provide: getRepositoryToken(Visita), useValue: visitasRepo },
-        { provide: getRepositoryToken(ProfesionalSalud), useValue: profesionalesRepo },
+        {
+          provide: getRepositoryToken(ProfesionalSalud),
+          useValue: profesionalesRepo,
+        },
       ],
     }).compile();
 
@@ -44,14 +47,18 @@ describe('PacienteAccessService', () => {
 
   describe('assertAccesoPaciente', () => {
     it('no bloquea si no hay usuario (llamadas internas/sistema)', async () => {
-      await expect(service.assertAccesoPaciente(undefined, 'paciente-1')).resolves.toBeUndefined();
+      await expect(
+        service.assertAccesoPaciente(undefined, 'paciente-1'),
+      ).resolves.toBeUndefined();
       expect(profesionalesRepo.findOne).not.toHaveBeenCalled();
     });
 
     it.each(['ADMIN', 'COORDINADOR', 'SUPERVISOR'])(
       'no bloquea a %s: conserva visibilidad total de supervisión',
       async (rol) => {
-        await expect(service.assertAccesoPaciente(mockUser(rol), 'paciente-1')).resolves.toBeUndefined();
+        await expect(
+          service.assertAccesoPaciente(mockUser(rol), 'paciente-1'),
+        ).resolves.toBeUndefined();
         expect(profesionalesRepo.findOne).not.toHaveBeenCalled();
         expect(visitasRepo.exist).not.toHaveBeenCalled();
       },
@@ -60,9 +67,9 @@ describe('PacienteAccessService', () => {
     it('rechaza a un PROFESIONAL sin perfil de ProfesionalSalud asociado', async () => {
       profesionalesRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.assertAccesoPaciente(mockUser('PROFESIONAL'), 'paciente-1')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertAccesoPaciente(mockUser('PROFESIONAL'), 'paciente-1'),
+      ).rejects.toThrow(ForbiddenException);
       expect(visitasRepo.exist).not.toHaveBeenCalled();
     });
 
@@ -70,11 +77,15 @@ describe('PacienteAccessService', () => {
       profesionalesRepo.findOne.mockResolvedValue({ id: 'prof-1' });
       visitasRepo.exist.mockResolvedValue(false);
 
-      await expect(service.assertAccesoPaciente(mockUser('PROFESIONAL'), 'paciente-ajeno')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertAccesoPaciente(mockUser('PROFESIONAL'), 'paciente-ajeno'),
+      ).rejects.toThrow(ForbiddenException);
       expect(visitasRepo.exist).toHaveBeenCalledWith({
-        where: { pacienteId: 'paciente-ajeno', profesionalSaludId: 'prof-1', deletedAt: expect.anything() },
+        where: {
+          pacienteId: 'paciente-ajeno',
+          profesionalSaludId: 'prof-1',
+          deletedAt: expect.anything(),
+        },
       });
     });
 
@@ -82,34 +93,51 @@ describe('PacienteAccessService', () => {
       profesionalesRepo.findOne.mockResolvedValue({ id: 'prof-1' });
       visitasRepo.exist.mockResolvedValue(true);
 
-      await expect(service.assertAccesoPaciente(mockUser('PROFESIONAL'), 'paciente-propio')).resolves.toBeUndefined();
+      await expect(
+        service.assertAccesoPaciente(
+          mockUser('PROFESIONAL'),
+          'paciente-propio',
+        ),
+      ).resolves.toBeUndefined();
     });
   });
 
   describe('assertAccesoVisita', () => {
     it('no bloquea a roles de supervisión sin consultar la visita', async () => {
-      await expect(service.assertAccesoVisita(mockUser('ADMIN'), 'visita-1')).resolves.toBeUndefined();
+      await expect(
+        service.assertAccesoVisita(mockUser('ADMIN'), 'visita-1'),
+      ).resolves.toBeUndefined();
       expect(visitasRepo.findOne).not.toHaveBeenCalled();
     });
 
     it('lanza NotFoundException si la visita no existe', async () => {
       visitasRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.assertAccesoVisita(mockUser('PROFESIONAL'), 'visita-inexistente')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.assertAccesoVisita(
+          mockUser('PROFESIONAL'),
+          'visita-inexistente',
+        ),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('resuelve el pacienteId de la visita y delega en assertAccesoPaciente', async () => {
-      visitasRepo.findOne.mockResolvedValue({ id: 'visita-1', pacienteId: 'paciente-de-la-visita' });
+      visitasRepo.findOne.mockResolvedValue({
+        id: 'visita-1',
+        pacienteId: 'paciente-de-la-visita',
+      });
       profesionalesRepo.findOne.mockResolvedValue({ id: 'prof-1' });
       visitasRepo.exist.mockResolvedValue(false);
 
-      await expect(service.assertAccesoVisita(mockUser('PROFESIONAL'), 'visita-1')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertAccesoVisita(mockUser('PROFESIONAL'), 'visita-1'),
+      ).rejects.toThrow(ForbiddenException);
       expect(visitasRepo.exist).toHaveBeenCalledWith({
-        where: { pacienteId: 'paciente-de-la-visita', profesionalSaludId: 'prof-1', deletedAt: expect.anything() },
+        where: {
+          pacienteId: 'paciente-de-la-visita',
+          profesionalSaludId: 'prof-1',
+          deletedAt: expect.anything(),
+        },
       });
     });
   });

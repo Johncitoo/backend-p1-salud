@@ -1,6 +1,23 @@
-import { IsDateString, IsIn, IsInt, IsOptional, IsPositive, IsString, IsUUID, Matches } from 'class-validator';
+import {
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsPositive,
+  IsString,
+  IsUUID,
+  Matches,
+} from 'class-validator';
 
-const VISITA_ESTADOS = ['PROGRAMADA', 'EN_CAMINO', 'EN_ATENCION', 'REALIZADA', 'CANCELADA', 'REPROGRAMADA', 'NO_REALIZADA'] as const;
+const VISITA_ESTADOS = [
+  'PROGRAMADA',
+  'EN_CAMINO',
+  'EN_ATENCION',
+  'REALIZADA',
+  'CANCELADA',
+  'REPROGRAMADA',
+  'NO_REALIZADA',
+] as const;
 const VISITA_PRIORIDADES = ['BAJA', 'NORMAL', 'ALTA', 'URGENTE'] as const;
 
 export class CreateVisitaDto {

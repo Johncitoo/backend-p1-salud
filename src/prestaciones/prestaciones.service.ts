@@ -1,14 +1,30 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { Visita } from '../pacientes/entities/visita.entity';
-import { CreatePrestacionDto, UpdatePrestacionDto } from './dto/create-prestacion.dto';
-import { CreateVisitaPrestacionDto, UpdateVisitaPrestacionDto } from './dto/create-visita-prestacion.dto';
+import {
+  CreatePrestacionDto,
+  UpdatePrestacionDto,
+} from './dto/create-prestacion.dto';
+import {
+  CreateVisitaPrestacionDto,
+  UpdateVisitaPrestacionDto,
+} from './dto/create-visita-prestacion.dto';
 import { Prestacion } from './entities/prestacion.entity';
 import { VisitaPrestacion } from './entities/visita-prestacion.entity';
 
-const ESTADOS_VISITA_PRESTACION = ['PROGRAMADA', 'REALIZADA', 'NO_REALIZADA', 'CANCELADA'];
+const ESTADOS_VISITA_PRESTACION = [
+  'PROGRAMADA',
+  'REALIZADA',
+  'NO_REALIZADA',
+  'CANCELADA',
+];
 
 @Injectable()
 export class PrestacionesService {
@@ -27,16 +43,22 @@ export class PrestacionesService {
       .createQueryBuilder('prestacion')
       .where('prestacion.deleted_at IS NULL');
 
-    if (filtros?.activa !== undefined) qb.andWhere('prestacion.activa = :activa', { activa: filtros.activa });
+    if (filtros?.activa !== undefined)
+      qb.andWhere('prestacion.activa = :activa', { activa: filtros.activa });
     if (filtros?.q) {
-      qb.andWhere('(prestacion.codigo ILIKE :q OR prestacion.nombre ILIKE :q)', { q: `%${filtros.q}%` });
+      qb.andWhere(
+        '(prestacion.codigo ILIKE :q OR prestacion.nombre ILIKE :q)',
+        { q: `%${filtros.q}%` },
+      );
     }
 
     return qb.orderBy('prestacion.nombre', 'ASC').getMany();
   }
 
   async findOne(id: string) {
-    const prestacion = await this.prestacionesRepo.findOne({ where: { id, deletedAt: IsNull() } });
+    const prestacion = await this.prestacionesRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!prestacion) throw new NotFoundException('Prestación no encontrada');
     return prestacion;
   }
@@ -70,12 +92,18 @@ export class PrestacionesService {
 
   async update(id: string, dto: UpdatePrestacionDto) {
     const prestacion = await this.findOne(id);
-    const oldValues = { codigo: prestacion.codigo, nombre: prestacion.nombre, activa: prestacion.activa };
+    const oldValues = {
+      codigo: prestacion.codigo,
+      nombre: prestacion.nombre,
+      activa: prestacion.activa,
+    };
 
-    if (dto.codigo !== undefined) prestacion.codigo = dto.codigo.trim().toUpperCase();
+    if (dto.codigo !== undefined)
+      prestacion.codigo = dto.codigo.trim().toUpperCase();
     if (dto.nombre !== undefined) prestacion.nombre = dto.nombre.trim();
     if (dto.descripcion !== undefined) prestacion.descripcion = dto.descripcion;
-    if (dto.duracionEstimadaMin !== undefined) prestacion.duracionEstimadaMin = dto.duracionEstimadaMin;
+    if (dto.duracionEstimadaMin !== undefined)
+      prestacion.duracionEstimadaMin = dto.duracionEstimadaMin;
     if (dto.activa !== undefined) prestacion.activa = dto.activa;
 
     let saved: Prestacion;
@@ -92,7 +120,11 @@ export class PrestacionesService {
       accion: 'ACTUALIZAR',
       detalle: `Prestación ${saved.codigo} actualizada`,
       oldValues,
-      newValues: { codigo: saved.codigo, nombre: saved.nombre, activa: saved.activa },
+      newValues: {
+        codigo: saved.codigo,
+        nombre: saved.nombre,
+        activa: saved.activa,
+      },
     });
 
     return saved;
@@ -118,18 +150,30 @@ export class PrestacionesService {
 
     return this.visitaPrestacionesRepo
       .createQueryBuilder('vp')
-      .leftJoinAndMapOne('vp.prestacion', Prestacion, 'prestacion', 'prestacion.id = vp.prestacion_id')
+      .leftJoinAndMapOne(
+        'vp.prestacion',
+        Prestacion,
+        'prestacion',
+        'prestacion.id = vp.prestacion_id',
+      )
       .where('vp.visita_id = :visitaId', { visitaId })
       .andWhere('vp.deleted_at IS NULL')
       .orderBy('prestacion.nombre', 'ASC')
       .getMany();
   }
 
-  async addToVisita(visitaId: string, dto: CreateVisitaPrestacionDto, usuarioId?: string) {
+  async addToVisita(
+    visitaId: string,
+    dto: CreateVisitaPrestacionDto,
+    usuarioId?: string,
+  ) {
     const visita = await this.ensureEditableVisita(visitaId);
     const prestacion = await this.findOne(dto.prestacionId);
 
-    if (!prestacion.activa) throw new BadRequestException('No se puede asignar una prestación inactiva');
+    if (!prestacion.activa)
+      throw new BadRequestException(
+        'No se puede asignar una prestación inactiva',
+      );
     this.ensureEstadoValido(dto.estado ?? 'PROGRAMADA');
 
     const visitaPrestacion = this.visitaPrestacionesRepo.create({
@@ -144,8 +188,13 @@ export class PrestacionesService {
     try {
       saved = await this.visitaPrestacionesRepo.save(visitaPrestacion);
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
-        throw new ConflictException('La prestación ya está asignada a esta visita');
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
+        throw new ConflictException(
+          'La prestación ya está asignada a esta visita',
+        );
       }
       throw error;
     }
@@ -161,16 +210,25 @@ export class PrestacionesService {
     return this.findVisitaPrestacion(visita.id, prestacion.id);
   }
 
-  async updateVisitaPrestacion(visitaId: string, prestacionId: string, dto: UpdateVisitaPrestacionDto, usuarioId?: string) {
+  async updateVisitaPrestacion(
+    visitaId: string,
+    prestacionId: string,
+    dto: UpdateVisitaPrestacionDto,
+    usuarioId?: string,
+  ) {
     await this.ensureEditableVisita(visitaId);
-    const visitaPrestacion = await this.findVisitaPrestacion(visitaId, prestacionId);
+    const visitaPrestacion = await this.findVisitaPrestacion(
+      visitaId,
+      prestacionId,
+    );
 
     if (dto.estado !== undefined) {
       this.ensureEstadoValido(dto.estado);
       visitaPrestacion.estado = dto.estado;
     }
     if (dto.cantidad !== undefined) visitaPrestacion.cantidad = dto.cantidad;
-    if (dto.observacion !== undefined) visitaPrestacion.observacion = dto.observacion;
+    if (dto.observacion !== undefined)
+      visitaPrestacion.observacion = dto.observacion;
 
     const saved = await this.visitaPrestacionesRepo.save(visitaPrestacion);
 
@@ -185,9 +243,16 @@ export class PrestacionesService {
     return this.findVisitaPrestacion(visitaId, prestacionId);
   }
 
-  async removeFromVisita(visitaId: string, prestacionId: string, usuarioId?: string) {
+  async removeFromVisita(
+    visitaId: string,
+    prestacionId: string,
+    usuarioId?: string,
+  ) {
     await this.ensureEditableVisita(visitaId);
-    const visitaPrestacion = await this.findVisitaPrestacion(visitaId, prestacionId);
+    const visitaPrestacion = await this.findVisitaPrestacion(
+      visitaId,
+      prestacionId,
+    );
     visitaPrestacion.deletedAt = new Date();
     const saved = await this.visitaPrestacionesRepo.save(visitaPrestacion);
 
@@ -203,7 +268,9 @@ export class PrestacionesService {
   }
 
   private async ensureVisitaExists(visitaId: string) {
-    const visita = await this.visitasRepo.findOne({ where: { id: visitaId, deletedAt: IsNull() } });
+    const visita = await this.visitasRepo.findOne({
+      where: { id: visitaId, deletedAt: IsNull() },
+    });
     if (!visita) throw new NotFoundException('Visita no encontrada');
     return visita;
   }
@@ -211,7 +278,9 @@ export class PrestacionesService {
   private async ensureEditableVisita(visitaId: string) {
     const visita = await this.ensureVisitaExists(visitaId);
     if (['REALIZADA', 'CANCELADA'].includes(visita.estado)) {
-      throw new BadRequestException('No se pueden modificar prestaciones de una visita cerrada o cancelada');
+      throw new BadRequestException(
+        'No se pueden modificar prestaciones de una visita cerrada o cancelada',
+      );
     }
     return visita;
   }
@@ -219,13 +288,19 @@ export class PrestacionesService {
   private async findVisitaPrestacion(visitaId: string, prestacionId: string) {
     const visitaPrestacion = await this.visitaPrestacionesRepo
       .createQueryBuilder('vp')
-      .leftJoinAndMapOne('vp.prestacion', Prestacion, 'prestacion', 'prestacion.id = vp.prestacion_id')
+      .leftJoinAndMapOne(
+        'vp.prestacion',
+        Prestacion,
+        'prestacion',
+        'prestacion.id = vp.prestacion_id',
+      )
       .where('vp.visita_id = :visitaId', { visitaId })
       .andWhere('vp.prestacion_id = :prestacionId', { prestacionId })
       .andWhere('vp.deleted_at IS NULL')
       .getOne();
 
-    if (!visitaPrestacion) throw new NotFoundException('Prestación de visita no encontrada');
+    if (!visitaPrestacion)
+      throw new NotFoundException('Prestación de visita no encontrada');
     return visitaPrestacion;
   }
 
@@ -238,8 +313,10 @@ export class PrestacionesService {
   private handleUniquePrestacionError(error: unknown) {
     if (error instanceof QueryFailedError && (error as any).code === '23505') {
       const detail = (error as any).detail ?? '';
-      if (detail.includes('codigo')) throw new ConflictException('Ya existe una prestación con ese código');
-      if (detail.includes('nombre')) throw new ConflictException('Ya existe una prestación con ese nombre');
+      if (detail.includes('codigo'))
+        throw new ConflictException('Ya existe una prestación con ese código');
+      if (detail.includes('nombre'))
+        throw new ConflictException('Ya existe una prestación con ese nombre');
       throw new ConflictException('Ya existe una prestación con esos datos');
     }
   }

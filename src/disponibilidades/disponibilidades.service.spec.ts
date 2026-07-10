@@ -6,7 +6,9 @@ import { DisponibilidadProfesional } from './entities/disponibilidad-profesional
 import { DisponibilidadesService } from './disponibilidades.service';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 
-type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends { id: string }> = Partial<
+  Record<keyof Repository<T>, jest.Mock>
+>;
 
 const createRepositoryMock = (): MockRepository<DisponibilidadProfesional> => ({
   find: jest.fn(),
@@ -44,7 +46,10 @@ describe('DisponibilidadesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DisponibilidadesService,
-        { provide: getRepositoryToken(DisponibilidadProfesional), useValue: repository },
+        {
+          provide: getRepositoryToken(DisponibilidadProfesional),
+          useValue: repository,
+        },
         { provide: AuditoriasService, useValue: auditoriasService },
       ],
     }).compile();
@@ -59,7 +64,9 @@ describe('DisponibilidadesService', () => {
 
   it('findOne lanza NotFoundException si no existe', async () => {
     repository.findOne!.mockResolvedValue(null);
-    await expect(service.findOne('no-existe')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne('no-existe')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('create guarda con activo=true por defecto', async () => {

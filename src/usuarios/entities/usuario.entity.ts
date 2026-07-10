@@ -1,13 +1,19 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, Index } from 'typeorm';
 
 @Entity({ name: 'usuarios' })
 export class Usuario {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'identity_user_id', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'identity_user_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   identityUserId?: string | null;
 
+  @Index()
   @Column({ name: 'rol_id', type: 'uuid' })
   rolId: string;
 

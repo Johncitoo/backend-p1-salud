@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -14,9 +18,7 @@ export class ReglasAsignacionService {
     private readonly auditoriasService: AuditoriasService,
   ) {}
 
-  async findAll(filtros?: {
-    activa?: boolean;
-  }): Promise<ReglaAsignacion[]> {
+  async findAll(filtros?: { activa?: boolean }): Promise<ReglaAsignacion[]> {
     const qb = this.repository
       .createQueryBuilder('ra')
       .where('ra.deleted_at IS NULL');
@@ -31,7 +33,8 @@ export class ReglasAsignacionService {
     const regla = await this.repository.findOne({
       where: { id, deletedAt: IsNull() },
     });
-    if (!regla) throw new NotFoundException('Regla de asignacion no encontrada');
+    if (!regla)
+      throw new NotFoundException('Regla de asignacion no encontrada');
     return regla;
   }
 
@@ -60,7 +63,10 @@ export class ReglasAsignacionService {
 
       return saved;
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         throw new ConflictException(`El codigo ${dto.codigo} ya existe.`);
       }
       throw error;
@@ -101,7 +107,10 @@ export class ReglasAsignacionService {
 
       return saved;
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         throw new ConflictException(`El codigo ${dto.codigo} ya existe.`);
       }
       throw error;

@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -69,12 +73,15 @@ export class PacientesService {
     try {
       saved = await this.pacientesRepository.save(paciente);
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         throw new ConflictException(`El RUT ${dto.rut} ya está registrado.`);
       }
       throw error;
     }
-    const result = Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
+    const result = Array.isArray(saved) ? saved[0] : (saved as Paciente);
     this.auditoriasService.registrar({
       entidad: 'pacientes',
       entidadId: result.id,
@@ -90,26 +97,39 @@ export class PacientesService {
 
   async update(id: string, dto: UpdatePacienteDto): Promise<Paciente> {
     const paciente = await this.findOne(id);
-    const oldValues = { nombres: paciente.nombres, apellidos: paciente.apellidos, rut: paciente.rut };
+    const oldValues = {
+      nombres: paciente.nombres,
+      apellidos: paciente.apellidos,
+      rut: paciente.rut,
+    };
     Object.assign(paciente, dto);
 
     let saved: Paciente | Paciente[];
     try {
       saved = await this.pacientesRepository.save(paciente);
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
-        throw new ConflictException(`El RUT ${dto.rut || paciente.rut} ya está registrado por otro paciente.`);
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
+        throw new ConflictException(
+          `El RUT ${dto.rut || paciente.rut} ya está registrado por otro paciente.`,
+        );
       }
       throw error;
     }
-    const result = Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
+    const result = Array.isArray(saved) ? (saved[0] as Paciente) : saved;
     this.auditoriasService.registrar({
       entidad: 'pacientes',
       entidadId: result.id,
       accion: 'ACTUALIZAR',
       detalle: `Paciente ${result.nombres} ${result.apellidos} actualizado`,
       oldValues,
-      newValues: { nombres: result.nombres, apellidos: result.apellidos, rut: result.rut },
+      newValues: {
+        nombres: result.nombres,
+        apellidos: result.apellidos,
+        rut: result.rut,
+      },
     });
 
     await this.analyticsService.sendPacienteUpsertEvent(result);
@@ -121,7 +141,7 @@ export class PacientesService {
     const paciente = await this.findOne(id);
     paciente.deletedAt = new Date();
     const saved = await this.pacientesRepository.save(paciente);
-    const result = Array.isArray(saved) ? (saved[0] as Paciente) : (saved as Paciente);
+    const result = Array.isArray(saved) ? (saved[0] as Paciente) : saved;
     this.auditoriasService.registrar({
       entidad: 'pacientes',
       entidadId: result.id,
@@ -142,103 +162,134 @@ export class PacientesService {
   async createDireccion(dto: CreateDireccionDto): Promise<DireccionPaciente> {
     const d = this.direccionesRepository.create(dto as any);
     const saved = await this.direccionesRepository.save(d);
-    return Array.isArray(saved) ? (saved[0] as DireccionPaciente) : (saved as DireccionPaciente);
+    return Array.isArray(saved) ? saved[0] : saved;
   }
 
-  async updateDireccion(id: string, dto: UpdateDireccionDto): Promise<DireccionPaciente> {
-    const dir = await this.direccionesRepository.findOne({ where: { id, deletedAt: IsNull() } });
+  async updateDireccion(
+    id: string,
+    dto: UpdateDireccionDto,
+  ): Promise<DireccionPaciente> {
+    const dir = await this.direccionesRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!dir) throw new NotFoundException('Dirección no encontrada');
     Object.assign(dir, dto);
     const saved = await this.direccionesRepository.save(dir);
-    return Array.isArray(saved) ? (saved[0] as DireccionPaciente) : (saved as DireccionPaciente);
+    return Array.isArray(saved) ? (saved[0] as DireccionPaciente) : saved;
   }
 
   async removeDireccion(id: string): Promise<DireccionPaciente> {
-    const dir = await this.direccionesRepository.findOne({ where: { id, deletedAt: IsNull() } });
+    const dir = await this.direccionesRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!dir) throw new NotFoundException('Dirección no encontrada');
     dir.deletedAt = new Date();
     const saved = await this.direccionesRepository.save(dir);
-    return Array.isArray(saved) ? (saved[0] as DireccionPaciente) : (saved as DireccionPaciente);
+    return Array.isArray(saved) ? (saved[0] as DireccionPaciente) : saved;
   }
 
   /* Contactos */
   async findContactos(pacienteId: string): Promise<ContactoPaciente[]> {
-    return this.contactosRepository.find({ where: { pacienteId, deletedAt: IsNull() }, order: { createdAt: 'DESC' } });
+    return this.contactosRepository.find({
+      where: { pacienteId, deletedAt: IsNull() },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async createContacto(dto: CreateContactoDto): Promise<ContactoPaciente> {
     const c = this.contactosRepository.create(dto as any);
     const saved = await this.contactosRepository.save(c);
-    return Array.isArray(saved) ? (saved[0] as ContactoPaciente) : (saved as ContactoPaciente);
+    return Array.isArray(saved) ? saved[0] : saved;
   }
 
-  async updateContacto(id: string, dto: UpdateContactoDto): Promise<ContactoPaciente> {
-    const c = await this.contactosRepository.findOne({ where: { id, deletedAt: IsNull() } });
+  async updateContacto(
+    id: string,
+    dto: UpdateContactoDto,
+  ): Promise<ContactoPaciente> {
+    const c = await this.contactosRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!c) throw new NotFoundException('Contacto no encontrado');
     Object.assign(c, dto);
     const saved = await this.contactosRepository.save(c);
-    return Array.isArray(saved) ? (saved[0] as ContactoPaciente) : (saved as ContactoPaciente);
+    return Array.isArray(saved) ? (saved[0] as ContactoPaciente) : saved;
   }
 
   async removeContacto(id: string): Promise<ContactoPaciente> {
-    const c = await this.contactosRepository.findOne({ where: { id, deletedAt: IsNull() } });
+    const c = await this.contactosRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!c) throw new NotFoundException('Contacto no encontrado');
     c.deletedAt = new Date();
     const saved = await this.contactosRepository.save(c);
-    return Array.isArray(saved) ? (saved[0] as ContactoPaciente) : (saved as ContactoPaciente);
+    return Array.isArray(saved) ? (saved[0] as ContactoPaciente) : saved;
   }
 
   /* Planes */
   async findPlanes(pacienteId: string): Promise<PlanCuidado[]> {
-    return this.planesRepository.find({ where: { pacienteId, deletedAt: IsNull() }, order: { createdAt: 'DESC' } });
+    return this.planesRepository.find({
+      where: { pacienteId, deletedAt: IsNull() },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async createPlan(dto: CreatePlanDto): Promise<PlanCuidado> {
     const p = this.planesRepository.create(dto as any);
     const saved = await this.planesRepository.save(p);
-    return Array.isArray(saved) ? (saved[0] as PlanCuidado) : (saved as PlanCuidado);
+    return Array.isArray(saved) ? saved[0] : saved;
   }
 
   async updatePlan(id: string, dto: UpdatePlanDto): Promise<PlanCuidado> {
-    const p = await this.planesRepository.findOne({ where: { id, deletedAt: IsNull() } });
+    const p = await this.planesRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!p) throw new NotFoundException('Plan no encontrado');
     Object.assign(p, dto);
     const saved = await this.planesRepository.save(p);
-    return Array.isArray(saved) ? (saved[0] as PlanCuidado) : (saved as PlanCuidado);
+    return Array.isArray(saved) ? (saved[0] as PlanCuidado) : saved;
   }
 
   async removePlan(id: string): Promise<PlanCuidado> {
-    const p = await this.planesRepository.findOne({ where: { id, deletedAt: IsNull() } });
+    const p = await this.planesRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!p) throw new NotFoundException('Plan no encontrado');
     p.deletedAt = new Date();
     const saved = await this.planesRepository.save(p);
-    return Array.isArray(saved) ? (saved[0] as PlanCuidado) : (saved as PlanCuidado);
+    return Array.isArray(saved) ? (saved[0] as PlanCuidado) : saved;
   }
 
   /* Visitas */
   async findVisitas(pacienteId: string): Promise<Visita[]> {
-    return this.visitasRepository.find({ where: { pacienteId, deletedAt: IsNull() }, order: { createdAt: 'DESC' } });
+    return this.visitasRepository.find({
+      where: { pacienteId, deletedAt: IsNull() },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async createVisita(dto: CreateVisitaDto): Promise<Visita> {
     const v = this.visitasRepository.create(dto as any);
     const saved = await this.visitasRepository.save(v);
-    return Array.isArray(saved) ? (saved[0] as Visita) : (saved as Visita);
+    return Array.isArray(saved) ? saved[0] : saved;
   }
 
   async updateVisita(id: string, dto: UpdateVisitaDto): Promise<Visita> {
-    const v = await this.visitasRepository.findOne({ where: { id, deletedAt: IsNull() } });
+    const v = await this.visitasRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!v) throw new NotFoundException('Visita no encontrada');
     Object.assign(v, dto);
     const saved = await this.visitasRepository.save(v);
-    return Array.isArray(saved) ? (saved[0] as Visita) : (saved as Visita);
+    return Array.isArray(saved) ? (saved[0] as Visita) : saved;
   }
 
   async removeVisita(id: string): Promise<Visita> {
-    const v = await this.visitasRepository.findOne({ where: { id, deletedAt: IsNull() } });
+    const v = await this.visitasRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!v) throw new NotFoundException('Visita no encontrada');
     v.deletedAt = new Date();
     const saved = await this.visitasRepository.save(v);
-    return Array.isArray(saved) ? (saved[0] as Visita) : (saved as Visita);
+    return Array.isArray(saved) ? (saved[0] as Visita) : saved;
   }
 }

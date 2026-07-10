@@ -1,4 +1,11 @@
-import { IsInt, IsOptional, IsString, IsUUID, Length, Min } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Min,
+} from 'class-validator';
 
 export class CreateVisitaPrestacionDto {
   @IsUUID()

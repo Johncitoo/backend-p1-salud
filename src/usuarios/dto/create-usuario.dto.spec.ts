@@ -34,16 +34,10 @@ describe('CreateUsuarioDto', () => {
 
   it('rejects payload without required fields', async () => {
     const errors = await validateDto({});
-    const properties = errors.map(error => error.property);
+    const properties = errors.map((error) => error.property);
 
     expect(properties).toEqual(
-      expect.arrayContaining([
-        'rolId',
-        'rut',
-        'nombres',
-        'apellidos',
-        'email',
-      ]),
+      expect.arrayContaining(['rolId', 'rut', 'nombres', 'apellidos', 'email']),
     );
   });
 
@@ -53,7 +47,7 @@ describe('CreateUsuarioDto', () => {
       rolId: 'rol-invalido',
       email: 'correo-invalido',
     });
-    const properties = errors.map(error => error.property);
+    const properties = errors.map((error) => error.property);
 
     expect(properties).toEqual(expect.arrayContaining(['rolId', 'email']));
   });

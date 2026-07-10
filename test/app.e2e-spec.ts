@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, NotFoundException, ValidationPipe } from '@nestjs/common';
+import {
+  INestApplication,
+  NotFoundException,
+  ValidationPipe,
+} from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { randomUUID } from 'crypto';
@@ -21,9 +25,11 @@ describe('HTTP routes (e2e)', () => {
     zones = [];
 
     const zonasService = {
-      findAll: jest.fn(async () => zones.filter(zone => !zone.deletedAt)),
+      findAll: jest.fn(async () => zones.filter((zone) => !zone.deletedAt)),
       findOne: jest.fn(async (id: string) => {
-        const zone = zones.find(currentZone => currentZone.id === id && !currentZone.deletedAt);
+        const zone = zones.find(
+          (currentZone) => currentZone.id === id && !currentZone.deletedAt,
+        );
         if (!zone) throw new NotFoundException('Zona no encontrada');
         return zone;
       }),
@@ -44,13 +50,17 @@ describe('HTTP routes (e2e)', () => {
         return zone;
       }),
       update: jest.fn(async (id: string, dto: Partial<Zona>) => {
-        const zone = zones.find(currentZone => currentZone.id === id && !currentZone.deletedAt);
+        const zone = zones.find(
+          (currentZone) => currentZone.id === id && !currentZone.deletedAt,
+        );
         if (!zone) throw new NotFoundException('Zona no encontrada');
         Object.assign(zone, dto, { updatedAt: new Date() });
         return zone;
       }),
       remove: jest.fn(async (id: string) => {
-        const zone = zones.find(currentZone => currentZone.id === id && !currentZone.deletedAt);
+        const zone = zones.find(
+          (currentZone) => currentZone.id === id && !currentZone.deletedAt,
+        );
         if (!zone) throw new NotFoundException('Zona no encontrada');
         zone.deletedAt = new Date();
         return zone;
@@ -70,7 +80,9 @@ describe('HTTP routes (e2e)', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string) => (key === 'AUTH_MODE' ? 'mock' : undefined)),
+            get: jest.fn((key: string) =>
+              key === 'AUTH_MODE' ? 'mock' : undefined,
+            ),
           },
         },
         {
@@ -83,12 +95,17 @@ describe('HTTP routes (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
   });
 
   it('/ (GET)', () => {
-    return request(app.getHttpServer()).get('/').expect(200).expect('Hello World!');
+    return request(app.getHttpServer())
+      .get('/')
+      .expect(200)
+      .expect('Hello World!');
   });
 
   it('/zonas CRUD', async () => {
@@ -120,9 +137,11 @@ describe('HTTP routes (e2e)', () => {
       .get('/zonas')
       .set('x-mock-role', 'COORDINADOR')
       .expect(200)
-      .expect(response => {
+      .expect((response) => {
         expect(response.body).toEqual(
-          expect.arrayContaining([expect.objectContaining({ id, nombre: 'Zona Test' })]),
+          expect.arrayContaining([
+            expect.objectContaining({ id, nombre: 'Zona Test' }),
+          ]),
         );
       });
 
@@ -131,9 +150,13 @@ describe('HTTP routes (e2e)', () => {
       .set('x-mock-role', 'COORDINADOR')
       .send({ nombre: 'Zona Test Actualizada', activa: false })
       .expect(200)
-      .expect(response => {
+      .expect((response) => {
         expect(response.body).toEqual(
-          expect.objectContaining({ id, nombre: 'Zona Test Actualizada', activa: false }),
+          expect.objectContaining({
+            id,
+            nombre: 'Zona Test Actualizada',
+            activa: false,
+          }),
         );
       });
 
@@ -141,11 +164,16 @@ describe('HTTP routes (e2e)', () => {
       .delete(`/zonas/${id}`)
       .set('x-mock-role', 'ADMIN')
       .expect(200)
-      .expect(response => {
-        expect(response.body).toEqual(expect.objectContaining({ id, deletedAt: expect.any(String) }));
+      .expect((response) => {
+        expect(response.body).toEqual(
+          expect.objectContaining({ id, deletedAt: expect.any(String) }),
+        );
       });
 
-    await request(app.getHttpServer()).get(`/zonas/${id}`).set('x-mock-role', 'COORDINADOR').expect(404);
+    await request(app.getHttpServer())
+      .get(`/zonas/${id}`)
+      .set('x-mock-role', 'COORDINADOR')
+      .expect(404);
   });
 
   afterEach(async () => {

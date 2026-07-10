@@ -21,7 +21,9 @@ const zona = {
 
 describe('ZonasController', () => {
   let controller: ZonasController;
-  let service: jest.Mocked<Pick<ZonasService, 'findAll' | 'findOne' | 'create' | 'update' | 'remove'>>;
+  let service: jest.Mocked<
+    Pick<ZonasService, 'findAll' | 'findOne' | 'create' | 'update' | 'remove'>
+  >;
 
   beforeEach(async () => {
     service = {
@@ -40,7 +42,11 @@ describe('ZonasController', () => {
         { provide: ZonasService, useValue: service },
         {
           provide: ConfigService,
-          useValue: { get: jest.fn((key: string) => (key === 'AUTH_MODE' ? 'mock' : undefined)) },
+          useValue: {
+            get: jest.fn((key: string) =>
+              key === 'AUTH_MODE' ? 'mock' : undefined,
+            ),
+          },
         },
         {
           provide: UsuariosService,
@@ -73,14 +79,21 @@ describe('ZonasController', () => {
   it('delega update al servicio', async () => {
     service.update.mockResolvedValue({ ...zona, activa: false });
 
-    await expect(controller.update(zona.id, { activa: false })).resolves.toEqual({ ...zona, activa: false });
+    await expect(
+      controller.update(zona.id, { activa: false }),
+    ).resolves.toEqual({ ...zona, activa: false });
     expect(service.update).toHaveBeenCalledWith(zona.id, { activa: false });
   });
 
   it('delega remove al servicio', async () => {
-    service.remove.mockResolvedValue({ ...zona, deletedAt: new Date('2026-06-05T10:00:00Z') });
+    service.remove.mockResolvedValue({
+      ...zona,
+      deletedAt: new Date('2026-06-05T10:00:00Z'),
+    });
 
-    await expect(controller.remove(zona.id)).resolves.toEqual(expect.objectContaining({ id: zona.id }));
+    await expect(controller.remove(zona.id)).resolves.toEqual(
+      expect.objectContaining({ id: zona.id }),
+    );
     expect(service.remove).toHaveBeenCalledWith(zona.id);
   });
 });

@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -12,13 +20,19 @@ export class AuditoriasController {
 
   @Get()
   @Roles('ADMIN', 'SUPERVISOR')
-  findAll() { return this.service.findAll(); }
+  findAll() {
+    return this.service.findAll();
+  }
 
   @Get(':id')
   @Roles('ADMIN', 'SUPERVISOR')
-  findOne(@Param('id', ParseUUIDPipe) id: string) { return this.service.findOne(id); }
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.findOne(id);
+  }
 
   @Post()
   @Roles('ADMIN')
-  create(@Body() dto: CreateAuditoriaDto) { return this.service.create(dto); }
+  create(@Body() dto: CreateAuditoriaDto) {
+    return this.service.create(dto);
+  }
 }

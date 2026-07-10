@@ -1,4 +1,10 @@
-import { IsObject, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import {
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+} from 'class-validator';
 
 export class CreateAuditoriaDto {
   @IsUUID()

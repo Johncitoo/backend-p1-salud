@@ -1,4 +1,11 @@
-import { IsDate, IsNumber, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsDate,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateMedicionClinicaDto {
   @IsOptional()

@@ -17,7 +17,10 @@ export class LocalStorageService implements StorageService {
     return 'local-disk';
   }
 
-  async putEncryptedObject(objectKey: string, encryptedBuffer: Buffer): Promise<void> {
+  async putEncryptedObject(
+    objectKey: string,
+    encryptedBuffer: Buffer,
+  ): Promise<void> {
     const filePath = this.resolvePath(objectKey);
     await mkdir(dirname(filePath), { recursive: true });
     await writeFile(filePath, encryptedBuffer);

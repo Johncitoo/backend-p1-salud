@@ -47,11 +47,23 @@ describe('IoTService', () => {
       providers: [
         IoTService,
         { provide: ConfigService, useValue: mockConfigService },
-        { provide: getRepositoryToken(PacienteSensor), useValue: mockPacienteSensorRepo },
-        { provide: MedicionesClinicasService, useValue: mockMedicionesClinicasService },
-        { provide: VariablesClinicasService, useValue: mockVariablesClinicasService },
+        {
+          provide: getRepositoryToken(PacienteSensor),
+          useValue: mockPacienteSensorRepo,
+        },
+        {
+          provide: MedicionesClinicasService,
+          useValue: mockMedicionesClinicasService,
+        },
+        {
+          provide: VariablesClinicasService,
+          useValue: mockVariablesClinicasService,
+        },
         { provide: AlertasService, useValue: mockAlertasService },
-        { provide: IncidentesSaludService, useValue: mockIncidentesSaludService },
+        {
+          provide: IncidentesSaludService,
+          useValue: mockIncidentesSaludService,
+        },
       ],
     }).compile();
 
@@ -77,8 +89,14 @@ describe('IoTService', () => {
       const mediciones = service.extractMediciones(reading);
 
       expect(mediciones).toHaveLength(2);
-      expect(mediciones).toContainEqual({ codigoVariable: 'saturacion_oxigeno', valor: 98 });
-      expect(mediciones).toContainEqual({ codigoVariable: 'frecuencia_cardiaca', valor: 75 });
+      expect(mediciones).toContainEqual({
+        codigoVariable: 'saturacion_oxigeno',
+        valor: 98,
+      });
+      expect(mediciones).toContainEqual({
+        codigoVariable: 'frecuencia_cardiaca',
+        valor: 75,
+      });
     });
 
     it('mapea thermometer (temperatura)', () => {
@@ -93,7 +111,9 @@ describe('IoTService', () => {
 
       const mediciones = service.extractMediciones(reading);
 
-      expect(mediciones).toEqual([{ codigoVariable: 'temperatura', valor: 37.8 }]);
+      expect(mediciones).toEqual([
+        { codigoVariable: 'temperatura', valor: 37.8 },
+      ]);
     });
 
     it('mapea glucometer (glicemia capilar)', () => {
@@ -108,7 +128,9 @@ describe('IoTService', () => {
 
       const mediciones = service.extractMediciones(reading);
 
-      expect(mediciones).toEqual([{ codigoVariable: 'glicemia_capilar', valor: 145 }]);
+      expect(mediciones).toEqual([
+        { codigoVariable: 'glicemia_capilar', valor: 145 },
+      ]);
     });
 
     it('mapea sphygmomanometer (presion sistolica + diastolica)', () => {
@@ -125,8 +147,14 @@ describe('IoTService', () => {
       const mediciones = service.extractMediciones(reading);
 
       expect(mediciones).toHaveLength(2);
-      expect(mediciones).toContainEqual({ codigoVariable: 'presion_arterial_sistolica', valor: 120 });
-      expect(mediciones).toContainEqual({ codigoVariable: 'presion_arterial_diastolica', valor: 80 });
+      expect(mediciones).toContainEqual({
+        codigoVariable: 'presion_arterial_sistolica',
+        valor: 120,
+      });
+      expect(mediciones).toContainEqual({
+        codigoVariable: 'presion_arterial_diastolica',
+        valor: 80,
+      });
     });
 
     it('no incluye campos ausentes ni NaN', () => {
@@ -173,8 +201,12 @@ describe('IoTService', () => {
 
     it('no duplica si ya existe una medicion con la misma fecha exacta', async () => {
       mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
-      mockVariablesClinicasService.findByCodigo.mockResolvedValue({ id: 'var-1' });
-      mockMedicionesClinicasService.findAll.mockResolvedValue([{ id: 'med-existente' }]);
+      mockVariablesClinicasService.findByCodigo.mockResolvedValue({
+        id: 'var-1',
+      });
+      mockMedicionesClinicasService.findAll.mockResolvedValue([
+        { id: 'med-existente' },
+      ]);
 
       await service.processTelemetryReading(reading);
 
@@ -183,7 +215,9 @@ describe('IoTService', () => {
 
     it('guarda la medicion con origen IOT cuando todo es valido', async () => {
       mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
-      mockVariablesClinicasService.findByCodigo.mockResolvedValue({ id: 'var-saturacion' });
+      mockVariablesClinicasService.findByCodigo.mockResolvedValue({
+        id: 'var-saturacion',
+      });
       mockMedicionesClinicasService.findAll.mockResolvedValue([]);
 
       await service.processTelemetryReading(reading);
@@ -219,7 +253,10 @@ describe('IoTService', () => {
     it('no duplica si ya existe una alerta identica (mismo mensaje y tipo)', async () => {
       mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
       mockAlertasService.findAll.mockResolvedValue([
-        { mensaje: baseAlert.message, tipo: `IOT_${baseAlert.type.toUpperCase()}` },
+        {
+          mensaje: baseAlert.message,
+          tipo: `IOT_${baseAlert.type.toUpperCase()}`,
+        },
       ]);
 
       await service.processAlertReading(baseAlert);
@@ -248,7 +285,12 @@ describe('IoTService', () => {
 
     it('alerta técnica sensor_offline con severity critical: sube a MEDIA (respeta Grupo 8)', async () => {
       mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
-      const offlineAlert: IoTAlert = { ...baseAlert, type: 'sensor_offline', severity: 'critical', message: 'Sensor sin conexión' };
+      const offlineAlert: IoTAlert = {
+        ...baseAlert,
+        type: 'sensor_offline',
+        severity: 'critical',
+        message: 'Sensor sin conexión',
+      };
 
       await service.processAlertReading(offlineAlert);
 
@@ -262,12 +304,20 @@ describe('IoTService', () => {
 
     it('alerta técnica low_battery con severity critical: sube a MEDIA (respeta Grupo 8)', async () => {
       mockPacienteSensorRepo.findOne.mockResolvedValue({ pacienteId: 'pac-1' });
-      const critBattery: IoTAlert = { ...baseAlert, type: 'low_battery', severity: 'critical', message: 'Battery level is low: 5%' };
+      const critBattery: IoTAlert = {
+        ...baseAlert,
+        type: 'low_battery',
+        severity: 'critical',
+        message: 'Battery level is low: 5%',
+      };
 
       await service.processAlertReading(critBattery);
 
       expect(mockIncidentesSaludService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ tipo: 'FALLA_DISPOSITIVO', severidad: 'MEDIA' }),
+        expect.objectContaining({
+          tipo: 'FALLA_DISPOSITIVO',
+          severidad: 'MEDIA',
+        }),
       );
     });
 
@@ -311,7 +361,10 @@ describe('IoTService', () => {
         expect.objectContaining({ pacienteId: 'pac-1', prioridad: 'CRITICA' }),
       );
       expect(mockIncidentesSaludService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ tipo: 'SIGNO_VITAL_ANORMAL', severidad: 'CRITICA' }),
+        expect.objectContaining({
+          tipo: 'SIGNO_VITAL_ANORMAL',
+          severidad: 'CRITICA',
+        }),
       );
     });
   });
@@ -322,7 +375,8 @@ describe('IoTService', () => {
     beforeEach(() => {
       mockConfigService.get.mockImplementation((key: string) => {
         if (key === 'IOT_ENABLED') return 'true';
-        if (key === 'IOT_API_URL') return 'https://iot-platform-backend-bm5b.onrender.com';
+        if (key === 'IOT_API_URL')
+          return 'https://iot-platform-backend-bm5b.onrender.com';
         return undefined;
       });
     });
@@ -334,8 +388,13 @@ describe('IoTService', () => {
     it('getReadingsBySensor desenvuelve el envoltorio { data, page, limit, total }', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ data: [{ sensorId: 'OXI-001' }], page: 1, limit: 10, total: 776 }),
-      }) as unknown as typeof fetch;
+        json: async () => ({
+          data: [{ sensorId: 'OXI-001' }],
+          page: 1,
+          limit: 10,
+          total: 776,
+        }),
+      });
 
       const readings = await service.getReadingsBySensor('OXI-001');
 
@@ -346,8 +405,13 @@ describe('IoTService', () => {
     it('getAlertsBySensor desenvuelve el envoltorio { data, page, limit, total }', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ data: [{ sensorId: 'OXI-001', severity: 'warning' }], page: 1, limit: 10, total: 5 }),
-      }) as unknown as typeof fetch;
+        json: async () => ({
+          data: [{ sensorId: 'OXI-001', severity: 'warning' }],
+          page: 1,
+          limit: 10,
+          total: 5,
+        }),
+      });
 
       const alerts = await service.getAlertsBySensor('OXI-001');
 
@@ -358,7 +422,7 @@ describe('IoTService', () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ sensorId: 'GLUCO-192', glucoseLevel: 73 }),
-      }) as unknown as typeof fetch;
+      });
 
       const reading = await service.getLatestReading();
 
@@ -369,14 +433,25 @@ describe('IoTService', () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
-          data: [{ sensorId: 'OXI-001', assetId: 'PATIENT-001', sensorType: 'pulse_oximeter' }],
+          data: [
+            {
+              sensorId: 'OXI-001',
+              assetId: 'PATIENT-001',
+              sensorType: 'pulse_oximeter',
+            },
+          ],
           page: 1,
           limit: 25,
           total: 250,
         }),
-      }) as unknown as typeof fetch;
+      });
 
-      const catalog = await service.getDeviceCatalog({ page: 1, limit: 25, sensorType: 'pulse_oximeter', search: 'OXI' });
+      const catalog = await service.getDeviceCatalog({
+        page: 1,
+        limit: 25,
+        sensorType: 'pulse_oximeter',
+        search: 'OXI',
+      });
 
       expect(catalog).toEqual(
         expect.objectContaining({ page: 1, limit: 25, total: 250 }),

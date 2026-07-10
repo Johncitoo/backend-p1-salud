@@ -20,7 +20,12 @@ export class DocumentoAdjunto {
   @Column({ name: 'tamano_bytes', type: 'bigint', nullable: true })
   tamanoBytes?: string | null;
 
-  @Column({ name: 'hash_archivo', type: 'varchar', length: 128, nullable: true })
+  @Column({
+    name: 'hash_archivo',
+    type: 'varchar',
+    length: 128,
+    nullable: true,
+  })
   hashArchivo?: string | null;
 
   @Column({ type: 'text', nullable: true })
@@ -47,7 +52,12 @@ export class DocumentoAdjunto {
   @Column({ name: 'documento_padre_id', type: 'uuid', nullable: true })
   documentoPadreId?: string | null;
 
-  @Column({ name: 'storage_provider', type: 'varchar', length: 30, default: 'R2' })
+  @Column({
+    name: 'storage_provider',
+    type: 'varchar',
+    length: 30,
+    default: 'R2',
+  })
   storageProvider: string;
 
   @Column({ type: 'varchar', length: 120, nullable: true })
@@ -56,16 +66,36 @@ export class DocumentoAdjunto {
   @Column({ name: 'object_key', type: 'text', nullable: true })
   objectKey?: string | null;
 
-  @Column({ name: 'mime_type_original', type: 'varchar', length: 120, nullable: true })
+  @Column({
+    name: 'mime_type_original',
+    type: 'varchar',
+    length: 120,
+    nullable: true,
+  })
   mimeTypeOriginal?: string | null;
 
-  @Column({ name: 'mime_type_almacenado', type: 'varchar', length: 120, nullable: true })
+  @Column({
+    name: 'mime_type_almacenado',
+    type: 'varchar',
+    length: 120,
+    nullable: true,
+  })
   mimeTypeAlmacenado?: string | null;
 
-  @Column({ name: 'extension_original', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'extension_original',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   extensionOriginal?: string | null;
 
-  @Column({ name: 'extension_almacenada', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'extension_almacenada',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   extensionAlmacenada?: string | null;
 
   @Column({ name: 'tamano_original_bytes', type: 'bigint', nullable: true })
@@ -74,22 +104,52 @@ export class DocumentoAdjunto {
   @Column({ name: 'tamano_almacenado_bytes', type: 'bigint', nullable: true })
   tamanoAlmacenadoBytes?: string | null;
 
-  @Column({ name: 'sha256_original', type: 'varchar', length: 64, nullable: true })
+  @Column({
+    name: 'sha256_original',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
   sha256Original?: string | null;
 
-  @Column({ name: 'sha256_almacenado', type: 'varchar', length: 64, nullable: true })
+  @Column({
+    name: 'sha256_almacenado',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
   sha256Almacenado?: string | null;
 
-  @Column({ name: 'encryption_alg', type: 'varchar', length: 40, nullable: true })
+  @Column({
+    name: 'encryption_alg',
+    type: 'varchar',
+    length: 40,
+    nullable: true,
+  })
   encryptionAlg?: string | null;
 
-  @Column({ name: 'encryption_iv', type: 'varchar', length: 64, nullable: true })
+  @Column({
+    name: 'encryption_iv',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
   encryptionIv?: string | null;
 
-  @Column({ name: 'encryption_tag', type: 'varchar', length: 64, nullable: true })
+  @Column({
+    name: 'encryption_tag',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
   encryptionTag?: string | null;
 
-  @Column({ name: 'encryption_key_id', type: 'varchar', length: 120, nullable: true })
+  @Column({
+    name: 'encryption_key_id',
+    type: 'varchar',
+    length: 120,
+    nullable: true,
+  })
   encryptionKeyId?: string | null;
 
   @Column({ name: 'fue_optimizado', type: 'boolean', default: false })

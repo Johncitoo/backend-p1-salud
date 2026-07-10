@@ -34,7 +34,9 @@ describe('GoogleCalendarSyncService', () => {
     googleCalendarSyncAttempts: 0,
   } as Visita;
 
-  let connectionsRepo: ReturnType<typeof makeRepo<ProfesionalGoogleCalendarConnection>>;
+  let connectionsRepo: ReturnType<
+    typeof makeRepo<ProfesionalGoogleCalendarConnection>
+  >;
   let logsRepo: ReturnType<typeof makeRepo<any>>;
   let visitasRepo: ReturnType<typeof makeRepo<Visita>>;
   let googleClient: {
@@ -51,17 +53,34 @@ describe('GoogleCalendarSyncService', () => {
     logsRepo = makeRepo();
     visitasRepo = makeRepo<Visita>();
     googleClient = {
-      createEvent: jest.fn().mockResolvedValue({ id: 'g-event-1', etag: 'etag-1', htmlLink: 'https://calendar/event' }),
-      updateEvent: jest.fn().mockResolvedValue({ id: 'g-event-1', etag: 'etag-2', htmlLink: 'https://calendar/event' }),
+      createEvent: jest.fn().mockResolvedValue({
+        id: 'g-event-1',
+        etag: 'etag-1',
+        htmlLink: 'https://calendar/event',
+      }),
+      updateEvent: jest.fn().mockResolvedValue({
+        id: 'g-event-1',
+        etag: 'etag-2',
+        htmlLink: 'https://calendar/event',
+      }),
       deleteEvent: jest.fn().mockResolvedValue(undefined),
       refreshToken: jest.fn(),
     };
     tokenEncryption = {
-      decrypt: jest.fn().mockReturnValue(JSON.stringify({ accessToken: 'access-token', refreshToken: 'refresh-token' })),
+      decrypt: jest.fn().mockReturnValue(
+        JSON.stringify({
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+        }),
+      ),
       encrypt: jest.fn(),
     };
     const configService = {
-      get: jest.fn((name: string) => (name === 'GOOGLE_CALENDAR_DEFAULT_TIMEZONE' ? 'America/Santiago' : undefined)),
+      get: jest.fn((name: string) =>
+        name === 'GOOGLE_CALENDAR_DEFAULT_TIMEZONE'
+          ? 'America/Santiago'
+          : undefined,
+      ),
     };
 
     connectionsRepo.findOne.mockResolvedValue(connection);
@@ -86,23 +105,37 @@ describe('GoogleCalendarSyncService', () => {
     const payload = service.buildEventPayload(visita);
 
     expect(payload.summary).toBe('Visita domiciliaria - Paciente pac-1');
-    expect(payload.start).toEqual({ dateTime: '2026-07-01T09:30:00', timeZone: 'America/Santiago' });
-    expect(payload.end).toEqual({ dateTime: '2026-07-01T10:15:00', timeZone: 'America/Santiago' });
+    expect(payload.start).toEqual({
+      dateTime: '2026-07-01T09:30:00',
+      timeZone: 'America/Santiago',
+    });
+    expect(payload.end).toEqual({
+      dateTime: '2026-07-01T10:15:00',
+      timeZone: 'America/Santiago',
+    });
   });
 
   it('creates an event for a newly created visit', async () => {
     await service.syncCreatedVisit({ ...visita });
 
-    expect(googleClient.createEvent).toHaveBeenCalledWith('primary', 'access-token', expect.objectContaining({
-      summary: 'Visita domiciliaria - Paciente Uno',
-      location: 'Calle 123, Illapel',
-    }));
-    expect(visitasRepo.save).toHaveBeenCalledWith(expect.objectContaining({
-      googleCalendarEventId: 'g-event-1',
-      googleCalendarSyncStatus: 'SYNCED',
-      googleCalendarSyncAttempts: 1,
-    }));
-    expect(logsRepo.save).toHaveBeenCalledWith(expect.objectContaining({ action: 'CREATE', status: 'SUCCESS' }));
+    expect(googleClient.createEvent).toHaveBeenCalledWith(
+      'primary',
+      'access-token',
+      expect.objectContaining({
+        summary: 'Visita domiciliaria - Paciente Uno',
+        location: 'Calle 123, Illapel',
+      }),
+    );
+    expect(visitasRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        googleCalendarEventId: 'g-event-1',
+        googleCalendarSyncStatus: 'SYNCED',
+        googleCalendarSyncAttempts: 1,
+      }),
+    );
+    expect(logsRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'CREATE', status: 'SUCCESS' }),
+    );
   });
 
   it('marks the visit as failed when Google rejects the sync', async () => {
@@ -110,32 +143,65 @@ describe('GoogleCalendarSyncService', () => {
 
     await service.syncCreatedVisit({ ...visita });
 
-    expect(visitasRepo.save).toHaveBeenCalledWith(expect.objectContaining({
-      googleCalendarSyncStatus: 'FAILED',
-      googleCalendarLastError: 'google down',
-      googleCalendarSyncAttempts: 1,
-    }));
-    expect(logsRepo.save).toHaveBeenCalledWith(expect.objectContaining({ action: 'CREATE', status: 'FAILED' }));
+    expect(visitasRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        googleCalendarSyncStatus: 'FAILED',
+        googleCalendarLastError: 'google down',
+        googleCalendarSyncAttempts: 1,
+      }),
+    );
+    expect(logsRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'CREATE', status: 'FAILED' }),
+    );
   });
 
   it('updates an existing event', async () => {
-    await service.syncUpdatedVisit({ ...visita, googleCalendarEventId: 'g-event-1' } as Visita);
+    await service.syncUpdatedVisit({
+      ...visita,
+      googleCalendarEventId: 'g-event-1',
+    });
 
-    expect(googleClient.updateEvent).toHaveBeenCalledWith('primary', 'g-event-1', 'access-token', expect.any(Object));
-    expect(visitasRepo.save).toHaveBeenCalledWith(expect.objectContaining({ googleCalendarSyncStatus: 'SYNCED' }));
+    expect(googleClient.updateEvent).toHaveBeenCalledWith(
+      'primary',
+      'g-event-1',
+      'access-token',
+      expect.any(Object),
+    );
+    expect(visitasRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ googleCalendarSyncStatus: 'SYNCED' }),
+    );
   });
 
   it('retries sync for an existing Google event', async () => {
-    const result = await service.syncVisitNow({ ...visita, googleCalendarEventId: 'g-event-1' } as Visita);
+    const result = await service.syncVisitNow({
+      ...visita,
+      googleCalendarEventId: 'g-event-1',
+    });
 
-    expect(googleClient.updateEvent).toHaveBeenCalledWith('primary', 'g-event-1', 'access-token', expect.any(Object));
-    expect(result).toEqual(expect.objectContaining({ googleCalendarSyncStatus: 'SYNCED' }));
+    expect(googleClient.updateEvent).toHaveBeenCalledWith(
+      'primary',
+      'g-event-1',
+      'access-token',
+      expect.any(Object),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({ googleCalendarSyncStatus: 'SYNCED' }),
+    );
   });
 
   it('deletes an event when the visit is canceled', async () => {
-    await service.syncCanceledVisit({ ...visita, googleCalendarEventId: 'g-event-1' } as Visita);
+    await service.syncCanceledVisit({
+      ...visita,
+      googleCalendarEventId: 'g-event-1',
+    });
 
-    expect(googleClient.deleteEvent).toHaveBeenCalledWith('primary', 'g-event-1', 'access-token');
-    expect(visitasRepo.save).toHaveBeenCalledWith(expect.objectContaining({ googleCalendarSyncStatus: 'DELETED' }));
+    expect(googleClient.deleteEvent).toHaveBeenCalledWith(
+      'primary',
+      'g-event-1',
+      'access-token',
+    );
+    expect(visitasRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ googleCalendarSyncStatus: 'DELETED' }),
+    );
   });
 });

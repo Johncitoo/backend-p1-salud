@@ -24,4 +24,3 @@ export class UploadDocumentoAdjuntoDto {
   @MaxLength(500)
   descripcion?: string;
 }
-

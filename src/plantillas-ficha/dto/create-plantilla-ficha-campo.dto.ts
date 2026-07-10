@@ -1,4 +1,13 @@
-import { IsBoolean, IsInt, IsObject, IsOptional, IsString, IsUUID, Length, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Min,
+} from 'class-validator';
 
 export class CreatePlantillaFichaCampoDto {
   @IsUUID()

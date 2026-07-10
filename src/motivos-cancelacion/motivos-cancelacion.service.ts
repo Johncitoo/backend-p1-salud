@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -28,7 +32,8 @@ export class MotivosCancelacionService {
     const motivo = await this.repository.findOne({
       where: { id, deletedAt: IsNull() },
     });
-    if (!motivo) throw new NotFoundException('Motivo de cancelación no encontrado');
+    if (!motivo)
+      throw new NotFoundException('Motivo de cancelación no encontrado');
     return motivo;
   }
 
@@ -52,16 +57,26 @@ export class MotivosCancelacionService {
 
       return saved;
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         throw new ConflictException(`El código ${dto.codigo} ya existe.`);
       }
       throw error;
     }
   }
 
-  async update(id: string, dto: UpdateMotivoCancelacionDto): Promise<MotivoCancelacion> {
+  async update(
+    id: string,
+    dto: UpdateMotivoCancelacionDto,
+  ): Promise<MotivoCancelacion> {
     const motivo = await this.findOne(id);
-    const oldValues = { codigo: motivo.codigo, nombre: motivo.nombre, activo: motivo.activo };
+    const oldValues = {
+      codigo: motivo.codigo,
+      nombre: motivo.nombre,
+      activo: motivo.activo,
+    };
     Object.assign(motivo, dto);
 
     try {
@@ -73,12 +88,19 @@ export class MotivosCancelacionService {
         accion: 'ACTUALIZAR',
         detalle: `Motivo ${saved.codigo} actualizado`,
         oldValues,
-        newValues: { codigo: saved.codigo, nombre: saved.nombre, activo: saved.activo },
+        newValues: {
+          codigo: saved.codigo,
+          nombre: saved.nombre,
+          activo: saved.activo,
+        },
       });
 
       return saved;
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         throw new ConflictException(`El código ${dto.codigo} ya existe.`);
       }
       throw error;

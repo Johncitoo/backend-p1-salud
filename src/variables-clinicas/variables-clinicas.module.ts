@@ -9,7 +9,11 @@ import { VariablesClinicasController } from './variables-clinicas.controller';
 import { VariablesClinicasService } from './variables-clinicas.service';
 
 @Module({
-  imports: [UsuariosModule, AuditoriasModule, TypeOrmModule.forFeature([VariableClinica])],
+  imports: [
+    UsuariosModule,
+    AuditoriasModule,
+    TypeOrmModule.forFeature([VariableClinica]),
+  ],
   controllers: [VariablesClinicasController],
   providers: [VariablesClinicasService, DevAuthGuard, RolesGuard],
   exports: [VariablesClinicasService],

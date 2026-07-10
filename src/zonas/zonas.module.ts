@@ -10,7 +10,12 @@ import { ZonasController } from './zonas.controller';
 import { ZonasService } from './zonas.service';
 
 @Module({
-  imports: [UsuariosModule, AuditoriasModule, AnalyticsModule, TypeOrmModule.forFeature([Zona])],
+  imports: [
+    UsuariosModule,
+    AuditoriasModule,
+    AnalyticsModule,
+    TypeOrmModule.forFeature([Zona]),
+  ],
   controllers: [ZonasController],
   providers: [ZonasService, DevAuthGuard, RolesGuard],
 })

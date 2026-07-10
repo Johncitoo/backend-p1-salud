@@ -1,8 +1,14 @@
 const { Client } = require('pg');
 
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error("Error: DATABASE_URL environment variable is not defined.");
+  process.exit(1);
+}
+
 const client = new Client({
-  connectionString: 'postgresql://postgres:pgoJHeyVwYiHnjTAjaDANlgZlKOhhTPA@reseau.proxy.rlwy.net:23242/railway',
-  ssl: { rejectUnauthorized: false }
+  connectionString,
+  ssl: connectionString.includes('railway') ? { rejectUnauthorized: false } : undefined
 });
 
 const sql = `

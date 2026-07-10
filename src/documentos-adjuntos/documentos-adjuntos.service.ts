@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'crypto';
 import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
@@ -42,20 +48,34 @@ export class DocumentosAdjuntosService {
   /** Resuelve el pacienteId de un documento: viene denormalizado en metadata
    * (ver upload()), con fallback vía ficha→visita para filas viejas que no
    * lo tengan. */
-  private async pacienteIdDeDocumento(documento: DocumentoAdjunto): Promise<string> {
-    const metadataPacienteId = (documento.metadata as Record<string, unknown> | null)?.pacienteId;
+  private async pacienteIdDeDocumento(
+    documento: DocumentoAdjunto,
+  ): Promise<string> {
+    const metadataPacienteId = (
+      documento.metadata as Record<string, unknown> | null
+    )?.pacienteId;
     if (typeof metadataPacienteId === 'string') return metadataPacienteId;
 
     const ficha = await this.findFicha(documento.fichaClinicaId);
-    const visita = await this.visitasRepo.findOne({ where: { id: ficha.visitaId, deletedAt: IsNull() } });
-    if (!visita) throw new NotFoundException('Visita asociada al documento no encontrada');
+    const visita = await this.visitasRepo.findOne({
+      where: { id: ficha.visitaId, deletedAt: IsNull() },
+    });
+    if (!visita)
+      throw new NotFoundException('Visita asociada al documento no encontrada');
     return visita.pacienteId;
   }
 
-  async upload(dto: UploadDocumentoAdjuntoDto, file: UploadedClinicalFile, usuarioId?: string) {
+  async upload(
+    dto: UploadDocumentoAdjuntoDto,
+    file: UploadedClinicalFile,
+    usuarioId?: string,
+  ) {
     const ficha = await this.findFicha(dto.fichaClinicaId);
-    const visita = await this.visitasRepo.findOne({ where: { id: ficha.visitaId, deletedAt: IsNull() } });
-    if (!visita) throw new NotFoundException('Visita asociada a la ficha no encontrada');
+    const visita = await this.visitasRepo.findOne({
+      where: { id: ficha.visitaId, deletedAt: IsNull() },
+    });
+    if (!visita)
+      throw new NotFoundException('Visita asociada a la ficha no encontrada');
 
     const validated = this.fileValidation.validate(file);
     const processed = await this.imageOptimizer.process(file.buffer, validated);
@@ -76,7 +96,9 @@ export class DocumentosAdjuntosService {
       url: null,
       descripcion: dto.descripcion ?? null,
       estado: 'ACTIVO',
-      categoria: dto.categoria ?? (validated.kind === 'IMAGE' ? 'FOTO_CLINICA' : 'GENERAL'),
+      categoria:
+        dto.categoria ??
+        (validated.kind === 'IMAGE' ? 'FOTO_CLINICA' : 'GENERAL'),
       metadata: {
         visitaId: visita.id,
         pacienteId: visita.pacienteId,
@@ -147,7 +169,9 @@ export class DocumentosAdjuntosService {
   async findAll(filtros: { fichaClinicaId?: string }, user?: UsuarioPerfil) {
     if (user?.rol === 'PROFESIONAL') {
       if (!filtros.fichaClinicaId) {
-        throw new ForbiddenException('Debes especificar una ficha clínica para consultar sus adjuntos.');
+        throw new ForbiddenException(
+          'Debes especificar una ficha clínica para consultar sus adjuntos.',
+        );
       }
       const ficha = await this.findFicha(filtros.fichaClinicaId);
       await this.pacienteAccessService.assertAccesoVisita(user, ficha.visitaId);
@@ -161,18 +185,37 @@ export class DocumentosAdjuntosService {
       order: { createdAt: 'DESC' },
     });
 
-    return rows.map(row => this.toResponse(row));
+    return rows.map((row) => this.toResponse(row));
   }
 
-  async download(id: string, usuarioId?: string, user?: UsuarioPerfil): Promise<DownloadDocumentoAdjunto> {
+  async download(
+    id: string,
+    usuarioId?: string,
+    user?: UsuarioPerfil,
+  ): Promise<DownloadDocumentoAdjunto> {
     const documento = await this.findOneActive(id);
-    await this.pacienteAccessService.assertAccesoPaciente(user, await this.pacienteIdDeDocumento(documento));
-    if (!documento.objectKey || !documento.encryptionIv || !documento.encryptionTag) {
-      throw new BadRequestException('Documento sin informacion de almacenamiento cifrado.');
+    await this.pacienteAccessService.assertAccesoPaciente(
+      user,
+      await this.pacienteIdDeDocumento(documento),
+    );
+    if (
+      !documento.objectKey ||
+      !documento.encryptionIv ||
+      !documento.encryptionTag
+    ) {
+      throw new BadRequestException(
+        'Documento sin informacion de almacenamiento cifrado.',
+      );
     }
 
-    const encryptedBuffer = await this.storage.getEncryptedObject(documento.objectKey);
-    const buffer = this.encryption.decrypt(encryptedBuffer, documento.encryptionIv, documento.encryptionTag);
+    const encryptedBuffer = await this.storage.getEncryptedObject(
+      documento.objectKey,
+    );
+    const buffer = this.encryption.decrypt(
+      encryptedBuffer,
+      documento.encryptionIv,
+      documento.encryptionTag,
+    );
 
     this.auditoriasService.registrar({
       usuarioId,
@@ -186,7 +229,10 @@ export class DocumentosAdjuntosService {
     return {
       buffer,
       fileName: this.downloadFileName(documento),
-      mimeType: documento.mimeTypeAlmacenado ?? documento.mimeType ?? 'application/octet-stream',
+      mimeType:
+        documento.mimeTypeAlmacenado ??
+        documento.mimeType ??
+        'application/octet-stream',
     };
   }
 
@@ -198,7 +244,9 @@ export class DocumentosAdjuntosService {
     const saved = await this.documentosRepo.save(documento);
 
     if (documento.objectKey) {
-      await this.storage.deleteObject(documento.objectKey).catch(() => undefined);
+      await this.storage
+        .deleteObject(documento.objectKey)
+        .catch(() => undefined);
     }
 
     this.auditoriasService.registrar({
@@ -215,14 +263,19 @@ export class DocumentosAdjuntosService {
   }
 
   private async findFicha(id: string) {
-    const ficha = await this.fichasRepo.findOne({ where: { id, deletedAt: IsNull() } });
+    const ficha = await this.fichasRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!ficha) throw new NotFoundException('Ficha clinica no encontrada');
     return ficha;
   }
 
   private async findOneActive(id: string) {
-    const documento = await this.documentosRepo.findOne({ where: { id, deletedAt: IsNull() } });
-    if (!documento) throw new NotFoundException('Documento adjunto no encontrado');
+    const documento = await this.documentosRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
+    if (!documento)
+      throw new NotFoundException('Documento adjunto no encontrado');
     return documento;
   }
 
@@ -235,16 +288,23 @@ export class DocumentosAdjuntosService {
   }
 
   private downloadFileName(documento: DocumentoAdjunto) {
-    const extension = documento.extensionAlmacenada ?? documento.tipoArchivo ?? 'bin';
-    const baseName = documento.nombreArchivo.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]+/g, '_') || 'documento';
+    const extension =
+      documento.extensionAlmacenada ?? documento.tipoArchivo ?? 'bin';
+    const baseName =
+      documento.nombreArchivo
+        .replace(/\.[^.]+$/, '')
+        .replace(/[^a-zA-Z0-9._-]+/g, '_') || 'documento';
     return `${baseName}.${extension}`;
   }
 
   private toResponse(documento: DocumentoAdjunto) {
-    const { encryptionIv, encryptionTag, objectKey, ...safeDocumento } = documento;
+    const { encryptionIv, encryptionTag, objectKey, ...safeDocumento } =
+      documento;
     return {
       ...safeDocumento,
-      objectKey: objectKey ? `${documento.storageProvider.toLowerCase()}://encrypted-object` : null,
+      objectKey: objectKey
+        ? `${documento.storageProvider.toLowerCase()}://encrypted-object`
+        : null,
       encryptionIv: encryptionIv ? '***' : null,
       encryptionTag: encryptionTag ? '***' : null,
     };
@@ -264,13 +324,17 @@ export class DocumentosAdjuntosService {
       bucket: documento.bucket ?? null,
       objectKey: documento.objectKey ?? null,
       mimeTypeOriginal: documento.mimeTypeOriginal ?? null,
-      mimeTypeAlmacenado: documento.mimeTypeAlmacenado ?? documento.mimeType ?? null,
+      mimeTypeAlmacenado:
+        documento.mimeTypeAlmacenado ?? documento.mimeType ?? null,
       extensionOriginal: documento.extensionOriginal ?? null,
-      extensionAlmacenada: documento.extensionAlmacenada ?? documento.tipoArchivo ?? null,
+      extensionAlmacenada:
+        documento.extensionAlmacenada ?? documento.tipoArchivo ?? null,
       tamanoOriginalBytes: documento.tamanoOriginalBytes ?? null,
-      tamanoAlmacenadoBytes: documento.tamanoAlmacenadoBytes ?? documento.tamanoBytes ?? null,
+      tamanoAlmacenadoBytes:
+        documento.tamanoAlmacenadoBytes ?? documento.tamanoBytes ?? null,
       sha256Original: documento.sha256Original ?? null,
-      sha256Almacenado: documento.sha256Almacenado ?? documento.hashArchivo ?? null,
+      sha256Almacenado:
+        documento.sha256Almacenado ?? documento.hashArchivo ?? null,
       encryptionAlg: documento.encryptionAlg ?? null,
       encryptionKeyId: documento.encryptionKeyId ?? null,
       fueOptimizado: documento.fueOptimizado,

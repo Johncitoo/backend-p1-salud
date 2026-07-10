@@ -17,7 +17,21 @@ import { PacientesController } from './pacientes.controller';
 import { PacientesService } from './pacientes.service';
 
 @Module({
-  imports: [UsuariosModule, AuditoriasModule, AnalyticsModule, NotificacionesModule, VisitasModule, PacienteAccessModule, TypeOrmModule.forFeature([Paciente, DireccionPaciente, ContactoPaciente, PlanCuidado, Visita])],
+  imports: [
+    UsuariosModule,
+    AuditoriasModule,
+    AnalyticsModule,
+    NotificacionesModule,
+    VisitasModule,
+    PacienteAccessModule,
+    TypeOrmModule.forFeature([
+      Paciente,
+      DireccionPaciente,
+      ContactoPaciente,
+      PlanCuidado,
+      Visita,
+    ]),
+  ],
   controllers: [PacientesController],
   providers: [PacientesService, DevAuthGuard, RolesGuard],
   exports: [PacientesService],

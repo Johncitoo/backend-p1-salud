@@ -17,7 +17,9 @@ import { CreateIncidenteEstadoHistorialDto } from './dto/create-incidente-estado
 @Controller('incidente-estado-historial')
 @UseGuards(DevAuthGuard, RolesGuard)
 export class IncidenteEstadoHistorialController {
-  constructor(private readonly incidenteEstadoHistorialService: IncidenteEstadoHistorialService) {}
+  constructor(
+    private readonly incidenteEstadoHistorialService: IncidenteEstadoHistorialService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')

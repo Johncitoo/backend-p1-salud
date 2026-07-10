@@ -1,4 +1,11 @@
-import { IsBoolean, IsIn, IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  Length,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateMotivoCancelacionDto {
   @IsOptional()

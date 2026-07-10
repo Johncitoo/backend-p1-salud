@@ -21,7 +21,13 @@ export class VisitaCheckpoint {
   @Column({ type: 'numeric', precision: 10, scale: 7, nullable: true })
   longitud?: number | null;
 
-  @Column({ name: 'precision_metros', type: 'numeric', precision: 10, scale: 2, nullable: true })
+  @Column({
+    name: 'precision_metros',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
   precisionMetros?: number | null;
 
   @Column({ type: 'varchar', length: 30, default: 'APP' })

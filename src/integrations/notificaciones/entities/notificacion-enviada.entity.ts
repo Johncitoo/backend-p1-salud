@@ -17,10 +17,20 @@ export class NotificacionEnviada {
   @Column({ name: 'paciente_id', type: 'uuid', nullable: true })
   pacienteId?: string | null;
 
-  @Column({ name: 'destinatario_email', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'destinatario_email',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   destinatarioEmail?: string | null;
 
-  @Column({ name: 'destinatario_telefono', type: 'varchar', length: 30, nullable: true })
+  @Column({
+    name: 'destinatario_telefono',
+    type: 'varchar',
+    length: 30,
+    nullable: true,
+  })
   destinatarioTelefono?: string | null;
 
   @Column({ name: 'notification_id', type: 'varchar', length: 100 })

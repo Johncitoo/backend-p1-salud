@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { OptimisticLockVersionMismatchError } from 'typeorm';
@@ -8,7 +14,10 @@ import { AnalyticsService } from '../integrations/analytics/analytics.service';
 import { PlantillasFichaService } from '../plantillas-ficha/plantillas-ficha.service';
 import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { VariablesClinicasService } from '../variables-clinicas/variables-clinicas.service';
-import { CreateFichaClinicaDto, UpdateFichaClinicaDto } from './dto/create-ficha-clinica.dto';
+import {
+  CreateFichaClinicaDto,
+  UpdateFichaClinicaDto,
+} from './dto/create-ficha-clinica.dto';
 import { FichaClinica } from './entities/ficha-clinica.entity';
 import { MedicionClinica } from '../mediciones-clinicas/entities/medicion-clinica.entity';
 
@@ -41,27 +50,41 @@ export class FichasClinicasService {
     await this.analyticsService.sendFichaUpsertEvent(ficha, adjuntosCount);
   }
 
-  async findAll(filtros?: { visitaId?: string; pacienteId?: string; estado?: string }, user?: UsuarioPerfil) {
+  async findAll(
+    filtros?: { visitaId?: string; pacienteId?: string; estado?: string },
+    user?: UsuarioPerfil,
+  ) {
     if (user?.rol === 'PROFESIONAL') {
       // Sin un filtro de visita concreto no hay forma de acotar el resultado
       // a "solo lo que este profesional atendió" — se exige el filtro en vez
       // de devolver (o barrer) las fichas de todo el sistema.
       if (!filtros?.visitaId) {
-        throw new ForbiddenException('Debes especificar una visita para consultar sus fichas clínicas.');
+        throw new ForbiddenException(
+          'Debes especificar una visita para consultar sus fichas clínicas.',
+        );
       }
-      await this.pacienteAccessService.assertAccesoVisita(user, filtros.visitaId);
+      await this.pacienteAccessService.assertAccesoVisita(
+        user,
+        filtros.visitaId,
+      );
     }
 
-    const qb = this.fichasRepo.createQueryBuilder('fc').where('fc.deleted_at IS NULL');
+    const qb = this.fichasRepo
+      .createQueryBuilder('fc')
+      .where('fc.deleted_at IS NULL');
 
-    if (filtros?.visitaId) qb.andWhere('fc.visita_id = :visitaId', { visitaId: filtros.visitaId });
-    if (filtros?.estado) qb.andWhere('fc.estado = :estado', { estado: filtros.estado });
+    if (filtros?.visitaId)
+      qb.andWhere('fc.visita_id = :visitaId', { visitaId: filtros.visitaId });
+    if (filtros?.estado)
+      qb.andWhere('fc.estado = :estado', { estado: filtros.estado });
 
     return qb.orderBy('fc.created_at', 'DESC').getMany();
   }
 
   async findOne(id: string, user?: UsuarioPerfil) {
-    const ficha = await this.fichasRepo.findOne({ where: { id, deletedAt: IsNull() } });
+    const ficha = await this.fichasRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!ficha) throw new NotFoundException('Ficha clínica no encontrada');
     await this.pacienteAccessService.assertAccesoVisita(user, ficha.visitaId);
     return ficha;
@@ -84,10 +107,15 @@ export class FichasClinicasService {
     try {
       saved = await this.fichasRepo.save(ficha);
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         const detail = (error as any).detail ?? '';
         if (detail.includes('visita_id')) {
-          throw new ConflictException('La visita seleccionada ya tiene una ficha clínica asociada.');
+          throw new ConflictException(
+            'La visita seleccionada ya tiene una ficha clínica asociada.',
+          );
         }
       }
       throw error;
@@ -112,7 +140,12 @@ export class FichasClinicasService {
     return saved;
   }
 
-  async update(id: string, dto: UpdateFichaClinicaDto, usuarioId?: string, expectedVersion?: number) {
+  async update(
+    id: string,
+    dto: UpdateFichaClinicaDto,
+    usuarioId?: string,
+    expectedVersion?: number,
+  ) {
     const ficha = await this.findOne(id);
 
     // Optimistic locking: verificar versión esperada
@@ -130,10 +163,12 @@ export class FichasClinicasService {
     const oldEstado = ficha.estado;
 
     if (dto.estado !== undefined) ficha.estado = dto.estado;
-    if (dto.plantillaFichaId !== undefined) ficha.plantillaFichaId = dto.plantillaFichaId;
+    if (dto.plantillaFichaId !== undefined)
+      ficha.plantillaFichaId = dto.plantillaFichaId;
     if (dto.contenido !== undefined) ficha.contenido = dto.contenido;
     if (usuarioId) ficha.actualizadaPorUsuarioId = usuarioId;
-    const shouldSyncMediciones = dto.contenido !== undefined || dto.plantillaFichaId !== undefined;
+    const shouldSyncMediciones =
+      dto.contenido !== undefined || dto.plantillaFichaId !== undefined;
     const plantillaFichaIdForSync = ficha.plantillaFichaId ?? null;
 
     try {
@@ -171,7 +206,8 @@ export class FichasClinicasService {
 
   async cerrar(id: string, usuarioId?: string) {
     const ficha = await this.findOne(id);
-    if (ficha.estado === 'CERRADA') throw new BadRequestException('La ficha ya está cerrada');
+    if (ficha.estado === 'CERRADA')
+      throw new BadRequestException('La ficha ya está cerrada');
     const oldValues = this.auditFichaValues(ficha);
     ficha.estado = 'CERRADA';
     if (usuarioId) ficha.actualizadaPorUsuarioId = usuarioId;
@@ -222,7 +258,8 @@ export class FichasClinicasService {
     if (!plantillaId) return;
 
     // 1. Obtener campos de plantilla tipo VARIABLE_CLINICA
-    const campos = await this.plantillasService.findCamposVariablesByPlantilla(plantillaId);
+    const campos =
+      await this.plantillasService.findCamposVariablesByPlantilla(plantillaId);
     if (campos.length === 0) return;
 
     // 2. Soft-delete mediciones anteriores de esta ficha con origen FICHA
@@ -243,20 +280,31 @@ export class FichasClinicasService {
     for (const campo of campos) {
       if (!campo.variableClinicaId) continue;
 
-      const variable = await this.variablesService.findOne(campo.variableClinicaId);
+      const variable = await this.variablesService.findOne(
+        campo.variableClinicaId,
+      );
       const valorRaw = ficha.contenido[campo.codigoCampo];
 
       // Si no hay valor en el contenido, saltar
-      if (valorRaw === undefined || valorRaw === null || valorRaw === '') continue;
+      if (valorRaw === undefined || valorRaw === null || valorRaw === '')
+        continue;
 
       // Validar rango si aplica
       if (variable.tipoDato === 'NUMERO' && typeof valorRaw === 'number') {
-        if (variable.valorMinimo !== null && variable.valorMinimo !== undefined && valorRaw < variable.valorMinimo) {
+        if (
+          variable.valorMinimo !== null &&
+          variable.valorMinimo !== undefined &&
+          valorRaw < variable.valorMinimo
+        ) {
           throw new BadRequestException(
             `${variable.nombre}: valor ${valorRaw} está por debajo del mínimo (${variable.valorMinimo} ${variable.unidad ?? ''})`,
           );
         }
-        if (variable.valorMaximo !== null && variable.valorMaximo !== undefined && valorRaw > variable.valorMaximo) {
+        if (
+          variable.valorMaximo !== null &&
+          variable.valorMaximo !== undefined &&
+          valorRaw > variable.valorMaximo
+        ) {
           throw new BadRequestException(
             `${variable.nombre}: valor ${valorRaw} está por encima del máximo (${variable.valorMaximo} ${variable.unidad ?? ''})`,
           );
@@ -280,7 +328,11 @@ export class FichasClinicasService {
     }
   }
 
-  private mapearValor(medicion: MedicionClinica, tipoDato: string, valor: unknown) {
+  private mapearValor(
+    medicion: MedicionClinica,
+    tipoDato: string,
+    valor: unknown,
+  ) {
     switch (tipoDato) {
       case 'NUMERO':
         medicion.valorNumero = Number(valor);
@@ -292,17 +344,21 @@ export class FichasClinicasService {
         medicion.valorBoolean = Boolean(valor);
         break;
       case 'FECHA':
-        medicion.valorFecha = valor instanceof Date ? valor : new Date(String(valor));
+        medicion.valorFecha =
+          valor instanceof Date ? valor : new Date(String(valor));
         break;
       case 'JSON':
-        medicion.valorJson = typeof valor === 'object' ? (valor as Record<string, unknown>) : {};
+        medicion.valorJson =
+          typeof valor === 'object' ? (valor as Record<string, unknown>) : {};
         break;
       default:
         medicion.valorTexto = String(valor);
     }
   }
 
-  private async obtenerPacienteIdDesdeVisita(visitaId: string): Promise<string> {
+  private async obtenerPacienteIdDesdeVisita(
+    visitaId: string,
+  ): Promise<string> {
     // fallback: consultamos la tabla visitas directamente con query nativo
     const result = await this.fichasRepo.manager
       .createQueryBuilder()
@@ -312,7 +368,10 @@ export class FichasClinicasService {
       .andWhere('v.deleted_at IS NULL')
       .getRawOne<{ pacienteId: string }>();
 
-    if (!result?.pacienteId) throw new NotFoundException('No se pudo obtener el paciente desde la visita');
+    if (!result?.pacienteId)
+      throw new NotFoundException(
+        'No se pudo obtener el paciente desde la visita',
+      );
     return result.pacienteId;
   }
 

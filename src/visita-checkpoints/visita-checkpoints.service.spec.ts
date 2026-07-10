@@ -6,21 +6,36 @@ import { VisitaCheckpoint } from './entities/visita-checkpoint.entity';
 import { VisitaCheckpointsService } from './visita-checkpoints.service';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 
-type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends { id: string }> = Partial<
+  Record<keyof Repository<T>, jest.Mock>
+>;
 
 const checkpoint: VisitaCheckpoint = {
-  id: 'vc-1111', visitaId: 'v-2222', tipo: 'CHECK_IN',
-  fechaHora: new Date(), latitud: -23.65, longitud: -70.39,
-  precisionMetros: 10, origen: 'APP', observacion: null,
-  registradoPorUsuarioId: 'u-1111', createdAt: new Date(),
-} as VisitaCheckpoint;
+  id: 'vc-1111',
+  visitaId: 'v-2222',
+  tipo: 'CHECK_IN',
+  fechaHora: new Date(),
+  latitud: -23.65,
+  longitud: -70.39,
+  precisionMetros: 10,
+  origen: 'APP',
+  observacion: null,
+  registradoPorUsuarioId: 'u-1111',
+  createdAt: new Date(),
+};
 
 describe('VisitaCheckpointsService', () => {
   let service: VisitaCheckpointsService;
   let repository: MockRepository<VisitaCheckpoint>;
 
   beforeEach(async () => {
-    repository = { find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(), createQueryBuilder: jest.fn() };
+    repository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+      createQueryBuilder: jest.fn(),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VisitaCheckpointsService,
@@ -38,13 +53,22 @@ describe('VisitaCheckpointsService', () => {
 
   it('findOne lanza NotFoundException si no existe', async () => {
     repository.findOne!.mockResolvedValue(null);
-    await expect(service.findOne('no')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne('no')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('create guarda el checkpoint con origen APP por defecto', async () => {
-    const dto = { visitaId: 'v-2222', tipo: 'CHECK_IN' as const, latitud: -23.65, longitud: -70.39 };
+    const dto = {
+      visitaId: 'v-2222',
+      tipo: 'CHECK_IN' as const,
+      latitud: -23.65,
+      longitud: -70.39,
+    };
     repository.create!.mockReturnValue({ ...dto, origen: 'APP' });
     repository.save!.mockResolvedValue(checkpoint);
-    await expect(service.create(dto as any, 'u-1111')).resolves.toEqual(checkpoint);
+    await expect(service.create(dto as any, 'u-1111')).resolves.toEqual(
+      checkpoint,
+    );
   });
 });

@@ -9,7 +9,11 @@ import { MedicionesClinicasController } from './mediciones-clinicas.controller';
 import { MedicionesClinicasService } from './mediciones-clinicas.service';
 
 @Module({
-  imports: [UsuariosModule, AuditoriasModule, TypeOrmModule.forFeature([MedicionClinica])],
+  imports: [
+    UsuariosModule,
+    AuditoriasModule,
+    TypeOrmModule.forFeature([MedicionClinica]),
+  ],
   controllers: [MedicionesClinicasController],
   providers: [MedicionesClinicasService, DevAuthGuard, RolesGuard],
   exports: [MedicionesClinicasService],

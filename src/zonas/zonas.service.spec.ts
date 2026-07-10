@@ -7,7 +7,9 @@ import { ZonasService } from './zonas.service';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { AnalyticsService } from '../integrations/analytics/analytics.service';
 
-type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends { id: string }> = Partial<
+  Record<keyof Repository<T>, jest.Mock>
+>;
 
 const createRepositoryMock = (): MockRepository<Zona> => ({
   find: jest.fn(),
@@ -85,28 +87,40 @@ describe('ZonasService', () => {
   });
 
   it('actualiza una zona existente', async () => {
-    const updated = { ...zona, nombre: 'Zona Norte Actualizada', activa: false };
+    const updated = {
+      ...zona,
+      nombre: 'Zona Norte Actualizada',
+      activa: false,
+    };
 
     repository.findOne!.mockResolvedValue({ ...zona });
     repository.save!.mockResolvedValue(updated);
 
-    await expect(service.update(zona.id, { nombre: updated.nombre, activa: false })).resolves.toEqual(updated);
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ nombre: updated.nombre, activa: false }));
+    await expect(
+      service.update(zona.id, { nombre: updated.nombre, activa: false }),
+    ).resolves.toEqual(updated);
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ nombre: updated.nombre, activa: false }),
+    );
   });
 
   it('marca deletedAt al eliminar', async () => {
     repository.findOne!.mockResolvedValue({ ...zona });
-    repository.save!.mockImplementation(async value => value);
+    repository.save!.mockImplementation(async (value) => value);
 
     const removed = await service.remove(zona.id);
 
     expect(removed.deletedAt).toBeInstanceOf(Date);
-    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ id: zona.id, deletedAt: expect.any(Date) }));
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ id: zona.id, deletedAt: expect.any(Date) }),
+    );
   });
 
   it('lanza NotFoundException si la zona no existe', async () => {
     repository.findOne!.mockResolvedValue(null);
 
-    await expect(service.findOne(zona.id)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne(zona.id)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

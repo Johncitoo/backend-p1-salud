@@ -8,7 +8,12 @@ export class IncidenteEstadoHistorial {
   @Column({ name: 'incidente_salud_id', type: 'uuid' })
   incidenteSaludId: string;
 
-  @Column({ name: 'estado_anterior', type: 'varchar', length: 30, nullable: true })
+  @Column({
+    name: 'estado_anterior',
+    type: 'varchar',
+    length: 30,
+    nullable: true,
+  })
   estadoAnterior?: string | null;
 
   @Column({ name: 'estado_nuevo', type: 'varchar', length: 30 })

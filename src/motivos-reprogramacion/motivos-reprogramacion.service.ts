@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -25,11 +29,14 @@ export class MotivosReprogramacionService {
     const motivo = await this.repository.findOne({
       where: { id, deletedAt: IsNull() },
     });
-    if (!motivo) throw new NotFoundException('Motivo de reprogramación no encontrado');
+    if (!motivo)
+      throw new NotFoundException('Motivo de reprogramación no encontrado');
     return motivo;
   }
 
-  async create(dto: CreateMotivoReprogramacionDto): Promise<MotivoReprogramacion> {
+  async create(
+    dto: CreateMotivoReprogramacionDto,
+  ): Promise<MotivoReprogramacion> {
     const motivo = this.repository.create({
       ...dto,
       requiereObservacion: dto.requiereObservacion ?? false,
@@ -48,16 +55,26 @@ export class MotivosReprogramacionService {
 
       return saved;
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         throw new ConflictException(`El código ${dto.codigo} ya existe.`);
       }
       throw error;
     }
   }
 
-  async update(id: string, dto: UpdateMotivoReprogramacionDto): Promise<MotivoReprogramacion> {
+  async update(
+    id: string,
+    dto: UpdateMotivoReprogramacionDto,
+  ): Promise<MotivoReprogramacion> {
     const motivo = await this.findOne(id);
-    const oldValues = { codigo: motivo.codigo, nombre: motivo.nombre, activo: motivo.activo };
+    const oldValues = {
+      codigo: motivo.codigo,
+      nombre: motivo.nombre,
+      activo: motivo.activo,
+    };
     Object.assign(motivo, dto);
 
     try {
@@ -69,12 +86,19 @@ export class MotivosReprogramacionService {
         accion: 'ACTUALIZAR',
         detalle: `Motivo ${saved.codigo} actualizado`,
         oldValues,
-        newValues: { codigo: saved.codigo, nombre: saved.nombre, activo: saved.activo },
+        newValues: {
+          codigo: saved.codigo,
+          nombre: saved.nombre,
+          activo: saved.activo,
+        },
       });
 
       return saved;
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         throw new ConflictException(`El código ${dto.codigo} ya existe.`);
       }
       throw error;

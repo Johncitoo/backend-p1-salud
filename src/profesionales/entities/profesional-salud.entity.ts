@@ -1,17 +1,23 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, Index } from 'typeorm';
 
 @Entity({ name: 'profesionales_salud' })
 export class ProfesionalSalud {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column({ name: 'usuario_id', type: 'uuid' })
   usuarioId: string;
 
   @Column({ length: 50 })
   profesion: string;
 
-  @Column({ name: 'numero_registro', type: 'varchar', length: 50, nullable: true })
+  @Column({
+    name: 'numero_registro',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
   numeroRegistro?: string | null;
 
   @Column({ default: true })

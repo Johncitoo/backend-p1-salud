@@ -23,7 +23,12 @@ export class DireccionPaciente {
   @Column({ type: 'varchar', length: 50, nullable: true })
   departamento?: string | null;
 
-  @Column({ name: 'villa_poblacion', type: 'varchar', length: 150, nullable: true })
+  @Column({
+    name: 'villa_poblacion',
+    type: 'varchar',
+    length: 150,
+    nullable: true,
+  })
   villaPoblacion?: string | null;
 
   @Column({ length: 100 })

@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
@@ -26,48 +26,62 @@ describe('Usuarios (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true }),
-        TypeOrmModule.forRoot({
-          type: 'postgres',
-          host: process.env.TEST_DB_HOST ?? 'localhost',
-          port: Number(process.env.TEST_DB_PORT ?? 5433),
-          username: process.env.TEST_DB_USER ?? 'admin',
-          password: process.env.TEST_DB_PASSWORD ?? 'admin123',
-          database: process.env.TEST_DB_NAME ?? 'salud_db',
-          entities: [Usuario, Rol, Auditoria],
-          synchronize: false,
+        TypeOrmModule.forRootAsync({
+          imports: [ConfigModule],
+          inject: [ConfigService],
+          useFactory: (configService: ConfigService) => {
+            const databaseUrl =
+              configService.get<string>('DATABASE_URL') ||
+              'postgres://admin:admin123@localhost:5432/salud_db';
+            return {
+              type: 'postgres',
+              url: databaseUrl,
+              entities: [Usuario, Rol, Auditoria],
+              synchronize: false,
+              ssl: databaseUrl.includes('railway')
+                ? { rejectUnauthorized: false }
+                : undefined,
+            };
+          },
         }),
         UsuariosModule,
       ],
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     dataSource = app.get(DataSource);
-    await dataSource.query(`DELETE FROM usuarios WHERE rut = $1 OR email = $2 OR identity_user_id = $3`, [
-      rut,
-      email,
-      identityUserId,
-    ]);
+    await dataSource.query(
+      `DELETE FROM usuarios WHERE rut = $1 OR email = $2 OR identity_user_id = $3`,
+      [rut, email, identityUserId],
+    );
 
-    const roles = await dataSource.query(`SELECT id FROM roles WHERE nombre = 'ADMIN' AND deleted_at IS NULL LIMIT 1`);
+    const roles = await dataSource.query(
+      `SELECT id FROM roles WHERE nombre = 'ADMIN' AND deleted_at IS NULL LIMIT 1`,
+    );
     rolId = roles[0].id;
   });
 
   afterAll(async () => {
     if (dataSource?.isInitialized) {
-      await dataSource.query(`DELETE FROM usuarios WHERE rut = $1 OR email = $2 OR identity_user_id = $3`, [
-        rut,
-        email,
-        identityUserId,
-      ]);
+      await dataSource.query(
+        `DELETE FROM usuarios WHERE rut = $1 OR email = $2 OR identity_user_id = $3`,
+        [rut, email, identityUserId],
+      );
     }
     await app?.close();
   });
 
   it('creates, lists, updates and soft deletes a local usuario', async () => {
-    await request(app.getHttpServer()).post('/usuarios').set('x-mock-role', 'ADMIN').send({}).expect(400);
+    await request(app.getHttpServer())
+      .post('/usuarios')
+      .set('x-mock-role', 'ADMIN')
+      .send({})
+      .expect(400);
 
     const createRes = await request(app.getHttpServer())
       .post('/usuarios')
@@ -89,8 +103,13 @@ describe('Usuarios (e2e)', () => {
     expect(createRes.body.rol).toBe('ADMIN');
     expect(createRes.body.email).toBe(email);
 
-    const listRes = await request(app.getHttpServer()).get('/usuarios').set('x-mock-role', 'ADMIN').expect(200);
-    expect(listRes.body.some((usuario: Usuario) => usuario.id === id)).toBe(true);
+    const listRes = await request(app.getHttpServer())
+      .get('/usuarios')
+      .set('x-mock-role', 'ADMIN')
+      .expect(200);
+    expect(listRes.body.some((usuario: Usuario) => usuario.id === id)).toBe(
+      true,
+    );
 
     const updateRes = await request(app.getHttpServer())
       .patch(`/usuarios/${id}`)
@@ -101,9 +120,17 @@ describe('Usuarios (e2e)', () => {
     expect(updateRes.body.nombres).toBe('Usuario Editado');
     expect(updateRes.body.activo).toBe(false);
 
-    await request(app.getHttpServer()).delete(`/usuarios/${id}`).set('x-mock-role', 'ADMIN').expect(200);
+    await request(app.getHttpServer())
+      .delete(`/usuarios/${id}`)
+      .set('x-mock-role', 'ADMIN')
+      .expect(200);
 
-    const afterDeleteList = await request(app.getHttpServer()).get('/usuarios').set('x-mock-role', 'ADMIN').expect(200);
-    expect(afterDeleteList.body.some((usuario: Usuario) => usuario.id === id)).toBe(false);
+    const afterDeleteList = await request(app.getHttpServer())
+      .get('/usuarios')
+      .set('x-mock-role', 'ADMIN')
+      .expect(200);
+    expect(
+      afterDeleteList.body.some((usuario: Usuario) => usuario.id === id),
+    ).toBe(false);
   });
 });

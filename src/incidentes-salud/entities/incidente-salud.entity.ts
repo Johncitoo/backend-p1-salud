@@ -38,7 +38,12 @@ export class IncidenteSalud {
   @Column({ type: 'varchar', length: 30, default: 'SISTEMA' })
   origen: string;
 
-  @Column({ name: 'external_incident_id', type: 'varchar', length: 150, nullable: true })
+  @Column({
+    name: 'external_incident_id',
+    type: 'varchar',
+    length: 150,
+    nullable: true,
+  })
   externalIncidentId?: string | null;
 
   @Column({ type: 'jsonb', default: '{}' })

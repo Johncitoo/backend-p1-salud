@@ -1,4 +1,10 @@
-import { IsDateString, IsEmail, IsOptional, IsString, Length } from 'class-validator';
+import {
+  IsDateString,
+  IsEmail,
+  IsOptional,
+  IsString,
+  Length,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { formatearRut } from '../../lib/rut.util';
 import { IsRutValido } from '../../lib/rut-validator.decorator';

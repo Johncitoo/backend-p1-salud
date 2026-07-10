@@ -1,10 +1,20 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { VariablesClinicasService } from '../variables-clinicas/variables-clinicas.service';
-import { CreatePlantillaFichaDto, UpdatePlantillaFichaDto } from './dto/create-plantilla-ficha.dto';
-import { CreatePlantillaFichaCampoDto, UpdatePlantillaFichaCampoDto } from './dto/create-plantilla-ficha-campo.dto';
+import {
+  CreatePlantillaFichaDto,
+  UpdatePlantillaFichaDto,
+} from './dto/create-plantilla-ficha.dto';
+import {
+  CreatePlantillaFichaCampoDto,
+  UpdatePlantillaFichaCampoDto,
+} from './dto/create-plantilla-ficha-campo.dto';
 import { PlantillaFichaCampo } from './entities/plantilla-ficha-campo.entity';
 import { PlantillaFicha } from './entities/plantilla-ficha.entity';
 
@@ -24,23 +34,35 @@ export class PlantillasFichaService {
   }
 
   private hasValidOptions(opciones?: Record<string, unknown> | null) {
-    return Object.values(opciones ?? {}).some(option => String(option ?? '').trim().length > 0);
+    return Object.values(opciones ?? {}).some(
+      (option) => String(option ?? '').trim().length > 0,
+    );
   }
 
-  private validateSelectableOptions(tipoCampo: string, opciones?: Record<string, unknown> | null) {
+  private validateSelectableOptions(
+    tipoCampo: string,
+    opciones?: Record<string, unknown> | null,
+  ) {
     if (this.isSelectableField(tipoCampo) && !this.hasValidOptions(opciones)) {
-      throw new BadRequestException('Los campos SELECT y MULTISELECT deben tener al menos una opcion');
+      throw new BadRequestException(
+        'Los campos SELECT y MULTISELECT deben tener al menos una opcion',
+      );
     }
   }
 
   // ---- plantillas ----
 
   async findAll() {
-    return this.plantillasRepo.find({ where: { deletedAt: IsNull() }, order: { nombre: 'ASC' } });
+    return this.plantillasRepo.find({
+      where: { deletedAt: IsNull() },
+      order: { nombre: 'ASC' },
+    });
   }
 
   async findOne(id: string) {
-    const plantilla = await this.plantillasRepo.findOne({ where: { id, deletedAt: IsNull() } });
+    const plantilla = await this.plantillasRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!plantilla) throw new NotFoundException('Plantilla no encontrada');
     return plantilla;
   }
@@ -56,7 +78,9 @@ export class PlantillasFichaService {
       where: { codigo: dto.codigo, deletedAt: IsNull() },
     });
     if (existente) {
-      throw new BadRequestException(`Ya existe una plantilla con el codigo ${dto.codigo}`);
+      throw new BadRequestException(
+        `Ya existe una plantilla con el codigo ${dto.codigo}`,
+      );
     }
 
     const plantilla = this.plantillasRepo.create({
@@ -68,7 +92,12 @@ export class PlantillasFichaService {
       creadaPorUsuarioId: dto.creadaPorUsuarioId ?? null,
     });
     const saved = await this.plantillasRepo.save(plantilla);
-    this.auditoriasService.registrar({ entidad: 'plantillas_ficha', entidadId: saved.id, accion: 'CREAR', detalle: `Plantilla ${saved.codigo} creada` });
+    this.auditoriasService.registrar({
+      entidad: 'plantillas_ficha',
+      entidadId: saved.id,
+      accion: 'CREAR',
+      detalle: `Plantilla ${saved.codigo} creada`,
+    });
     return saved;
   }
 
@@ -76,7 +105,12 @@ export class PlantillasFichaService {
     const plantilla = await this.findOne(id);
     Object.assign(plantilla, dto);
     const saved = await this.plantillasRepo.save(plantilla);
-    this.auditoriasService.registrar({ entidad: 'plantillas_ficha', entidadId: saved.id, accion: 'ACTUALIZAR', detalle: `Plantilla ${saved.codigo} actualizada` });
+    this.auditoriasService.registrar({
+      entidad: 'plantillas_ficha',
+      entidadId: saved.id,
+      accion: 'ACTUALIZAR',
+      detalle: `Plantilla ${saved.codigo} actualizada`,
+    });
     return saved;
   }
 
@@ -84,7 +118,12 @@ export class PlantillasFichaService {
     const plantilla = await this.findOne(id);
     plantilla.deletedAt = new Date();
     const saved = await this.plantillasRepo.save(plantilla);
-    this.auditoriasService.registrar({ entidad: 'plantillas_ficha', entidadId: saved.id, accion: 'ELIMINAR', detalle: `Plantilla ${saved.codigo} eliminada` });
+    this.auditoriasService.registrar({
+      entidad: 'plantillas_ficha',
+      entidadId: saved.id,
+      accion: 'ELIMINAR',
+      detalle: `Plantilla ${saved.codigo} eliminada`,
+    });
     return saved;
   }
 
@@ -98,27 +137,41 @@ export class PlantillasFichaService {
   }
 
   async findCampo(id: string) {
-    const campo = await this.camposRepo.findOne({ where: { id, deletedAt: IsNull() } });
+    const campo = await this.camposRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!campo) throw new NotFoundException('Campo de plantilla no encontrado');
     return campo;
   }
 
-  async createCampo(dto: CreatePlantillaFichaCampoDto & { plantillaFichaId: string }) {
+  async createCampo(
+    dto: CreatePlantillaFichaCampoDto & { plantillaFichaId: string },
+  ) {
     // validar que la plantilla existe
     await this.findOne(dto.plantillaFichaId);
 
     // validar variable_clinica si tipo VARIABLE_CLINICA
     if (dto.tipoCampo === 'VARIABLE_CLINICA') {
-      if (!dto.variableClinicaId) throw new BadRequestException('variableClinicaId es obligatorio cuando tipoCampo = VARIABLE_CLINICA');
+      if (!dto.variableClinicaId)
+        throw new BadRequestException(
+          'variableClinicaId es obligatorio cuando tipoCampo = VARIABLE_CLINICA',
+        );
       await this.variablesClinicasService.findOne(dto.variableClinicaId);
     }
     this.validateSelectableOptions(dto.tipoCampo, dto.opciones);
 
     // no duplicados en la misma plantilla
     const existente = await this.camposRepo.findOne({
-      where: { plantillaFichaId: dto.plantillaFichaId, codigoCampo: dto.codigoCampo, deletedAt: IsNull() },
+      where: {
+        plantillaFichaId: dto.plantillaFichaId,
+        codigoCampo: dto.codigoCampo,
+        deletedAt: IsNull(),
+      },
     });
-    if (existente) throw new BadRequestException(`El campo ${dto.codigoCampo} ya existe en esta plantilla`);
+    if (existente)
+      throw new BadRequestException(
+        `El campo ${dto.codigoCampo} ya existe en esta plantilla`,
+      );
 
     const campo = this.camposRepo.create({
       plantillaFichaId: dto.plantillaFichaId,
@@ -138,12 +191,18 @@ export class PlantillasFichaService {
   async updateCampo(id: string, dto: UpdatePlantillaFichaCampoDto) {
     const campo = await this.findCampo(id);
     const tipoEfectivo = dto.tipoCampo ?? campo.tipoCampo;
-    const opcionesEfectivas = dto.opciones !== undefined ? dto.opciones : campo.opciones;
+    const opcionesEfectivas =
+      dto.opciones !== undefined ? dto.opciones : campo.opciones;
 
     if (dto.tipoCampo) {
-      const variableId = dto.variableClinicaId !== undefined ? dto.variableClinicaId : campo.variableClinicaId;
+      const variableId =
+        dto.variableClinicaId !== undefined
+          ? dto.variableClinicaId
+          : campo.variableClinicaId;
       if (tipoEfectivo === 'VARIABLE_CLINICA' && !variableId) {
-        throw new BadRequestException('variableClinicaId es obligatorio cuando tipoCampo = VARIABLE_CLINICA');
+        throw new BadRequestException(
+          'variableClinicaId es obligatorio cuando tipoCampo = VARIABLE_CLINICA',
+        );
       }
       if (variableId) await this.variablesClinicasService.findOne(variableId);
     }
@@ -151,9 +210,16 @@ export class PlantillasFichaService {
 
     if (dto.codigoCampo && dto.codigoCampo !== campo.codigoCampo) {
       const existente = await this.camposRepo.findOne({
-        where: { plantillaFichaId: campo.plantillaFichaId, codigoCampo: dto.codigoCampo, deletedAt: IsNull() },
+        where: {
+          plantillaFichaId: campo.plantillaFichaId,
+          codigoCampo: dto.codigoCampo,
+          deletedAt: IsNull(),
+        },
       });
-      if (existente) throw new BadRequestException(`El campo ${dto.codigoCampo} ya existe en esta plantilla`);
+      if (existente)
+        throw new BadRequestException(
+          `El campo ${dto.codigoCampo} ya existe en esta plantilla`,
+        );
     }
 
     Object.assign(campo, dto);
@@ -169,7 +235,11 @@ export class PlantillasFichaService {
   /** Devuelve los campos de tipo VARIABLE_CLINICA activos de una plantilla */
   async findCamposVariablesByPlantilla(plantillaFichaId: string) {
     return this.camposRepo.find({
-      where: { plantillaFichaId, tipoCampo: 'VARIABLE_CLINICA', deletedAt: IsNull() },
+      where: {
+        plantillaFichaId,
+        tipoCampo: 'VARIABLE_CLINICA',
+        deletedAt: IsNull(),
+      },
     });
   }
 }

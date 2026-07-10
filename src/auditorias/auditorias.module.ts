@@ -8,7 +8,10 @@ import { AuditoriasService } from './auditorias.service';
 import { Auditoria } from './entities/auditoria.entity';
 
 @Module({
-  imports: [forwardRef(() => UsuariosModule), TypeOrmModule.forFeature([Auditoria])],
+  imports: [
+    forwardRef(() => UsuariosModule),
+    TypeOrmModule.forFeature([Auditoria]),
+  ],
   controllers: [AuditoriasController],
   providers: [AuditoriasService, DevAuthGuard, RolesGuard],
   exports: [AuditoriasService],

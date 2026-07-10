@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -13,9 +17,7 @@ export class VisitaCheckpointsService {
     private readonly auditoriasService: AuditoriasService,
   ) {}
 
-  async findAll(filtros?: {
-    visitaId?: string;
-  }): Promise<VisitaCheckpoint[]> {
+  async findAll(filtros?: { visitaId?: string }): Promise<VisitaCheckpoint[]> {
     const qb = this.repository.createQueryBuilder('vc');
 
     if (filtros?.visitaId)
@@ -28,7 +30,8 @@ export class VisitaCheckpointsService {
     const checkpoint = await this.repository.findOne({
       where: { id },
     });
-    if (!checkpoint) throw new NotFoundException('Checkpoint de visita no encontrado');
+    if (!checkpoint)
+      throw new NotFoundException('Checkpoint de visita no encontrado');
     return checkpoint;
   }
 
@@ -55,8 +58,13 @@ export class VisitaCheckpointsService {
 
       return saved;
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
-        throw new ConflictException(`Ya existe un ${dto.tipo} para esta visita.`);
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
+        throw new ConflictException(
+          `Ya existe un ${dto.tipo} para esta visita.`,
+        );
       }
       throw error;
     }

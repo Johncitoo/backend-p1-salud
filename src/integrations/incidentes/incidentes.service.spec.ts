@@ -14,7 +14,8 @@ describe('IncidentesService (Proyecto 11 Integration)', () => {
   const incidenteOperacional: IncidenteSalud = {
     id: 'inc-123',
     titulo: 'Visita No Registrada en Tiempo',
-    descripcion: 'El profesional no realizó check-in. Excedió el umbral de 60 min.',
+    descripcion:
+      'El profesional no realizó check-in. Excedió el umbral de 60 min.',
     severidad: 'ALTA',
     estado: 'ABIERTO',
     tipo: 'VISITA_NO_REGISTRADA',
@@ -66,7 +67,8 @@ describe('IncidentesService (Proyecto 11 Integration)', () => {
         payload: expect.objectContaining({
           // Obligatorios oficiales de Grupo 11
           titulo: 'Visita No Registrada en Tiempo',
-          descripcion: 'El profesional no realizó check-in. Excedió el umbral de 60 min.',
+          descripcion:
+            'El profesional no realizó check-in. Excedió el umbral de 60 min.',
           prioridad: 'alta', // ALTA -> alta
           // Extras propios (mapeados por ellos)
           eventId: 'inc-123',
@@ -80,14 +82,20 @@ describe('IncidentesService (Proyecto 11 Integration)', () => {
         }),
       },
       expect.objectContaining({
-        headers: { 'Content-Type': 'application/json', 'x-api-key': 'mock_secret_key' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'mock_secret_key',
+        },
         timeout: 20_000,
       }),
     );
   });
 
   it('NO envía incidentes cuyo tipo no está en el catálogo (ej. IoT)', async () => {
-    const incidenteIot = { ...incidenteOperacional, tipo: 'SIGNO_VITAL_ANORMAL' } as IncidenteSalud;
+    const incidenteIot = {
+      ...incidenteOperacional,
+      tipo: 'SIGNO_VITAL_ANORMAL',
+    };
 
     await service.enviarIncidente(incidenteIot);
 
@@ -122,7 +130,10 @@ describe('IncidentesService (Proyecto 11 Integration)', () => {
   });
 
   it('sin forzar, un ticket manual (tipo no mapeado) NO se envía', async () => {
-    const ticketManual = { ...incidenteOperacional, tipo: 'SOLICITUD_SOPORTE' } as IncidenteSalud;
+    const ticketManual = {
+      ...incidenteOperacional,
+      tipo: 'SOLICITUD_SOPORTE',
+    };
 
     await service.enviarIncidente(ticketManual);
 
@@ -130,9 +141,13 @@ describe('IncidentesService (Proyecto 11 Integration)', () => {
   });
 
   it('reintenta ante fallos y no lanza excepción (manejo silencioso)', async () => {
-    httpServiceMock.post.mockReturnValue(throwError(() => new Error('Network error')));
+    httpServiceMock.post.mockReturnValue(
+      throwError(() => new Error('Network error')),
+    );
 
-    await expect(service.enviarIncidente(incidenteOperacional)).resolves.not.toThrow();
+    await expect(
+      service.enviarIncidente(incidenteOperacional),
+    ).resolves.not.toThrow();
     // 3 intentos con backoff (mockeado)
     expect(httpServiceMock.post).toHaveBeenCalledTimes(3);
   });

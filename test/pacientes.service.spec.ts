@@ -9,9 +9,13 @@ import { ContactoPaciente } from '../src/pacientes/entities/contacto-paciente.en
 import { PlanCuidado } from '../src/pacientes/entities/plan-cuidado.entity';
 import { Visita } from '../src/pacientes/entities/visita.entity';
 
-type MockRepository<T extends ObjectLiteral = any> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends ObjectLiteral = any> = Partial<
+  Record<keyof Repository<T>, jest.Mock>
+>;
 
-const createMockRepo = <T extends ObjectLiteral = any>(): MockRepository<T> => ({
+const createMockRepo = <
+  T extends ObjectLiteral = any,
+>(): MockRepository<T> => ({
   find: jest.fn(),
   findOne: jest.fn(),
   create: jest.fn(),
@@ -48,7 +52,10 @@ describe('PacientesService', () => {
         PacientesService,
         { provide: getRepositoryToken(Paciente), useValue: pacienteRepo },
         { provide: getRepositoryToken(DireccionPaciente), useValue: dirRepo },
-        { provide: getRepositoryToken(ContactoPaciente), useValue: contactoRepo },
+        {
+          provide: getRepositoryToken(ContactoPaciente),
+          useValue: contactoRepo,
+        },
         { provide: getRepositoryToken(PlanCuidado), useValue: planRepo },
         { provide: getRepositoryToken(Visita), useValue: visitaRepo },
         { provide: AuditoriasService, useValue: auditoriasService },
@@ -74,7 +81,7 @@ describe('PacientesService', () => {
       (pacienteRepo.create as jest.Mock).mockReturnValue(created);
       (pacienteRepo.save as jest.Mock).mockResolvedValue(created);
 
-      const res = await service.create(dto as any);
+      const res = await service.create(dto);
       expect(pacienteRepo.create).toHaveBeenCalledWith(dto);
       expect(pacienteRepo.save).toHaveBeenCalledWith(created);
       expect(res).toEqual(created);
@@ -91,8 +98,11 @@ describe('PacientesService', () => {
     it('updates paciente', async () => {
       const existing = { id: '1', nombres: 'Ana' };
       (pacienteRepo.findOne as jest.Mock).mockResolvedValue(existing);
-      (pacienteRepo.save as jest.Mock).mockResolvedValue({ ...existing, apellidos: 'X' });
-      const res = await service.update('1', { apellidos: 'X' } as any);
+      (pacienteRepo.save as jest.Mock).mockResolvedValue({
+        ...existing,
+        apellidos: 'X',
+      });
+      const res = await service.update('1', { apellidos: 'X' });
       expect(pacienteRepo.save).toHaveBeenCalled();
       expect(res.apellidos).toBe('X');
     });
@@ -100,7 +110,10 @@ describe('PacientesService', () => {
     it('removes paciente (soft delete)', async () => {
       const existing = { id: '1', nombres: 'Ana' };
       (pacienteRepo.findOne as jest.Mock).mockResolvedValue(existing);
-      (pacienteRepo.save as jest.Mock).mockResolvedValue({ ...existing, deletedAt: new Date() });
+      (pacienteRepo.save as jest.Mock).mockResolvedValue({
+        ...existing,
+        deletedAt: new Date(),
+      });
       const res = await service.remove('1');
       expect(pacienteRepo.save).toHaveBeenCalled();
       expect(res.deletedAt).toBeDefined();
@@ -125,7 +138,7 @@ describe('PacientesService', () => {
       const created = { id: 'c1', ...dto };
       (contactoRepo.create as jest.Mock).mockReturnValue(created);
       (contactoRepo.save as jest.Mock).mockResolvedValue(created);
-      const res = await service.createContacto(dto as any);
+      const res = await service.createContacto(dto);
       expect(contactoRepo.create).toHaveBeenCalledWith(dto);
       expect(res).toEqual(created);
     });
@@ -135,7 +148,7 @@ describe('PacientesService', () => {
       const created = { id: 'p1', ...dto };
       (planRepo.create as jest.Mock).mockReturnValue(created);
       (planRepo.save as jest.Mock).mockResolvedValue(created);
-      const res = await service.createPlan(dto as any);
+      const res = await service.createPlan(dto);
       expect(planRepo.create).toHaveBeenCalledWith(dto);
       expect(res).toEqual(created);
     });

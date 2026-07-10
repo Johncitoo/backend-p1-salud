@@ -1,8 +1,21 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { CreateVariableClinicaDto, UpdateVariableClinicaDto } from './dto/create-variable-clinica.dto';
+import {
+  CreateVariableClinicaDto,
+  UpdateVariableClinicaDto,
+} from './dto/create-variable-clinica.dto';
 import { VariablesClinicasService } from './variables-clinicas.service';
 
 @Controller('variables-clinicas')

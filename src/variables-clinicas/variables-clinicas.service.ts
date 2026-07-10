@@ -1,8 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
-import { CreateVariableClinicaDto, UpdateVariableClinicaDto } from './dto/create-variable-clinica.dto';
+import {
+  CreateVariableClinicaDto,
+  UpdateVariableClinicaDto,
+} from './dto/create-variable-clinica.dto';
 import { VariableClinica } from './entities/variable-clinica.entity';
 
 @Injectable()
@@ -13,19 +20,34 @@ export class VariablesClinicasService {
     private readonly auditoriasService: AuditoriasService,
   ) {}
 
-  async findAll(filtros?: { codigo?: string; nombre?: string; categoria?: string; activa?: boolean }) {
-    const qb = this.repo.createQueryBuilder('vc').where('vc.deleted_at IS NULL');
+  async findAll(filtros?: {
+    codigo?: string;
+    nombre?: string;
+    categoria?: string;
+    activa?: boolean;
+  }) {
+    const qb = this.repo
+      .createQueryBuilder('vc')
+      .where('vc.deleted_at IS NULL');
 
-    if (filtros?.codigo) qb.andWhere('vc.codigo ILIKE :codigo', { codigo: `%${filtros.codigo}%` });
-    if (filtros?.nombre) qb.andWhere('vc.nombre ILIKE :nombre', { nombre: `%${filtros.nombre}%` });
-    if (filtros?.categoria) qb.andWhere('vc.categoria = :categoria', { categoria: filtros.categoria });
-    if (filtros?.activa !== undefined) qb.andWhere('vc.activa = :activa', { activa: filtros.activa });
+    if (filtros?.codigo)
+      qb.andWhere('vc.codigo ILIKE :codigo', { codigo: `%${filtros.codigo}%` });
+    if (filtros?.nombre)
+      qb.andWhere('vc.nombre ILIKE :nombre', { nombre: `%${filtros.nombre}%` });
+    if (filtros?.categoria)
+      qb.andWhere('vc.categoria = :categoria', {
+        categoria: filtros.categoria,
+      });
+    if (filtros?.activa !== undefined)
+      qb.andWhere('vc.activa = :activa', { activa: filtros.activa });
 
     return qb.orderBy('vc.nombre', 'ASC').getMany();
   }
 
   async findOne(id: string) {
-    const entity = await this.repo.findOne({ where: { id, deletedAt: IsNull() } });
+    const entity = await this.repo.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!entity) throw new NotFoundException('Variable clínica no encontrada');
     return entity;
   }
@@ -39,7 +61,9 @@ export class VariablesClinicasService {
       where: { codigo: dto.codigo, deletedAt: IsNull() },
     });
     if (existente) {
-      throw new BadRequestException(`Ya existe una variable clinica con el codigo ${dto.codigo}`);
+      throw new BadRequestException(
+        `Ya existe una variable clinica con el codigo ${dto.codigo}`,
+      );
     }
 
     const entity = this.repo.create({
@@ -55,7 +79,12 @@ export class VariablesClinicasService {
       activa: dto.activa ?? true,
     });
     const saved = await this.repo.save(entity);
-    this.auditoriasService.registrar({ entidad: 'variables_clinicas', entidadId: saved.id, accion: 'CREAR', detalle: `Variable ${saved.codigo} creada` });
+    this.auditoriasService.registrar({
+      entidad: 'variables_clinicas',
+      entidadId: saved.id,
+      accion: 'CREAR',
+      detalle: `Variable ${saved.codigo} creada`,
+    });
     return saved;
   }
 
@@ -63,15 +92,26 @@ export class VariablesClinicasService {
     const entity = await this.findOne(id);
     Object.assign(entity, dto);
     const saved = await this.repo.save(entity);
-    this.auditoriasService.registrar({ entidad: 'variables_clinicas', entidadId: saved.id, accion: 'ACTUALIZAR', detalle: `Variable ${saved.codigo} actualizada` });
+    this.auditoriasService.registrar({
+      entidad: 'variables_clinicas',
+      entidadId: saved.id,
+      accion: 'ACTUALIZAR',
+      detalle: `Variable ${saved.codigo} actualizada`,
+    });
     return saved;
   }
 
   async remove(id: string) {
     const entity = await this.findOne(id);
     entity.deletedAt = new Date();
+    entity.codigo = `${entity.codigo}_deleted_${Date.now()}`;
     const saved = await this.repo.save(entity);
-    this.auditoriasService.registrar({ entidad: 'variables_clinicas', entidadId: saved.id, accion: 'ELIMINAR', detalle: `Variable ${saved.codigo} eliminada` });
+    this.auditoriasService.registrar({
+      entidad: 'variables_clinicas',
+      entidadId: saved.id,
+      accion: 'ELIMINAR',
+      detalle: `Variable ${entity.codigo} eliminada`,
+    });
     return saved;
   }
 }

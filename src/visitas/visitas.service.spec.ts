@@ -29,7 +29,7 @@ const baseVisita = (): Visita => ({
   createdAt: new Date('2026-07-01T12:00:00Z'),
   updatedAt: new Date('2026-07-01T12:00:00Z'),
   deletedAt: null,
-} as Visita);
+});
 
 // Genera fecha/hora programada relativas a "ahora" para probar cancelación tardía.
 const programadaDesdeAhora = (minutos: number) => {
@@ -46,8 +46,8 @@ const programadaDesdeAhora = (minutos: number) => {
   }).formatToParts(d);
   const values = Object.fromEntries(
     parts
-      .filter(part => part.type !== 'literal')
-      .map(part => [part.type, part.value]),
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
   );
   return {
     fechaProgramada: `${values.year}-${values.month}-${values.day}`,
@@ -92,9 +92,19 @@ const creador = {
   email: 'coord@test.cl',
 };
 
-const makeQueryBuilder = (result: { one?: unknown; raw?: unknown[]; many?: unknown[] } = {}) => {
+const makeQueryBuilder = (
+  result: { one?: unknown; raw?: unknown[]; many?: unknown[] } = {},
+) => {
   const qb: Record<string, jest.Mock> = {};
-  for (const method of ['leftJoin', 'select', 'where', 'andWhere', 'orderBy', 'addOrderBy', 'from']) {
+  for (const method of [
+    'leftJoin',
+    'select',
+    'where',
+    'andWhere',
+    'orderBy',
+    'addOrderBy',
+    'from',
+  ]) {
     qb[method] = jest.fn(() => qb);
   }
   qb.getOne = jest.fn(async () => result.one ?? null);
@@ -140,14 +150,18 @@ describe('VisitasService calendar flows', () => {
   const wireDefaults = () => {
     visitasRepo.createQueryBuilder.mockReturnValue(makeQueryBuilder());
     bloqueosRepo.createQueryBuilder.mockReturnValue(makeQueryBuilder());
-    visitaPrestacionesRepo.createQueryBuilder.mockReturnValue(makeQueryBuilder());
+    visitaPrestacionesRepo.createQueryBuilder.mockReturnValue(
+      makeQueryBuilder(),
+    );
 
     pacientesRepo.findOne.mockResolvedValue(paciente);
-    profesionalesRepo.findOne.mockImplementation(async ({ where }: any = {}) => {
-      if (where?.id === ids.profesionalNuevo) return profesionalNuevo;
-      if (where?.usuarioId) return profesional;
-      return profesional;
-    });
+    profesionalesRepo.findOne.mockImplementation(
+      async ({ where }: any = {}) => {
+        if (where?.id === ids.profesionalNuevo) return profesionalNuevo;
+        if (where?.usuarioId) return profesional;
+        return profesional;
+      },
+    );
     usuariosRepo.findOne.mockImplementation(async ({ where }: any = {}) => {
       if (where?.id === ids.usuarioProfesional) return usuarioProfesional;
       return creador;
@@ -179,7 +193,11 @@ describe('VisitasService calendar flows', () => {
       syncCanceledVisit: jest.fn(async (visita) => visita),
       syncVisitNow: jest.fn(async (visita) => visita),
       findLogsForVisit: jest.fn(async () => []),
-      retryPendingVisits: jest.fn(async () => ({ attempted: 1, synced: 1, failed: 0 })),
+      retryPendingVisits: jest.fn(async () => ({
+        attempted: 1,
+        synced: 1,
+        failed: 0,
+      })),
     };
     analyticsService = {
       sendUsuarioUpsertEvent: jest.fn(),
@@ -235,39 +253,66 @@ describe('VisitasService calendar flows', () => {
     visitasRepo.create.mockReturnValue(saved);
     visitasRepo.save.mockResolvedValue(saved);
 
-    await expect(service.create({
-      pacienteId: ids.paciente,
-      profesionalSaludId: ids.profesional,
-      zonaId: ids.zona,
-      fechaProgramada: '2026-07-01',
-      horaProgramada: '09:00',
-      duracionEstimadaMin: 60,
-      prioridad: 'NORMAL',
-    }, ids.usuario)).resolves.toEqual(saved);
+    await expect(
+      service.create(
+        {
+          pacienteId: ids.paciente,
+          profesionalSaludId: ids.profesional,
+          zonaId: ids.zona,
+          fechaProgramada: '2026-07-01',
+          horaProgramada: '09:00',
+          duracionEstimadaMin: 60,
+          prioridad: 'NORMAL',
+        },
+        ids.usuario,
+      ),
+    ).resolves.toEqual(saved);
 
-    expect(googleCalendarSyncService.syncCreatedVisit).toHaveBeenCalledWith(saved);
-    expect(analyticsService.sendPacienteUpsertEvent).toHaveBeenCalledWith(paciente);
-    expect(analyticsService.sendProfesionalUpsertEvent).toHaveBeenCalledWith(profesional, expect.objectContaining({ nombres: 'Ana' }));
-    expect(analyticsService.sendVisitUpsertEvent).toHaveBeenCalledWith(saved, { visitType: 'ENFERMERIA' });
-    expect(notificacionesService.notificarVisitaAgendada).toHaveBeenCalledWith(saved, paciente, usuarioProfesional);
-    expect(estadoHistorialRepo.save).toHaveBeenCalledWith(expect.objectContaining({
-      visitaId: saved.id,
-      estadoAnterior: null,
-      estadoNuevo: 'PROGRAMADA',
-      motivo: 'Visita creada',
-    }));
+    expect(googleCalendarSyncService.syncCreatedVisit).toHaveBeenCalledWith(
+      saved,
+    );
+    expect(analyticsService.sendPacienteUpsertEvent).toHaveBeenCalledWith(
+      paciente,
+    );
+    expect(analyticsService.sendProfesionalUpsertEvent).toHaveBeenCalledWith(
+      profesional,
+      expect.objectContaining({ nombres: 'Ana' }),
+    );
+    expect(analyticsService.sendVisitUpsertEvent).toHaveBeenCalledWith(saved, {
+      visitType: 'ENFERMERIA',
+    });
+    expect(notificacionesService.notificarVisitaAgendada).toHaveBeenCalledWith(
+      saved,
+      paciente,
+      usuarioProfesional,
+    );
+    expect(estadoHistorialRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visitaId: saved.id,
+        estadoAnterior: null,
+        estadoNuevo: 'PROGRAMADA',
+        motivo: 'Visita creada',
+      }),
+    );
   });
 
   it('bloquea creación cuando el profesional ya tiene una visita traslapada', async () => {
-    visitasRepo.createQueryBuilder.mockReturnValue(makeQueryBuilder({ one: baseVisita() }));
+    visitasRepo.createQueryBuilder.mockReturnValue(
+      makeQueryBuilder({ one: baseVisita() }),
+    );
 
-    await expect(service.create({
-      pacienteId: ids.paciente,
-      profesionalSaludId: ids.profesional,
-      fechaProgramada: '2026-07-01',
-      horaProgramada: '09:30',
-      duracionEstimadaMin: 30,
-    }, ids.usuario)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.create(
+        {
+          pacienteId: ids.paciente,
+          profesionalSaludId: ids.profesional,
+          fechaProgramada: '2026-07-01',
+          horaProgramada: '09:30',
+          duracionEstimadaMin: 30,
+        },
+        ids.usuario,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(visitasRepo.save).not.toHaveBeenCalled();
     expect(googleCalendarSyncService.syncCreatedVisit).not.toHaveBeenCalled();
@@ -275,46 +320,78 @@ describe('VisitasService calendar flows', () => {
 
   it('bloquea creación cuando existe bloqueo activo de agenda', async () => {
     visitasRepo.createQueryBuilder.mockReturnValue(makeQueryBuilder());
-    bloqueosRepo.createQueryBuilder.mockReturnValue(makeQueryBuilder({ one: { id: 'bloqueo-1' } }));
+    bloqueosRepo.createQueryBuilder.mockReturnValue(
+      makeQueryBuilder({ one: { id: 'bloqueo-1' } }),
+    );
 
-    await expect(service.create({
-      pacienteId: ids.paciente,
-      profesionalSaludId: ids.profesional,
-      zonaId: ids.zona,
-      fechaProgramada: '2026-07-01',
-      horaProgramada: '10:00',
-      duracionEstimadaMin: 45,
-    }, ids.usuario)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.create(
+        {
+          pacienteId: ids.paciente,
+          profesionalSaludId: ids.profesional,
+          zonaId: ids.zona,
+          fechaProgramada: '2026-07-01',
+          horaProgramada: '10:00',
+          duracionEstimadaMin: 45,
+        },
+        ids.usuario,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(visitasRepo.save).not.toHaveBeenCalled();
   });
 
   it('reprograma desde update, registra reprogramacion y notifica sin cambiar estado visible', async () => {
     const previous = baseVisita();
-    const updated = { ...previous, fechaProgramada: '2026-07-02', horaProgramada: '11:30:00' } as Visita;
+    const updated = {
+      ...previous,
+      fechaProgramada: '2026-07-02',
+      horaProgramada: '11:30:00',
+    };
     visitasRepo.findOne.mockResolvedValue({ ...previous });
     visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
 
-    await expect(service.update(previous.id, {
-      fechaProgramada: '2026-07-02',
-      horaProgramada: '11:30',
-    }, ids.usuario)).resolves.toEqual(expect.objectContaining({
-      id: previous.id,
-      fechaProgramada: updated.fechaProgramada,
-      horaProgramada: '11:30',
-      estado: 'PROGRAMADA',
-    }));
+    await expect(
+      service.update(
+        previous.id,
+        {
+          fechaProgramada: '2026-07-02',
+          horaProgramada: '11:30',
+        },
+        ids.usuario,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        id: previous.id,
+        fechaProgramada: updated.fechaProgramada,
+        horaProgramada: '11:30',
+        estado: 'PROGRAMADA',
+      }),
+    );
 
-    expect(auditoriasService.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'REPROGRAMAR' }));
-    expect(reprogramacionesRepo.save).toHaveBeenCalledWith(expect.objectContaining({
-      visitaId: previous.id,
-      fechaProgramadaAnterior: '2026-07-01',
-      horaProgramadaAnterior: '09:00:00',
-      fechaProgramadaNueva: '2026-07-02',
-      horaProgramadaNueva: '11:30:00',
-    }));
-    expect(googleCalendarSyncService.syncUpdatedVisit).toHaveBeenCalledWith(expect.objectContaining({ id: previous.id }), ids.profesional);
-    expect(notificacionesService.notificarVisitaReprogramada).toHaveBeenCalledWith(expect.objectContaining({ id: previous.id }), paciente, usuarioProfesional);
+    expect(auditoriasService.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ accion: 'REPROGRAMAR' }),
+    );
+    expect(reprogramacionesRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visitaId: previous.id,
+        fechaProgramadaAnterior: '2026-07-01',
+        horaProgramadaAnterior: '09:00:00',
+        fechaProgramadaNueva: '2026-07-02',
+        horaProgramadaNueva: '11:30:00',
+      }),
+    );
+    expect(googleCalendarSyncService.syncUpdatedVisit).toHaveBeenCalledWith(
+      expect.objectContaining({ id: previous.id }),
+      ids.profesional,
+    );
+    expect(
+      notificacionesService.notificarVisitaReprogramada,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ id: previous.id }),
+      paciente,
+      usuarioProfesional,
+    );
   });
 
   it('actualiza estado sin registrar reprogramacion y deja historial de estado', async () => {
@@ -324,13 +401,19 @@ describe('VisitasService calendar flows', () => {
 
     await service.update(previous.id, { estado: 'EN_CAMINO' }, ids.usuario);
 
-    expect(auditoriasService.registrar).toHaveBeenCalledWith(expect.objectContaining({ accion: 'ACTUALIZAR' }));
+    expect(auditoriasService.registrar).toHaveBeenCalledWith(
+      expect.objectContaining({ accion: 'ACTUALIZAR' }),
+    );
     expect(reprogramacionesRepo.save).not.toHaveBeenCalled();
-    expect(estadoHistorialRepo.save).toHaveBeenCalledWith(expect.objectContaining({
-      estadoAnterior: 'PROGRAMADA',
-      estadoNuevo: 'EN_CAMINO',
-    }));
-    expect(notificacionesService.notificarVisitaReprogramada).not.toHaveBeenCalled();
+    expect(estadoHistorialRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        estadoAnterior: 'PROGRAMADA',
+        estadoNuevo: 'EN_CAMINO',
+      }),
+    );
+    expect(
+      notificacionesService.notificarVisitaReprogramada,
+    ).not.toHaveBeenCalled();
   });
 
   it('cancela visita y dispara Google Calendar, analitica, historial y notificaciones', async () => {
@@ -338,26 +421,46 @@ describe('VisitasService calendar flows', () => {
     visitasRepo.findOne.mockResolvedValue({ ...visita });
     visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
 
-    const saved = await service.cancelar(visita.id, { observacionCancelacion: 'Paciente no disponible' }, ids.usuario);
+    const saved = await service.cancelar(
+      visita.id,
+      { observacionCancelacion: 'Paciente no disponible' },
+      ids.usuario,
+    );
 
     expect(saved.estado).toBe('CANCELADA');
     expect(saved.canceladaPorUsuarioId).toBe(ids.usuario);
-    expect(googleCalendarSyncService.syncCanceledVisit).toHaveBeenCalledWith(expect.objectContaining({ estado: 'CANCELADA' }));
-    expect(analyticsService.sendVisitUpsertEvent).toHaveBeenCalledWith(expect.objectContaining({ estado: 'CANCELADA' }), { visitType: 'ENFERMERIA' });
-    expect(notificacionesService.notificarVisitaCancelada).toHaveBeenCalledWith(expect.objectContaining({ id: visita.id }), paciente, usuarioProfesional, 'Paciente no disponible');
-    expect(estadoHistorialRepo.save).toHaveBeenCalledWith(expect.objectContaining({
-      estadoAnterior: 'PROGRAMADA',
-      estadoNuevo: 'CANCELADA',
-      observacion: 'Paciente no disponible',
-    }));
+    expect(googleCalendarSyncService.syncCanceledVisit).toHaveBeenCalledWith(
+      expect.objectContaining({ estado: 'CANCELADA' }),
+    );
+    expect(analyticsService.sendVisitUpsertEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ estado: 'CANCELADA' }),
+      { visitType: 'ENFERMERIA' },
+    );
+    expect(notificacionesService.notificarVisitaCancelada).toHaveBeenCalledWith(
+      expect.objectContaining({ id: visita.id }),
+      paciente,
+      usuarioProfesional,
+      'Paciente no disponible',
+    );
+    expect(estadoHistorialRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        estadoAnterior: 'PROGRAMADA',
+        estadoNuevo: 'CANCELADA',
+        observacion: 'Paciente no disponible',
+      }),
+    );
   });
 
   it('cancelación tardía muy cercana (<1h) genera incidente ALTA VISITA_CANCELADA_TARDIA', async () => {
-    const visita = { ...baseVisita(), ...programadaDesdeAhora(30) } as Visita;
+    const visita = { ...baseVisita(), ...programadaDesdeAhora(30) };
     visitasRepo.findOne.mockResolvedValue({ ...visita });
     visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
 
-    await service.cancelar(visita.id, { observacionCancelacion: 'Imprevisto' }, ids.usuario);
+    await service.cancelar(
+      visita.id,
+      { observacionCancelacion: 'Imprevisto' },
+      ids.usuario,
+    );
 
     expect(incidentesSaludService.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -381,11 +484,15 @@ describe('VisitasService calendar flows', () => {
         ...baseVisita(),
         fechaProgramada: '2026-07-09',
         horaProgramada: '15:00:00',
-      } as Visita;
+      };
       visitasRepo.findOne.mockResolvedValue({ ...visita });
       visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
 
-      await service.cancelar(visita.id, { observacionCancelacion: 'Imprevisto' }, ids.usuario);
+      await service.cancelar(
+        visita.id,
+        { observacionCancelacion: 'Imprevisto' },
+        ids.usuario,
+      );
 
       expect(incidentesSaludService.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -401,20 +508,23 @@ describe('VisitasService calendar flows', () => {
   });
 
   it('cancelación tardía moderada (1-2h) genera incidente MEDIA', async () => {
-    const visita = { ...baseVisita(), ...programadaDesdeAhora(90) } as Visita;
+    const visita = { ...baseVisita(), ...programadaDesdeAhora(90) };
     visitasRepo.findOne.mockResolvedValue({ ...visita });
     visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
 
     await service.cancelar(visita.id, {}, ids.usuario);
 
     expect(incidentesSaludService.create).toHaveBeenCalledWith(
-      expect.objectContaining({ tipo: 'VISITA_CANCELADA_TARDIA', severidad: 'MEDIA' }),
+      expect.objectContaining({
+        tipo: 'VISITA_CANCELADA_TARDIA',
+        severidad: 'MEDIA',
+      }),
       ids.usuario,
     );
   });
 
   it('cancelación con suficiente anticipación (>2h) NO genera incidente', async () => {
-    const visita = { ...baseVisita(), ...programadaDesdeAhora(180) } as Visita;
+    const visita = { ...baseVisita(), ...programadaDesdeAhora(180) };
     visitasRepo.findOne.mockResolvedValue({ ...visita });
     visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
 
@@ -428,25 +538,43 @@ describe('VisitasService calendar flows', () => {
     visitasRepo.findOne.mockResolvedValue({ ...visita });
     visitasRepo.save.mockImplementation(async (value) => ({ ...value }));
 
-    await service.cambiarEstado(visita.id, { estado: 'EN_ATENCION' }, ids.usuario);
-    expect(analyticsService.sendVisitaInicioEvent).toHaveBeenCalledWith(expect.objectContaining({
-      estado: 'EN_ATENCION',
-      fechaHoraInicioReal: expect.any(Date),
-    }));
+    await service.cambiarEstado(
+      visita.id,
+      { estado: 'EN_ATENCION' },
+      ids.usuario,
+    );
+    expect(analyticsService.sendVisitaInicioEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        estado: 'EN_ATENCION',
+        fechaHoraInicioReal: expect.any(Date),
+      }),
+    );
 
-    visitasRepo.findOne.mockResolvedValue({ ...visita, estado: 'EN_ATENCION', fechaHoraInicioReal: new Date() });
+    visitasRepo.findOne.mockResolvedValue({
+      ...visita,
+      estado: 'EN_ATENCION',
+      fechaHoraInicioReal: new Date(),
+    });
     await service.completar(visita.id, { puntual: true }, ids.usuario);
-    expect(analyticsService.sendVisitaFinEvent).toHaveBeenCalledWith(expect.objectContaining({
-      estado: 'REALIZADA',
-      fechaHoraFinReal: expect.any(Date),
-    }), { puntual: true });
+    expect(analyticsService.sendVisitaFinEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        estado: 'REALIZADA',
+        fechaHoraFinReal: expect.any(Date),
+      }),
+      { puntual: true },
+    );
   });
 
   it('rechaza estados inválidos antes de persistir', async () => {
     visitasRepo.findOne.mockResolvedValue(baseVisita());
 
-    await expect(service.cambiarEstado(ids.visita, { estado: 'ROMPIDA' } as any, ids.usuario))
-      .rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.cambiarEstado(
+        ids.visita,
+        { estado: 'ROMPIDA' } as any,
+        ids.usuario,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(visitasRepo.save).not.toHaveBeenCalled();
     expect(analyticsService.sendVisitUpsertEvent).not.toHaveBeenCalled();
@@ -455,39 +583,43 @@ describe('VisitasService calendar flows', () => {
   it('devuelve calendario filtrado para profesional con campos enriquecidos y prestaciones', async () => {
     profesionalesRepo.findOne.mockResolvedValueOnce(profesional);
     const calendarQb = makeQueryBuilder({
-      raw: [{
-        id: ids.visita,
-        estado: 'PROGRAMADA',
-        prioridad: 'NORMAL',
-        fechaProgramada: new Date('2026-07-01T00:00:00Z'),
-        horaProgramada: '09:00:00',
-        duracionEstimadaMin: 60,
-        pacienteId: ids.paciente,
-        pacienteNombres: 'Maria',
-        pacienteApellidos: 'Rojas',
-        pacienteRut: '12.345.678-9',
-        pacienteTelefono: '+56911111111',
-        pacienteDireccion: 'Av Salud 123',
-        profesionalSaludId: ids.profesional,
-        profesionalNombres: 'Ana',
-        profesionalApellidos: 'Profesional',
-        profesionalProfesion: 'ENFERMERIA',
-        zonaId: ids.zona,
-        zonaNombre: 'Zona Norte',
-        direccionDetallada: 'Los Robles 45, Santiago',
-        googleCalendarSyncStatus: 'SYNCED',
-      }],
+      raw: [
+        {
+          id: ids.visita,
+          estado: 'PROGRAMADA',
+          prioridad: 'NORMAL',
+          fechaProgramada: new Date('2026-07-01T00:00:00Z'),
+          horaProgramada: '09:00:00',
+          duracionEstimadaMin: 60,
+          pacienteId: ids.paciente,
+          pacienteNombres: 'Maria',
+          pacienteApellidos: 'Rojas',
+          pacienteRut: '12.345.678-9',
+          pacienteTelefono: '+56911111111',
+          pacienteDireccion: 'Av Salud 123',
+          profesionalSaludId: ids.profesional,
+          profesionalNombres: 'Ana',
+          profesionalApellidos: 'Profesional',
+          profesionalProfesion: 'ENFERMERIA',
+          zonaId: ids.zona,
+          zonaNombre: 'Zona Norte',
+          direccionDetallada: 'Los Robles 45, Santiago',
+          googleCalendarSyncStatus: 'SYNCED',
+        },
+      ],
     });
     const prestacionesQb = makeQueryBuilder({
-      raw: [{
-        visitaId: ids.visita,
-        prestacionId: '88888888-8888-4888-8888-888888888888',
-        cantidad: 1,
-        estado: 'PROGRAMADA',
-        codigo: 'CONTROL',
-        nombre: 'Control de signos vitales',
-        duracionEstimadaMin: 20,
-      }],
+      raw: [
+        {
+          visitaId: ids.visita,
+          prestacionId: '88888888-8888-4888-8888-888888888888',
+          cantidad: 1,
+          estado: 'PROGRAMADA',
+          codigo: 'CONTROL',
+          nombre: 'Control de signos vitales',
+          duracionEstimadaMin: 20,
+        },
+      ],
     });
     visitasRepo.createQueryBuilder.mockReturnValue(calendarQb);
     visitaPrestacionesRepo.createQueryBuilder.mockReturnValue(prestacionesQb);
@@ -497,14 +629,24 @@ describe('VisitasService calendar flows', () => {
       { id: ids.usuarioProfesional, rol: 'PROFESIONAL' } as any,
     );
 
-    expect(calendarQb.andWhere).toHaveBeenCalledWith('visita.profesional_salud_id = :profesionalId', { profesionalId: ids.profesional });
-    expect(rows).toEqual([expect.objectContaining({
-      id: ids.visita,
-      fechaProgramada: '2026-07-01',
-      startsAt: '2026-07-01T09:00:00',
-      endsAt: '2026-07-01T10:00:00',
-      direccion: 'Los Robles 45, Santiago',
-      prestaciones: [expect.objectContaining({ nombre: 'Control de signos vitales', cantidad: 1 })],
-    })]);
+    expect(calendarQb.andWhere).toHaveBeenCalledWith(
+      'visita.profesional_salud_id = :profesionalId',
+      { profesionalId: ids.profesional },
+    );
+    expect(rows).toEqual([
+      expect.objectContaining({
+        id: ids.visita,
+        fechaProgramada: '2026-07-01',
+        startsAt: '2026-07-01T09:00:00',
+        endsAt: '2026-07-01T10:00:00',
+        direccion: 'Los Robles 45, Santiago',
+        prestaciones: [
+          expect.objectContaining({
+            nombre: 'Control de signos vitales',
+            cantidad: 1,
+          }),
+        ],
+      }),
+    ]);
   });
 });

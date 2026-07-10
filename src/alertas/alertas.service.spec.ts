@@ -7,7 +7,9 @@ import { AlertasService } from './alertas.service';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 import { AnalyticsService } from '../integrations/analytics/analytics.service';
 
-type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends { id: string }> = Partial<
+  Record<keyof Repository<T>, jest.Mock>
+>;
 
 const createRepositoryMock = (): MockRepository<Alerta> => ({
   find: jest.fn(),
@@ -65,7 +67,9 @@ describe('AlertasService', () => {
   it('findOne lanza NotFoundException si no existe', async () => {
     repository.findOne!.mockResolvedValue(null);
 
-    await expect(service.findOne('no-existe')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne('no-existe')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('create guarda la alerta con valores por defecto', async () => {
@@ -135,7 +139,9 @@ describe('AlertasService', () => {
     const result = await service.update('a-1111', { estado: 'EN_REVISION' });
 
     expect(result.estado).toBe('EN_REVISION');
-    expect(analyticsService.sendAlertaUpsertEvent).toHaveBeenCalledWith(updated);
+    expect(analyticsService.sendAlertaUpsertEvent).toHaveBeenCalledWith(
+      updated,
+    );
     expect(auditoriasService.registrar).toHaveBeenCalledWith(
       expect.objectContaining({ accion: 'ACTUALIZAR' }),
     );

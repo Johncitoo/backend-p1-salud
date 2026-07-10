@@ -1,4 +1,12 @@
-import { IsBoolean, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 const DIRECCION_TIPOS = ['DOMICILIO', 'TEMPORAL', 'CUIDADOR', 'OTRO'] as const;
 

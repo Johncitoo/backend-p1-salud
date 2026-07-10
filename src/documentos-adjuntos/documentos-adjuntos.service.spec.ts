@@ -12,7 +12,11 @@ const makeRepo = <T extends object>() => ({
   findOne: jest.fn(),
   find: jest.fn(),
   create: jest.fn((value: Partial<T>) => value),
-  save: jest.fn(async (value: Partial<T>) => ({ id: randomUUID(), version: 1, ...value })),
+  save: jest.fn(async (value: Partial<T>) => ({
+    id: randomUUID(),
+    version: 1,
+    ...value,
+  })),
 });
 
 describe('DocumentosAdjuntosService', () => {
@@ -24,7 +28,12 @@ describe('DocumentosAdjuntosService', () => {
   let documentosRepo: ReturnType<typeof makeRepo<DocumentoAdjunto>>;
   let fichasRepo: ReturnType<typeof makeRepo<any>>;
   let visitasRepo: ReturnType<typeof makeRepo<any>>;
-  let storage: jest.Mocked<Pick<R2StorageService, 'putEncryptedObject' | 'getBucket' | 'getEncryptedObject' | 'deleteObject'>> & { providerName: string };
+  let storage: jest.Mocked<
+    Pick<
+      R2StorageService,
+      'putEncryptedObject' | 'getBucket' | 'getEncryptedObject' | 'deleteObject'
+    >
+  > & { providerName: string };
   let auditorias: { registrar: jest.Mock };
   let service: DocumentosAdjuntosService;
 
@@ -41,8 +50,16 @@ describe('DocumentosAdjuntosService', () => {
     };
     auditorias = { registrar: jest.fn() };
 
-    fichasRepo.findOne.mockResolvedValue({ id: fichaId, visitaId, deletedAt: null });
-    visitasRepo.findOne.mockResolvedValue({ id: visitaId, pacienteId, deletedAt: null });
+    fichasRepo.findOne.mockResolvedValue({
+      id: fichaId,
+      visitaId,
+      deletedAt: null,
+    });
+    visitasRepo.findOne.mockResolvedValue({
+      id: visitaId,
+      pacienteId,
+      deletedAt: null,
+    });
 
     const encryption = new FileEncryptionService({
       get: jest.fn((name: string) =>
@@ -52,7 +69,10 @@ describe('DocumentosAdjuntosService', () => {
       ),
     } as any);
 
-    const pacienteAccess = { assertAccesoPaciente: jest.fn(), assertAccesoVisita: jest.fn() };
+    const pacienteAccess = {
+      assertAccesoPaciente: jest.fn(),
+      assertAccesoVisita: jest.fn(),
+    };
 
     service = new DocumentosAdjuntosService(
       documentosRepo as any,
@@ -61,7 +81,7 @@ describe('DocumentosAdjuntosService', () => {
       new FileValidationService(),
       new ImageOptimizerService(),
       encryption,
-      storage as any,
+      storage,
       auditorias as any,
       pacienteAccess as any,
     );
@@ -70,7 +90,11 @@ describe('DocumentosAdjuntosService', () => {
   it('uploads a valid PDF encrypted to storage and stores metadata', async () => {
     const fileBuffer = Buffer.from('%PDF-1.4\ncontenido');
     const result = await service.upload(
-      { fichaClinicaId: fichaId, categoria: 'GENERAL', descripcion: 'Consentimiento' },
+      {
+        fichaClinicaId: fichaId,
+        categoria: 'GENERAL',
+        descripcion: 'Consentimiento',
+      },
       {
         buffer: fileBuffer,
         originalname: 'consentimiento.pdf',
@@ -94,7 +118,9 @@ describe('DocumentosAdjuntosService', () => {
         subidoPorUsuarioId: userId,
       }),
     );
-    expect(result).toEqual(expect.objectContaining({ nombreArchivo: 'consentimiento.pdf' }));
+    expect(result).toEqual(
+      expect.objectContaining({ nombreArchivo: 'consentimiento.pdf' }),
+    );
     expect(auditorias.registrar).toHaveBeenCalledWith(
       expect.objectContaining({
         usuarioId: userId,
@@ -177,8 +203,13 @@ describe('DocumentosAdjuntosService', () => {
       ),
     ).rejects.toThrow(dbError);
 
-    expect(storage.putEncryptedObject).toHaveBeenCalledWith(expect.any(String), expect.any(Buffer));
-    expect(storage.deleteObject).toHaveBeenCalledWith(expect.stringContaining(`documentos-adjuntos/${fichaId}/`));
+    expect(storage.putEncryptedObject).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Buffer),
+    );
+    expect(storage.deleteObject).toHaveBeenCalledWith(
+      expect.stringContaining(`documentos-adjuntos/${fichaId}/`),
+    );
   });
 
   it('throws when ficha does not exist', async () => {
@@ -244,7 +275,9 @@ describe('DocumentosAdjuntosService', () => {
 
     await service.download(documento.id, userId);
 
-    expect(storage.getEncryptedObject).toHaveBeenCalledWith(documento.objectKey);
+    expect(storage.getEncryptedObject).toHaveBeenCalledWith(
+      documento.objectKey,
+    );
     expect(auditorias.registrar).toHaveBeenCalledWith(
       expect.objectContaining({
         usuarioId: userId,
@@ -259,15 +292,21 @@ describe('DocumentosAdjuntosService', () => {
       }),
     );
 
-    documentosRepo.save.mockImplementationOnce(async value => ({ ...value }));
+    documentosRepo.save.mockImplementationOnce(async (value) => ({ ...value }));
     await service.remove(documento.id, userId);
 
     expect(auditorias.registrar).toHaveBeenCalledWith(
       expect.objectContaining({
         usuarioId: userId,
         accion: 'ELIMINAR',
-        oldValues: expect.objectContaining({ estado: 'ACTIVO', deletedAt: null }),
-        newValues: expect.objectContaining({ estado: 'ELIMINADO', deletedAt: expect.any(Date) }),
+        oldValues: expect.objectContaining({
+          estado: 'ACTIVO',
+          deletedAt: null,
+        }),
+        newValues: expect.objectContaining({
+          estado: 'ELIMINADO',
+          deletedAt: expect.any(Date),
+        }),
       }),
     );
   });

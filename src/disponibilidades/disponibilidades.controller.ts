@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -19,17 +29,25 @@ export class DisponibilidadesController {
 
   @Get(':id')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
-  findOne(@Param('id') id: string) { return this.service.findOne(id); }
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
 
   @Post()
   @Roles('ADMIN', 'COORDINADOR')
-  create(@Body() dto: CreateDisponibilidadDto) { return this.service.create(dto); }
+  create(@Body() dto: CreateDisponibilidadDto) {
+    return this.service.create(dto);
+  }
 
   @Patch(':id')
   @Roles('ADMIN', 'COORDINADOR')
-  update(@Param('id') id: string, @Body() dto: UpdateDisponibilidadDto) { return this.service.update(id, dto); }
+  update(@Param('id') id: string, @Body() dto: UpdateDisponibilidadDto) {
+    return this.service.update(id, dto);
+  }
 
   @Delete(':id')
   @Roles('ADMIN')
-  remove(@Param('id') id: string) { return this.service.remove(id); }
+  remove(@Param('id') id: string) {
+    return this.service.remove(id);
+  }
 }

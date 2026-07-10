@@ -20,7 +20,7 @@ export class VisitasCronService {
   @Cron('*/15 * * * *')
   async checkLateVisits() {
     this.logger.log('Ejecutando Cron: Revisando visitas atrasadas...');
-    
+
     // Calcular el timestamp de hace 60 minutos
     const umbralAtraso = new Date();
     umbralAtraso.setMinutes(umbralAtraso.getMinutes() - 60);
@@ -32,11 +32,15 @@ export class VisitasCronService {
       // Para este MVP, buscaremos visitas que estén PROGRAMADA y tengan más de un cierto tiempo de creadas
       // o usaremos QueryBuilder.
 
-      const visitasAtrasadas = await this.visitasRepository.createQueryBuilder('v')
+      const visitasAtrasadas = await this.visitasRepository
+        .createQueryBuilder('v')
         .where('v.estado = :estado', { estado: 'PROGRAMADA' })
         .andWhere('v.check_in_at IS NULL')
         // Concatenamos fecha y hora para comparar con el umbral
-        .andWhere("CAST(CONCAT(v.fecha_programada, ' ', v.hora_programada) AS TIMESTAMP) < :umbral", { umbral: umbralAtraso })
+        .andWhere(
+          "CAST(CONCAT(v.fecha_programada, ' ', v.hora_programada) AS TIMESTAMP) < :umbral",
+          { umbral: umbralAtraso },
+        )
         .getMany();
 
       if (visitasAtrasadas.length === 0) {
@@ -44,7 +48,9 @@ export class VisitasCronService {
         return;
       }
 
-      this.logger.warn(`Se encontraron ${visitasAtrasadas.length} visitas con más de 60 minutos de atraso.`);
+      this.logger.warn(
+        `Se encontraron ${visitasAtrasadas.length} visitas con más de 60 minutos de atraso.`,
+      );
 
       for (const visita of visitasAtrasadas) {
         // 1. Crear el incidente clínico de severidad ALTA
@@ -62,14 +68,18 @@ export class VisitasCronService {
         // 2. Marcar la visita para que no vuelva a ser procesada por este cron
         // Le cambiamos el estado a 'CANCELADA' para cumplir con los constraints de BD
         visita.estado = 'CANCELADA';
-        visita.observacionCancelacion = 'Marcada como atrasada por el sistema debido a inactividad > 60m';
+        visita.observacionCancelacion =
+          'Marcada como atrasada por el sistema debido a inactividad > 60m';
         await this.visitasRepository.save(visita);
-        
-        this.logger.log(`Incidente generado y visita ${visita.id} actualizada a CANCELADA.`);
-      }
 
+        this.logger.log(
+          `Incidente generado y visita ${visita.id} actualizada a CANCELADA.`,
+        );
+      }
     } catch (error) {
-      this.logger.error(`Error en cron checkLateVisits: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `Error en cron checkLateVisits: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

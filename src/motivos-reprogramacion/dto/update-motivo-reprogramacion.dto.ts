@@ -1,4 +1,10 @@
-import { IsBoolean, IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  Length,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateMotivoReprogramacionDto {
   @IsOptional()

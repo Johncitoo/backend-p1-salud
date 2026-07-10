@@ -13,9 +13,11 @@ import { VisitasService } from '../src/visitas/visitas.service';
 const professionalUserId = randomUUID();
 
 const makeAuthGuard = () => ({
-  canActivate: context => {
+  canActivate: (context) => {
     const req = context.switchToHttp().getRequest();
-    const role = (req.header('x-mock-role') ?? 'PROFESIONAL').toUpperCase() as AppRole;
+    const role = (
+      req.header('x-mock-role') ?? 'PROFESIONAL'
+    ).toUpperCase() as AppRole;
     req.user = {
       id: role === 'PROFESIONAL' ? professionalUserId : randomUUID(),
       identityUserId: `mock-${role.toLowerCase()}`,
@@ -33,25 +35,67 @@ describe('Google Calendar and calendar routes (e2e)', () => {
   let app: INestApplication<App>;
 
   const googleCalendarService = {
-    getConnectUrl: jest.fn(async () => ({ authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=signed' })),
-    handleCallback: jest.fn(async () => ({ connected: true, profesionalSaludId: randomUUID(), syncEnabled: true })),
-    getStatus: jest.fn(async () => ({ connected: true, profesionalSaludId: randomUUID(), syncEnabled: true })),
-    disconnect: jest.fn(async () => ({ connected: false, profesionalSaludId: randomUUID(), syncEnabled: false })),
+    getConnectUrl: jest.fn(async () => ({
+      authorizationUrl:
+        'https://accounts.google.com/o/oauth2/v2/auth?state=signed',
+    })),
+    handleCallback: jest.fn(async () => ({
+      connected: true,
+      profesionalSaludId: randomUUID(),
+      syncEnabled: true,
+    })),
+    getStatus: jest.fn(async () => ({
+      connected: true,
+      profesionalSaludId: randomUUID(),
+      syncEnabled: true,
+    })),
+    disconnect: jest.fn(async () => ({
+      connected: false,
+      profesionalSaludId: randomUUID(),
+      syncEnabled: false,
+    })),
   };
 
   const visitasService = {
     findAllForUser: jest.fn(async () => []),
     findCalendarForUser: jest.fn(async () => []),
     findGoogleCalendarLogs: jest.fn(async () => []),
-    retryPendingGoogleCalendarSync: jest.fn(async () => ({ attempted: 1, synced: 1, failed: 0 })),
+    retryPendingGoogleCalendarSync: jest.fn(async () => ({
+      attempted: 1,
+      synced: 1,
+      failed: 0,
+    })),
     findOne: jest.fn(),
-    create: jest.fn(async (dto: Record<string, unknown>) => ({ id: randomUUID(), ...dto, estado: 'PROGRAMADA' })),
-    update: jest.fn(async (id: string, dto: Record<string, unknown>) => ({ id, ...dto })),
-    resyncGoogleCalendar: jest.fn(async (id: string) => ({ id, googleCalendarSyncStatus: 'SYNCED' })),
-    cambiarEstado: jest.fn(async (id: string, dto: Record<string, unknown>) => ({ id, ...dto })),
-    completar: jest.fn(async (id: string, dto: Record<string, unknown>) => ({ id, estado: 'REALIZADA', ...dto })),
-    cancelar: jest.fn(async (id: string, dto: Record<string, unknown>) => ({ id, estado: 'CANCELADA', ...dto })),
-    remove: jest.fn(async (id: string) => ({ id, deletedAt: new Date().toISOString() })),
+    create: jest.fn(async (dto: Record<string, unknown>) => ({
+      id: randomUUID(),
+      ...dto,
+      estado: 'PROGRAMADA',
+    })),
+    update: jest.fn(async (id: string, dto: Record<string, unknown>) => ({
+      id,
+      ...dto,
+    })),
+    resyncGoogleCalendar: jest.fn(async (id: string) => ({
+      id,
+      googleCalendarSyncStatus: 'SYNCED',
+    })),
+    cambiarEstado: jest.fn(
+      async (id: string, dto: Record<string, unknown>) => ({ id, ...dto }),
+    ),
+    completar: jest.fn(async (id: string, dto: Record<string, unknown>) => ({
+      id,
+      estado: 'REALIZADA',
+      ...dto,
+    })),
+    cancelar: jest.fn(async (id: string, dto: Record<string, unknown>) => ({
+      id,
+      estado: 'CANCELADA',
+      ...dto,
+    })),
+    remove: jest.fn(async (id: string) => ({
+      id,
+      deletedAt: new Date().toISOString(),
+    })),
   };
 
   beforeEach(async () => {
@@ -69,7 +113,9 @@ describe('Google Calendar and calendar routes (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
   });
 
@@ -82,11 +128,13 @@ describe('Google Calendar and calendar routes (e2e)', () => {
       .get('/google-calendar/connect')
       .set('x-mock-role', 'PROFESIONAL')
       .expect(200)
-      .expect(response => {
+      .expect((response) => {
         expect(response.body.authorizationUrl).toContain('accounts.google.com');
       });
 
-    expect(googleCalendarService.getConnectUrl).toHaveBeenCalledWith(expect.objectContaining({ rol: 'PROFESIONAL' }));
+    expect(googleCalendarService.getConnectUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ rol: 'PROFESIONAL' }),
+    );
   });
 
   it('blocks coordinators from connecting Google Calendar', async () => {
@@ -111,7 +159,9 @@ describe('Google Calendar and calendar routes (e2e)', () => {
 
   it('validates calendar query dates and rejects injection-like input', async () => {
     await request(app.getHttpServer())
-      .get("/visitas/calendario?desde=2026-07-01';DROP TABLE visitas;--&hasta=2026-07-31")
+      .get(
+        "/visitas/calendario?desde=2026-07-01';DROP TABLE visitas;--&hasta=2026-07-31",
+      )
       .set('x-mock-role', 'COORDINADOR')
       .expect(400);
 
@@ -120,7 +170,9 @@ describe('Google Calendar and calendar routes (e2e)', () => {
 
   it('validates calendar query uuid filters before reaching the service', async () => {
     await request(app.getHttpServer())
-      .get('/visitas/calendario?desde=2026-07-01&hasta=2026-07-31&profesionalSaludId=not-a-uuid')
+      .get(
+        '/visitas/calendario?desde=2026-07-01&hasta=2026-07-31&profesionalSaludId=not-a-uuid',
+      )
       .set('x-mock-role', 'COORDINADOR')
       .expect(400);
 
@@ -155,11 +207,14 @@ describe('Google Calendar and calendar routes (e2e)', () => {
       .set('x-mock-role', 'COORDINADOR')
       .send(payload)
       .expect(201)
-      .expect(response => {
+      .expect((response) => {
         expect(response.body).toEqual(expect.objectContaining(payload));
       });
 
-    expect(visitasService.create).toHaveBeenCalledWith(payload, expect.any(String));
+    expect(visitasService.create).toHaveBeenCalledWith(
+      payload,
+      expect.any(String),
+    );
   });
 
   it('blocks professionals from creating visits', async () => {
@@ -201,11 +256,17 @@ describe('Google Calendar and calendar routes (e2e)', () => {
       .set('x-mock-role', 'COORDINADOR')
       .send(dto)
       .expect(200)
-      .expect(response => {
-        expect(response.body).toEqual(expect.objectContaining({ id: visitaId, ...dto }));
+      .expect((response) => {
+        expect(response.body).toEqual(
+          expect.objectContaining({ id: visitaId, ...dto }),
+        );
       });
 
-    expect(visitasService.update).toHaveBeenCalledWith(visitaId, dto, expect.any(String));
+    expect(visitasService.update).toHaveBeenCalledWith(
+      visitaId,
+      dto,
+      expect.any(String),
+    );
   });
 
   it('blocks supervisors from canceling visits', async () => {
@@ -225,11 +286,19 @@ describe('Google Calendar and calendar routes (e2e)', () => {
       .post(`/visitas/${visitaId}/google-calendar/sync`)
       .set('x-mock-role', 'COORDINADOR')
       .expect(201)
-      .expect(response => {
-        expect(response.body).toEqual(expect.objectContaining({ id: visitaId, googleCalendarSyncStatus: 'SYNCED' }));
+      .expect((response) => {
+        expect(response.body).toEqual(
+          expect.objectContaining({
+            id: visitaId,
+            googleCalendarSyncStatus: 'SYNCED',
+          }),
+        );
       });
 
-    expect(visitasService.resyncGoogleCalendar).toHaveBeenCalledWith(visitaId, expect.any(String));
+    expect(visitasService.resyncGoogleCalendar).toHaveBeenCalledWith(
+      visitaId,
+      expect.any(String),
+    );
   });
 
   it('allows coordinators to inspect Google Calendar sync logs', async () => {
@@ -240,7 +309,9 @@ describe('Google Calendar and calendar routes (e2e)', () => {
       .set('x-mock-role', 'COORDINADOR')
       .expect(200);
 
-    expect(visitasService.findGoogleCalendarLogs).toHaveBeenCalledWith(visitaId);
+    expect(visitasService.findGoogleCalendarLogs).toHaveBeenCalledWith(
+      visitaId,
+    );
   });
 
   it('allows coordinators to retry pending Google Calendar syncs', async () => {
@@ -248,11 +319,13 @@ describe('Google Calendar and calendar routes (e2e)', () => {
       .post('/visitas/google-calendar/sync-pending')
       .set('x-mock-role', 'COORDINADOR')
       .expect(201)
-      .expect(response => {
+      .expect((response) => {
         expect(response.body).toEqual({ attempted: 1, synced: 1, failed: 0 });
       });
 
-    expect(visitasService.retryPendingGoogleCalendarSync).toHaveBeenCalledWith(expect.any(String));
+    expect(visitasService.retryPendingGoogleCalendarSync).toHaveBeenCalledWith(
+      expect.any(String),
+    );
   });
 
   it('blocks supervisors from retrying Google Calendar sync', async () => {

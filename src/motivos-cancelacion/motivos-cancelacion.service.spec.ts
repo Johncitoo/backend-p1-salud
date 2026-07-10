@@ -6,7 +6,9 @@ import { MotivoCancelacion } from './entities/motivo-cancelacion.entity';
 import { MotivosCancelacionService } from './motivos-cancelacion.service';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 
-type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends { id: string }> = Partial<
+  Record<keyof Repository<T>, jest.Mock>
+>;
 
 const createRepositoryMock = (): MockRepository<MotivoCancelacion> => ({
   find: jest.fn(),
@@ -41,7 +43,10 @@ describe('MotivosCancelacionService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MotivosCancelacionService,
-        { provide: getRepositoryToken(MotivoCancelacion), useValue: repository },
+        {
+          provide: getRepositoryToken(MotivoCancelacion),
+          useValue: repository,
+        },
         { provide: AuditoriasService, useValue: auditoriasService },
       ],
     }).compile();
@@ -61,12 +66,19 @@ describe('MotivosCancelacionService', () => {
   it('findOne lanza NotFoundException si no existe', async () => {
     repository.findOne!.mockResolvedValue(null);
 
-    await expect(service.findOne('no-existe')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne('no-existe')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('create guarda con valores por defecto', async () => {
     const dto = { codigo: 'NUEVO', nombre: 'Motivo nuevo' };
-    const created = { ...dto, aplicaA: 'VISITA', requiereObservacion: false, activo: true } as MotivoCancelacion;
+    const created = {
+      ...dto,
+      aplicaA: 'VISITA',
+      requiereObservacion: false,
+      activo: true,
+    } as MotivoCancelacion;
     const saved = { ...motivo, ...created };
 
     repository.create!.mockReturnValue(created);
@@ -114,7 +126,9 @@ describe('MotivosCancelacionService', () => {
     const updated = { ...motivo, nombre: 'Nombre actualizado' };
     repository.save!.mockResolvedValue(updated);
 
-    const result = await service.update('mc-1111', { nombre: 'Nombre actualizado' });
+    const result = await service.update('mc-1111', {
+      nombre: 'Nombre actualizado',
+    });
 
     expect(result.nombre).toBe('Nombre actualizado');
     expect(auditoriasService.registrar).toHaveBeenCalledWith(

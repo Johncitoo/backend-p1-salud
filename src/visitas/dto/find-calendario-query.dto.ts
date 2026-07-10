@@ -1,6 +1,14 @@
 import { IsDateString, IsIn, IsOptional, IsUUID } from 'class-validator';
 
-const VISITA_ESTADOS = ['PROGRAMADA', 'EN_CAMINO', 'EN_ATENCION', 'REALIZADA', 'CANCELADA', 'REPROGRAMADA', 'NO_REALIZADA'] as const;
+const VISITA_ESTADOS = [
+  'PROGRAMADA',
+  'EN_CAMINO',
+  'EN_ATENCION',
+  'REALIZADA',
+  'CANCELADA',
+  'REPROGRAMADA',
+  'NO_REALIZADA',
+] as const;
 
 export class FindCalendarioQueryDto {
   @IsDateString()

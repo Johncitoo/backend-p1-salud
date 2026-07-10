@@ -19,7 +19,12 @@ import { IncidentesSaludService } from './incidentes-salud.service';
     CrmModule,
     IncidentesModule,
     forwardRef(() => PacientesModule),
-    TypeOrmModule.forFeature([IncidenteSalud, Visita, ProfesionalSalud, Usuario]),
+    TypeOrmModule.forFeature([
+      IncidenteSalud,
+      Visita,
+      ProfesionalSalud,
+      Usuario,
+    ]),
   ],
   controllers: [IncidentesSaludController],
   providers: [IncidentesSaludService],

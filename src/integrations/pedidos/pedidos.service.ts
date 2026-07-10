@@ -60,8 +60,9 @@ export class PedidosService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.apiUrl = this.configService.get<string>('PEDIDOS_API_URL')
-      || 'https://agil-escalado.vercel.app/api/webhooks/prescriptions';
+    this.apiUrl =
+      this.configService.get<string>('PEDIDOS_API_URL') ||
+      'https://agil-escalado.vercel.app/api/webhooks/prescriptions';
     this.apiToken = this.configService.get<string>('PEDIDOS_API_TOKEN');
     // Igual que NOTIFICATIONS_ENABLED: por defecto en modo mock (solo loguea)
     // hasta tener el token real coordinado con Proyecto 3.
@@ -91,7 +92,7 @@ export class PedidosService {
         pais: 'Chile',
         notas_adicionales: direccion?.referencia ?? '',
       },
-      items: items.map(item => ({
+      items: items.map((item) => ({
         sku: item.nombre,
         cantidad: item.cantidad,
         precio_unitario: 0,
@@ -102,12 +103,16 @@ export class PedidosService {
 
   async enviarPedido(payload: PrescripcionPedidoPayload): Promise<void> {
     if (!this.enabled) {
-      this.logger.log(`[Pedidos mock] ${payload.orderId} → ${payload.cliente.email}:\n${JSON.stringify(payload, null, 2)}`);
+      this.logger.log(
+        `[Pedidos mock] ${payload.orderId} → ${payload.cliente.email}:\n${JSON.stringify(payload, null, 2)}`,
+      );
       return;
     }
 
     if (!this.apiToken) {
-      this.logger.warn(`PEDIDOS_ENABLED=true pero PEDIDOS_API_TOKEN está vacío. Pedido no enviado: ${payload.orderId}`);
+      this.logger.warn(
+        `PEDIDOS_ENABLED=true pero PEDIDOS_API_TOKEN está vacío. Pedido no enviado: ${payload.orderId}`,
+      );
       return;
     }
 
@@ -120,7 +125,9 @@ export class PedidosService {
           },
         }),
       );
-      this.logger.log(`Pedido ${payload.orderId} enviado a Proyecto 3. Respuesta: ${JSON.stringify(response.data)}`);
+      this.logger.log(
+        `Pedido ${payload.orderId} enviado a Proyecto 3. Respuesta: ${JSON.stringify(response.data)}`,
+      );
     } catch (error: any) {
       this.logger.error(
         `No se pudo enviar el pedido ${payload.orderId} a Proyecto 3: ${error.message}`,

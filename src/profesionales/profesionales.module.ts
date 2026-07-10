@@ -16,7 +16,20 @@ import { ProfesionalesController } from './profesionales.controller';
 import { ProfesionalesService } from './profesionales.service';
 
 @Module({
-  imports: [UsuariosModule, AuditoriasModule, AnalyticsModule, NotificacionesModule, TypeOrmModule.forFeature([ProfesionalSalud, Especialidad, ProfesionalZona, ProfesionalEspecialidad, Usuario, Rol])],
+  imports: [
+    UsuariosModule,
+    AuditoriasModule,
+    AnalyticsModule,
+    NotificacionesModule,
+    TypeOrmModule.forFeature([
+      ProfesionalSalud,
+      Especialidad,
+      ProfesionalZona,
+      ProfesionalEspecialidad,
+      Usuario,
+      Rol,
+    ]),
+  ],
   controllers: [ProfesionalesController],
   providers: [ProfesionalesService, DevAuthGuard, RolesGuard],
 })

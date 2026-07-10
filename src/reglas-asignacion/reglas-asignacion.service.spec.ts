@@ -6,20 +6,35 @@ import { ReglaAsignacion } from './entities/regla-asignacion.entity';
 import { ReglasAsignacionService } from './reglas-asignacion.service';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 
-type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends { id: string }> = Partial<
+  Record<keyof Repository<T>, jest.Mock>
+>;
 
 const regla: ReglaAsignacion = {
-  id: 'r-1111', codigo: 'MISMA_ZONA', nombre: 'Priorizar misma zona',
-  descripcion: 'Test', prioridad: 10, condiciones: {}, acciones: {}, activa: true,
-  createdAt: new Date(), updatedAt: new Date(), deletedAt: null,
-} as ReglaAsignacion;
+  id: 'r-1111',
+  codigo: 'MISMA_ZONA',
+  nombre: 'Priorizar misma zona',
+  descripcion: 'Test',
+  prioridad: 10,
+  condiciones: {},
+  acciones: {},
+  activa: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  deletedAt: null,
+};
 
 describe('ReglasAsignacionService', () => {
   let service: ReglasAsignacionService;
   let repository: MockRepository<ReglaAsignacion>;
 
   beforeEach(async () => {
-    repository = { find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn() };
+    repository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn(),
+      save: jest.fn(),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ReglasAsignacionService,
@@ -37,12 +52,18 @@ describe('ReglasAsignacionService', () => {
 
   it('findOne lanza NotFoundException si no existe', async () => {
     repository.findOne!.mockResolvedValue(null);
-    await expect(service.findOne('no')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne('no')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('create guarda con valores por defecto', async () => {
     const dto = { codigo: 'TEST', nombre: 'Test' };
-    repository.create!.mockReturnValue({ ...dto, prioridad: 100, activa: true });
+    repository.create!.mockReturnValue({
+      ...dto,
+      prioridad: 100,
+      activa: true,
+    });
     repository.save!.mockResolvedValue(regla);
     await expect(service.create(dto as any)).resolves.toEqual(regla);
   });
@@ -52,7 +73,9 @@ describe('ReglasAsignacionService', () => {
     const error = new QueryFailedError('INSERT', [], new Error('dup'));
     (error as any).code = '23505';
     repository.save!.mockRejectedValue(error);
-    await expect(service.create({ codigo: 'DUP', nombre: 'T' } as any)).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      service.create({ codigo: 'DUP', nombre: 'T' } as any),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('remove marca deletedAt', async () => {

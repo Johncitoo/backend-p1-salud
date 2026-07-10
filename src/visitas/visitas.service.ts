@@ -1,11 +1,24 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  forwardRef,
+} from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
-import { AnalyticsService, VisitAnalyticsOptions } from '../integrations/analytics/analytics.service';
+import {
+  AnalyticsService,
+  VisitAnalyticsOptions,
+} from '../integrations/analytics/analytics.service';
 import { NotificacionesService } from '../integrations/notificaciones/notificaciones.service';
-import { PedidosService, PrescripcionItem } from '../integrations/pedidos/pedidos.service';
+import {
+  PedidosService,
+  PrescripcionItem,
+} from '../integrations/pedidos/pedidos.service';
 import { BloqueoAgenda } from '../bloqueos-agenda/entities/bloqueo-agenda.entity';
 import { CreateVisitaDto } from '../pacientes/dto/create-visita.dto';
 import { UpdateVisitaDto } from '../pacientes/dto/update-visita.dto';
@@ -36,7 +49,15 @@ import type { UsuarioPerfil } from '../usuarios/usuarios.service';
 import { GoogleCalendarSyncService } from '../google-calendar/services/google-calendar-sync.service';
 import { IncidentesSaludService } from '../incidentes-salud/incidentes-salud.service';
 
-const ESTADOS_VISITA = ['PROGRAMADA', 'EN_CAMINO', 'EN_ATENCION', 'REALIZADA', 'CANCELADA', 'REPROGRAMADA', 'NO_REALIZADA'];
+const ESTADOS_VISITA = [
+  'PROGRAMADA',
+  'EN_CAMINO',
+  'EN_ATENCION',
+  'REALIZADA',
+  'CANCELADA',
+  'REPROGRAMADA',
+  'NO_REALIZADA',
+];
 const ESTADOS_SIN_CONFLICTO = ['CANCELADA', 'REALIZADA', 'NO_REALIZADA'];
 
 // Cancelación "tardía": se cancela faltando menos de este umbral para la hora
@@ -103,11 +124,20 @@ export class VisitasService {
 
   // Obtiene el paciente y el usuario del profesional de una visita, para enviar notificaciones.
   // Tolerante a fallos: si algo no se encuentra, retorna null en ese campo.
-  private async obtenerContactosVisita(visita: Visita): Promise<{ paciente: Paciente | null; profesionalUsuario: Usuario | null }> {
-    const paciente = await this.pacientesRepository.findOne({ where: { id: visita.pacienteId } });
-    const profesional = await this.profesionalesRepository.findOne({ where: { id: visita.profesionalSaludId } });
+  private async obtenerContactosVisita(visita: Visita): Promise<{
+    paciente: Paciente | null;
+    profesionalUsuario: Usuario | null;
+  }> {
+    const paciente = await this.pacientesRepository.findOne({
+      where: { id: visita.pacienteId },
+    });
+    const profesional = await this.profesionalesRepository.findOne({
+      where: { id: visita.profesionalSaludId },
+    });
     const profesionalUsuario = profesional
-      ? await this.usuariosRepository.findOne({ where: { id: profesional.usuarioId } })
+      ? await this.usuariosRepository.findOne({
+          where: { id: profesional.usuarioId },
+        })
       : null;
     return { paciente, profesionalUsuario };
   }
@@ -116,7 +146,9 @@ export class VisitasService {
   // del profesional asignado como equivalente, ya que es lo que Grupo 9 (Analítica)
   // requiere como campo obligatorio (visit_type) para construir la agenda del dashboard.
   private async obtenerVisitType(visita: Visita): Promise<string | null> {
-    const profesional = await this.profesionalesRepository.findOne({ where: { id: visita.profesionalSaludId } });
+    const profesional = await this.profesionalesRepository.findOne({
+      where: { id: visita.profesionalSaludId },
+    });
     return profesional?.profesion ?? null;
   }
 
@@ -126,16 +158,23 @@ export class VisitasService {
   // existe; eso ocurre cuando la entidad ya existía y nunca se envió en su creación
   // (p.ej. una zona o usuario creados antes de habilitar la integración). Los upsert
   // son idempotentes, así que reenviarlos no duplica nada en su dimensión.
-  private async sincronizarVisitaAnalytics(visita: Visita, options: VisitAnalyticsOptions = {}): Promise<void> {
+  private async sincronizarVisitaAnalytics(
+    visita: Visita,
+    options: VisitAnalyticsOptions = {},
+  ): Promise<void> {
     const [paciente, profesional, zona] = await Promise.all([
       this.pacientesRepository.findOne({ where: { id: visita.pacienteId } }),
-      this.profesionalesRepository.findOne({ where: { id: visita.profesionalSaludId } }),
+      this.profesionalesRepository.findOne({
+        where: { id: visita.profesionalSaludId },
+      }),
       visita.zonaId
         ? this.zonasRepository.findOne({ where: { id: visita.zonaId } })
         : Promise.resolve(null),
     ]);
     const creador = visita.creadaPorUsuarioId
-      ? await this.usuariosRepository.findOne({ where: { id: visita.creadaPorUsuarioId } })
+      ? await this.usuariosRepository.findOne({
+          where: { id: visita.creadaPorUsuarioId },
+        })
       : null;
 
     if (creador) await this.analyticsService.sendUsuarioUpsertEvent(creador);
@@ -159,12 +198,26 @@ export class VisitasService {
       .createQueryBuilder('visita')
       .where('visita.deleted_at IS NULL');
 
-    if (filtros.pacienteId) qb.andWhere('visita.paciente_id = :pacienteId', { pacienteId: filtros.pacienteId });
-    if (filtros.profesionalSaludId) qb.andWhere('visita.profesional_salud_id = :profesionalSaludId', { profesionalSaludId: filtros.profesionalSaludId });
-    if (filtros.zonaId) qb.andWhere('visita.zona_id = :zonaId', { zonaId: filtros.zonaId });
-    if (filtros.estado) qb.andWhere('visita.estado = :estado', { estado: filtros.estado });
-    if (filtros.fechaDesde) qb.andWhere('visita.fecha_programada >= :fechaDesde', { fechaDesde: filtros.fechaDesde });
-    if (filtros.fechaHasta) qb.andWhere('visita.fecha_programada <= :fechaHasta', { fechaHasta: filtros.fechaHasta });
+    if (filtros.pacienteId)
+      qb.andWhere('visita.paciente_id = :pacienteId', {
+        pacienteId: filtros.pacienteId,
+      });
+    if (filtros.profesionalSaludId)
+      qb.andWhere('visita.profesional_salud_id = :profesionalSaludId', {
+        profesionalSaludId: filtros.profesionalSaludId,
+      });
+    if (filtros.zonaId)
+      qb.andWhere('visita.zona_id = :zonaId', { zonaId: filtros.zonaId });
+    if (filtros.estado)
+      qb.andWhere('visita.estado = :estado', { estado: filtros.estado });
+    if (filtros.fechaDesde)
+      qb.andWhere('visita.fecha_programada >= :fechaDesde', {
+        fechaDesde: filtros.fechaDesde,
+      });
+    if (filtros.fechaHasta)
+      qb.andWhere('visita.fecha_programada <= :fechaHasta', {
+        fechaHasta: filtros.fechaHasta,
+      });
 
     return qb
       .orderBy('visita.fecha_programada', 'ASC')
@@ -172,7 +225,10 @@ export class VisitasService {
       .getMany();
   }
 
-  async findAllForUser(filtros: FindVisitasQueryDto = {}, user?: UsuarioPerfil): Promise<Visita[]> {
+  async findAllForUser(
+    filtros: FindVisitasQueryDto = {},
+    user?: UsuarioPerfil,
+  ): Promise<Visita[]> {
     if (user?.rol !== 'PROFESIONAL') return this.findAll(filtros);
 
     const profesional = await this.profesionalesRepository.findOne({
@@ -192,13 +248,18 @@ export class VisitasService {
   }
 
   async findOne(id: string): Promise<Visita> {
-    const visita = await this.visitasRepository.findOne({ where: { id, deletedAt: IsNull() } });
+    const visita = await this.visitasRepository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!visita) throw new NotFoundException('Visita no encontrada');
     return visita;
   }
 
   async create(dto: CreateVisitaDto, usuarioId?: string): Promise<Visita> {
-    if (!usuarioId) throw new BadRequestException('No se pudo identificar al usuario creador de la visita');
+    if (!usuarioId)
+      throw new BadRequestException(
+        'No se pudo identificar al usuario creador de la visita',
+      );
 
     await this.ensureReferences(dto);
     await this.ensureAgendaDisponible({
@@ -225,32 +286,69 @@ export class VisitasService {
       accion: 'CREAR',
       detalle: `Visita programada para ${saved.fechaProgramada} ${saved.horaProgramada}`,
     });
-    await this.registrarEstadoHistorial(saved, null, saved.estado, usuarioId, 'Visita creada');
+    await this.registrarEstadoHistorial(
+      saved,
+      null,
+      saved.estado,
+      usuarioId,
+      'Visita creada',
+    );
 
     await this.googleCalendarSyncService.syncCreatedVisit(saved);
-    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
+    await this.sincronizarVisitaAnalytics(saved, {
+      visitType: await this.obtenerVisitType(saved),
+    });
 
-    const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
-    await this.notificacionesService.notificarVisitaAgendada(saved, paciente, profesionalUsuario);
+    const { paciente, profesionalUsuario } =
+      await this.obtenerContactosVisita(saved);
+    await this.notificacionesService.notificarVisitaAgendada(
+      saved,
+      paciente,
+      profesionalUsuario,
+    );
 
     return saved;
   }
 
-  async findCalendarForUser(filtros: FindCalendarioQueryDto, user?: UsuarioPerfil) {
-    const profesionalId = user?.rol === 'PROFESIONAL'
-      ? (await this.profesionalesRepository.findOne({ where: { usuarioId: user.id, deletedAt: IsNull() } }))?.id
-      : filtros.profesionalSaludId;
+  async findCalendarForUser(
+    filtros: FindCalendarioQueryDto,
+    user?: UsuarioPerfil,
+  ) {
+    const profesionalId =
+      user?.rol === 'PROFESIONAL'
+        ? (
+            await this.profesionalesRepository.findOne({
+              where: { usuarioId: user.id, deletedAt: IsNull() },
+            })
+          )?.id
+        : filtros.profesionalSaludId;
 
     if (user?.rol === 'PROFESIONAL' && !profesionalId) return [];
 
     const qb = this.visitasRepository
       .createQueryBuilder('visita')
       .leftJoin('pacientes', 'paciente', 'paciente.id = visita.paciente_id')
-      .leftJoin('profesionales_salud', 'profesional', 'profesional.id = visita.profesional_salud_id')
-      .leftJoin('usuarios', 'usuarioProfesional', 'usuarioProfesional.id = profesional.usuario_id')
+      .leftJoin(
+        'profesionales_salud',
+        'profesional',
+        'profesional.id = visita.profesional_salud_id',
+      )
+      .leftJoin(
+        'usuarios',
+        'usuarioProfesional',
+        'usuarioProfesional.id = profesional.usuario_id',
+      )
       .leftJoin('zonas', 'zona', 'zona.id = visita.zona_id')
-      .leftJoin('direcciones_paciente', 'direccion', 'direccion.id = visita.direccion_paciente_id AND direccion.deleted_at IS NULL')
-      .leftJoin('fichas_clinicas', 'ficha', 'ficha.visita_id = visita.id AND ficha.deleted_at IS NULL')
+      .leftJoin(
+        'direcciones_paciente',
+        'direccion',
+        'direccion.id = visita.direccion_paciente_id AND direccion.deleted_at IS NULL',
+      )
+      .leftJoin(
+        'fichas_clinicas',
+        'ficha',
+        'ficha.visita_id = visita.id AND ficha.deleted_at IS NULL',
+      )
       .select([
         'visita.id AS "id"',
         'visita.estado AS "estado"',
@@ -278,11 +376,19 @@ export class VisitasService {
         'visita.google_calendar_last_error AS "googleCalendarLastError"',
       ])
       .where('visita.deleted_at IS NULL')
-      .andWhere('visita.fecha_programada BETWEEN :desde AND :hasta', { desde: filtros.desde, hasta: filtros.hasta });
+      .andWhere('visita.fecha_programada BETWEEN :desde AND :hasta', {
+        desde: filtros.desde,
+        hasta: filtros.hasta,
+      });
 
-    if (profesionalId) qb.andWhere('visita.profesional_salud_id = :profesionalId', { profesionalId });
-    if (filtros.zonaId) qb.andWhere('visita.zona_id = :zonaId', { zonaId: filtros.zonaId });
-    if (filtros.estado) qb.andWhere('visita.estado = :estado', { estado: filtros.estado });
+    if (profesionalId)
+      qb.andWhere('visita.profesional_salud_id = :profesionalId', {
+        profesionalId,
+      });
+    if (filtros.zonaId)
+      qb.andWhere('visita.zona_id = :zonaId', { zonaId: filtros.zonaId });
+    if (filtros.estado)
+      qb.andWhere('visita.estado = :estado', { estado: filtros.estado });
 
     const rows = await qb
       .orderBy('visita.fecha_programada', 'ASC')
@@ -290,12 +396,19 @@ export class VisitasService {
       .getRawMany();
 
     const visitaIds = rows.map((row) => row.id);
-    const prestacionesByVisita = new Map<string, Array<Record<string, unknown>>>();
+    const prestacionesByVisita = new Map<
+      string,
+      Array<Record<string, unknown>>
+    >();
 
     if (visitaIds.length > 0) {
       const prestaciones = await this.visitaPrestacionesRepository
         .createQueryBuilder('visitaPrestacion')
-        .leftJoin(Prestacion, 'prestacion', 'prestacion.id = visitaPrestacion.prestacion_id')
+        .leftJoin(
+          Prestacion,
+          'prestacion',
+          'prestacion.id = visitaPrestacion.prestacion_id',
+        )
         .select([
           'visitaPrestacion.visita_id AS "visitaId"',
           'visitaPrestacion.prestacion_id AS "prestacionId"',
@@ -307,7 +420,9 @@ export class VisitasService {
           'prestacion.duracion_estimada_min AS "duracionEstimadaMin"',
         ])
         .where('visitaPrestacion.deleted_at IS NULL')
-        .andWhere('visitaPrestacion.visita_id IN (:...visitaIds)', { visitaIds })
+        .andWhere('visitaPrestacion.visita_id IN (:...visitaIds)', {
+          visitaIds,
+        })
         .orderBy('prestacion.nombre', 'ASC')
         .getRawMany();
 
@@ -321,7 +436,10 @@ export class VisitasService {
           cantidad: Number(prestacion.cantidad ?? 1),
           estado: prestacion.estado,
           observacion: prestacion.observacion,
-          duracionEstimadaMin: prestacion.duracionEstimadaMin === null ? null : Number(prestacion.duracionEstimadaMin),
+          duracionEstimadaMin:
+            prestacion.duracionEstimadaMin === null
+              ? null
+              : Number(prestacion.duracionEstimadaMin),
         });
         prestacionesByVisita.set(visitaId, current);
       }
@@ -330,7 +448,11 @@ export class VisitasService {
     return rows.map((row) => {
       const fechaProgramada = normalizeVisitaDate(row.fechaProgramada);
       const startTime = normalizeVisitaTime(row.horaProgramada);
-      const end = addMinutesToDateTime(fechaProgramada, startTime, Number(row.duracionEstimadaMin ?? 60));
+      const end = addMinutesToDateTime(
+        fechaProgramada,
+        startTime,
+        Number(row.duracionEstimadaMin ?? 60),
+      );
 
       return {
         ...row,
@@ -343,7 +465,11 @@ export class VisitasService {
     });
   }
 
-  async update(id: string, dto: UpdateVisitaDto, usuarioId?: string): Promise<Visita> {
+  async update(
+    id: string,
+    dto: UpdateVisitaDto,
+    usuarioId?: string,
+  ): Promise<Visita> {
     const visita = await this.findOne(id);
     const previous = this.snapshotVisita(visita);
     await this.ensureReferences(dto);
@@ -351,9 +477,11 @@ export class VisitasService {
     const candidate = {
       profesionalSaludId: dto.profesionalSaludId ?? visita.profesionalSaludId,
       zonaId: dto.zonaId ?? visita.zonaId,
-      fechaProgramada: dto.fechaProgramada ?? normalizeVisitaDate(visita.fechaProgramada),
+      fechaProgramada:
+        dto.fechaProgramada ?? normalizeVisitaDate(visita.fechaProgramada),
       horaProgramada: dto.horaProgramada ?? visita.horaProgramada,
-      duracionEstimadaMin: dto.duracionEstimadaMin ?? visita.duracionEstimadaMin ?? 60,
+      duracionEstimadaMin:
+        dto.duracionEstimadaMin ?? visita.duracionEstimadaMin ?? 60,
       estado: dto.estado ?? visita.estado,
     };
 
@@ -373,19 +501,35 @@ export class VisitasService {
     });
 
     if (estadoAnterior !== saved.estado) {
-      await this.registrarEstadoHistorial(saved, estadoAnterior, saved.estado, usuarioId, 'Cambio desde edicion de visita');
+      await this.registrarEstadoHistorial(
+        saved,
+        estadoAnterior,
+        saved.estado,
+        usuarioId,
+        'Cambio desde edicion de visita',
+      );
     }
 
     if (isReprogramacion) {
       await this.registrarReprogramacion(saved, previous, usuarioId);
     }
 
-    await this.googleCalendarSyncService.syncUpdatedVisit(saved, previous.profesionalSaludId);
-    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
+    await this.googleCalendarSyncService.syncUpdatedVisit(
+      saved,
+      previous.profesionalSaludId,
+    );
+    await this.sincronizarVisitaAnalytics(saved, {
+      visitType: await this.obtenerVisitType(saved),
+    });
 
     if (isReprogramacion) {
-      const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
-      await this.notificacionesService.notificarVisitaReprogramada(saved, paciente, profesionalUsuario);
+      const { paciente, profesionalUsuario } =
+        await this.obtenerContactosVisita(saved);
+      await this.notificacionesService.notificarVisitaReprogramada(
+        saved,
+        paciente,
+        profesionalUsuario,
+      );
     }
 
     return saved;
@@ -426,7 +570,11 @@ export class VisitasService {
     return result;
   }
 
-  async cambiarEstado(id: string, dto: CambiarEstadoVisitaDto, usuarioId?: string): Promise<Visita> {
+  async cambiarEstado(
+    id: string,
+    dto: CambiarEstadoVisitaDto,
+    usuarioId?: string,
+  ): Promise<Visita> {
     const visita = await this.findOne(id);
     const estadoAnterior = visita.estado;
 
@@ -435,8 +583,10 @@ export class VisitasService {
     }
 
     visita.estado = dto.estado;
-    if (dto.estado === 'EN_ATENCION' && !visita.fechaHoraInicioReal) visita.fechaHoraInicioReal = new Date();
-    if (dto.estado === 'REALIZADA' && !visita.fechaHoraFinReal) visita.fechaHoraFinReal = new Date();
+    if (dto.estado === 'EN_ATENCION' && !visita.fechaHoraInicioReal)
+      visita.fechaHoraInicioReal = new Date();
+    if (dto.estado === 'REALIZADA' && !visita.fechaHoraFinReal)
+      visita.fechaHoraFinReal = new Date();
 
     const saved = await this.visitasRepository.save(visita);
     this.auditoriasService.registrar({
@@ -446,38 +596,69 @@ export class VisitasService {
       accion: 'CAMBIAR_ESTADO',
       detalle: `Visita cambió de ${estadoAnterior} a ${saved.estado}`,
     });
-    await this.registrarEstadoHistorial(saved, estadoAnterior, saved.estado, usuarioId, 'Cambio de estado');
+    await this.registrarEstadoHistorial(
+      saved,
+      estadoAnterior,
+      saved.estado,
+      usuarioId,
+      'Cambio de estado',
+    );
 
-    await this.sincronizarVisitaAnalytics(saved, { puntual: dto.puntual, visitType: await this.obtenerVisitType(saved) });
+    await this.sincronizarVisitaAnalytics(saved, {
+      puntual: dto.puntual,
+      visitType: await this.obtenerVisitType(saved),
+    });
 
     // Eventos de ciclo de vida complementarios al upsert
     if (dto.estado === 'EN_ATENCION') {
       await this.analyticsService.sendVisitaInicioEvent(saved);
     }
     if (dto.estado === 'REALIZADA') {
-      await this.analyticsService.sendVisitaFinEvent(saved, { puntual: dto.puntual });
+      await this.analyticsService.sendVisitaFinEvent(saved, {
+        puntual: dto.puntual,
+      });
     }
 
     // Notificar reprogramación a paciente y profesional
     if (dto.estado === 'REPROGRAMADA') {
-      const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
-      const motivo = await this.resolverMotivoReprogramacion(dto.motivoReprogramacionId, dto.observacion);
-      await this.notificacionesService.notificarVisitaReprogramada(saved, paciente, profesionalUsuario, motivo);
+      const { paciente, profesionalUsuario } =
+        await this.obtenerContactosVisita(saved);
+      const motivo = await this.resolverMotivoReprogramacion(
+        dto.motivoReprogramacionId,
+        dto.observacion,
+      );
+      await this.notificacionesService.notificarVisitaReprogramada(
+        saved,
+        paciente,
+        profesionalUsuario,
+        motivo,
+      );
     }
 
     // Notificar al paciente que el profesional va en camino
     if (dto.estado === 'EN_CAMINO') {
-      const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
-      await this.notificacionesService.notificarProfesionalEnCamino(saved, paciente, profesionalUsuario);
+      const { paciente, profesionalUsuario } =
+        await this.obtenerContactosVisita(saved);
+      await this.notificacionesService.notificarProfesionalEnCamino(
+        saved,
+        paciente,
+        profesionalUsuario,
+      );
     }
 
     return saved;
   }
 
-  async reprogramar(id: string, dto: ReprogramarVisitaDto, usuarioId?: string): Promise<Visita> {
+  async reprogramar(
+    id: string,
+    dto: ReprogramarVisitaDto,
+    usuarioId?: string,
+  ): Promise<Visita> {
     const visita = await this.findOne(id);
     if (['CANCELADA', 'REALIZADA'].includes(visita.estado)) {
-      throw new BadRequestException('No se puede reprogramar una visita cancelada o realizada');
+      throw new BadRequestException(
+        'No se puede reprogramar una visita cancelada o realizada',
+      );
     }
 
     const estadoAnterior = visita.estado;
@@ -510,22 +691,46 @@ export class VisitasService {
       accion: 'REPROGRAMAR',
       detalle: `Visita reprogramada de ${fechaAnterior} ${horaAnterior} a ${dto.fechaProgramadaNueva} ${dto.horaProgramadaNueva}`,
     });
-    await this.registrarEstadoHistorial(saved, estadoAnterior, saved.estado, usuarioId, 'Visita reprogramada');
+    await this.registrarEstadoHistorial(
+      saved,
+      estadoAnterior,
+      saved.estado,
+      usuarioId,
+      'Visita reprogramada',
+    );
 
-    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
+    await this.sincronizarVisitaAnalytics(saved, {
+      visitType: await this.obtenerVisitType(saved),
+    });
 
-    const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
-    const motivo = await this.resolverMotivoReprogramacion(dto.motivoReprogramacionId, dto.observacion);
-    await this.notificacionesService.notificarVisitaReprogramada(saved, paciente, profesionalUsuario, motivo);
+    const { paciente, profesionalUsuario } =
+      await this.obtenerContactosVisita(saved);
+    const motivo = await this.resolverMotivoReprogramacion(
+      dto.motivoReprogramacionId,
+      dto.observacion,
+    );
+    await this.notificacionesService.notificarVisitaReprogramada(
+      saved,
+      paciente,
+      profesionalUsuario,
+      motivo,
+    );
 
     return saved;
   }
 
-  async completar(id: string, dto: CompletarVisitaDto, usuarioId?: string): Promise<Visita> {
+  async completar(
+    id: string,
+    dto: CompletarVisitaDto,
+    usuarioId?: string,
+  ): Promise<Visita> {
     const visita = await this.findOne(id);
     const estadoAnterior = visita.estado;
 
-    if (visita.estado === 'CANCELADA') throw new BadRequestException('No se puede completar una visita cancelada');
+    if (visita.estado === 'CANCELADA')
+      throw new BadRequestException(
+        'No se puede completar una visita cancelada',
+      );
     if (!visita.fechaHoraInicioReal) visita.fechaHoraInicioReal = new Date();
 
     visita.estado = 'REALIZADA';
@@ -539,10 +744,21 @@ export class VisitasService {
       accion: 'COMPLETAR',
       detalle: `Visita completada desde ${estadoAnterior}`,
     });
-    await this.registrarEstadoHistorial(saved, estadoAnterior, saved.estado, usuarioId, 'Visita completada');
+    await this.registrarEstadoHistorial(
+      saved,
+      estadoAnterior,
+      saved.estado,
+      usuarioId,
+      'Visita completada',
+    );
 
-    await this.sincronizarVisitaAnalytics(saved, { puntual: dto.puntual, visitType: await this.obtenerVisitType(saved) });
-    await this.analyticsService.sendVisitaFinEvent(saved, { puntual: dto.puntual });
+    await this.sincronizarVisitaAnalytics(saved, {
+      puntual: dto.puntual,
+      visitType: await this.obtenerVisitType(saved),
+    });
+    await this.analyticsService.sendVisitaFinEvent(saved, {
+      puntual: dto.puntual,
+    });
     await this.enviarPedidoKitSiCorresponde(saved);
 
     return saved;
@@ -559,49 +775,86 @@ export class VisitasService {
     });
     if (medicamentos.length === 0) return;
 
-    const paciente = await this.pacientesRepository.findOne({ where: { id: visita.pacienteId } });
+    const paciente = await this.pacientesRepository.findOne({
+      where: { id: visita.pacienteId },
+    });
     if (!paciente?.email) {
-      this.logger.warn(`No se envía pedido de kit a Proyecto 3 para visita ${visita.id}: paciente sin email.`);
+      this.logger.warn(
+        `No se envía pedido de kit a Proyecto 3 para visita ${visita.id}: paciente sin email.`,
+      );
       return;
     }
 
     const direccion = visita.direccionPacienteId
-      ? await this.direccionesRepository.findOne({ where: { id: visita.direccionPacienteId } })
+      ? await this.direccionesRepository.findOne({
+          where: { id: visita.direccionPacienteId },
+        })
       : null;
 
-    const catalogoIds = [...new Set(medicamentos.map(m => m.medicamentoCatalogoId).filter((id): id is string => !!id))];
+    const catalogoIds = [
+      ...new Set(
+        medicamentos
+          .map((m) => m.medicamentoCatalogoId)
+          .filter((id): id is string => !!id),
+      ),
+    ];
     const catalogos = catalogoIds.length
-      ? await this.medicamentosCatalogoRepository.findBy({ id: In(catalogoIds) })
+      ? await this.medicamentosCatalogoRepository.findBy({
+          id: In(catalogoIds),
+        })
       : [];
-    const catalogoPorId = new Map(catalogos.map(c => [c.id, c]));
+    const catalogoPorId = new Map(catalogos.map((c) => [c.id, c]));
 
-    const items = medicamentos.map(m => {
-      const catalogo = m.medicamentoCatalogoId ? catalogoPorId.get(m.medicamentoCatalogoId) : undefined;
-      const nombre = catalogo?.presentacion ? `${m.nombre} ${catalogo.presentacion}` : m.nombre;
+    const items = medicamentos.map((m) => {
+      const catalogo = m.medicamentoCatalogoId
+        ? catalogoPorId.get(m.medicamentoCatalogoId)
+        : undefined;
+      const nombre = catalogo?.presentacion
+        ? `${m.nombre} ${catalogo.presentacion}`
+        : m.nombre;
       return { nombre, cantidad: m.cantidadCajas };
     });
 
-    const payload = this.pedidosService.buildPayload(visita, paciente, direccion, items);
+    const payload = this.pedidosService.buildPayload(
+      visita,
+      paciente,
+      direccion,
+      items,
+    );
     await this.pedidosService.enviarPedido(payload);
   }
 
   // Envía un pedido a Proyecto 3 con una lista explícita de ítems (repuestos o
   // medicamentos). Mismo patrón tolerante a fallos: si el cliente no tiene email
   // (CustomerID) se omite el envío sin bloquear el flujo — solo se loguea.
-  private async enviarPedidoRepuestos(visita: Visita, items: PrescripcionItem[]): Promise<void> {
+  private async enviarPedidoRepuestos(
+    visita: Visita,
+    items: PrescripcionItem[],
+  ): Promise<void> {
     if (items.length === 0) return;
 
-    const paciente = await this.pacientesRepository.findOne({ where: { id: visita.pacienteId } });
+    const paciente = await this.pacientesRepository.findOne({
+      where: { id: visita.pacienteId },
+    });
     if (!paciente?.email) {
-      this.logger.warn(`No se envía pedido de repuestos a Proyecto 3 para visita ${visita.id}: cliente sin email.`);
+      this.logger.warn(
+        `No se envía pedido de repuestos a Proyecto 3 para visita ${visita.id}: cliente sin email.`,
+      );
       return;
     }
 
     const direccion = visita.direccionPacienteId
-      ? await this.direccionesRepository.findOne({ where: { id: visita.direccionPacienteId } })
+      ? await this.direccionesRepository.findOne({
+          where: { id: visita.direccionPacienteId },
+        })
       : null;
 
-    const payload = this.pedidosService.buildPayload(visita, paciente, direccion, items);
+    const payload = this.pedidosService.buildPayload(
+      visita,
+      paciente,
+      direccion,
+      items,
+    );
     await this.pedidosService.enviarPedido(payload);
   }
 
@@ -661,16 +914,24 @@ export class VisitasService {
 
     await this.enviarPedidoRepuestos(
       visita,
-      dto.repuestos.map(r => ({ nombre: r.nombre, cantidad: r.cantidad })),
+      dto.repuestos.map((r) => ({ nombre: r.nombre, cantidad: r.cantidad })),
     );
 
     return diagnostico;
   }
 
-  async cancelar(id: string, dto: CancelarVisitaDto, usuarioId?: string): Promise<Visita> {
+  async cancelar(
+    id: string,
+    dto: CancelarVisitaDto,
+    usuarioId?: string,
+  ): Promise<Visita> {
     const visita = await this.findOne(id);
-    if (visita.estado === 'CANCELADA') throw new BadRequestException('La visita ya está cancelada');
-    if (visita.estado === 'REALIZADA') throw new BadRequestException('No se puede cancelar una visita realizada');
+    if (visita.estado === 'CANCELADA')
+      throw new BadRequestException('La visita ya está cancelada');
+    if (visita.estado === 'REALIZADA')
+      throw new BadRequestException(
+        'No se puede cancelar una visita realizada',
+      );
 
     const estadoAnterior = visita.estado;
     visita.estado = 'CANCELADA';
@@ -687,16 +948,38 @@ export class VisitasService {
       accion: 'CANCELAR',
       detalle: dto.observacionCancelacion ?? 'Visita cancelada',
     });
-    await this.registrarEstadoHistorial(saved, estadoAnterior, saved.estado, usuarioId, 'Visita cancelada', dto.observacionCancelacion);
+    await this.registrarEstadoHistorial(
+      saved,
+      estadoAnterior,
+      saved.estado,
+      usuarioId,
+      'Visita cancelada',
+      dto.observacionCancelacion,
+    );
 
     await this.googleCalendarSyncService.syncCanceledVisit(saved);
-    await this.sincronizarVisitaAnalytics(saved, { visitType: await this.obtenerVisitType(saved) });
+    await this.sincronizarVisitaAnalytics(saved, {
+      visitType: await this.obtenerVisitType(saved),
+    });
 
-    const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(saved);
-    const motivo = await this.resolverMotivoCancelacion(dto.motivoCancelacionId, dto.observacionCancelacion);
-    await this.notificacionesService.notificarVisitaCancelada(saved, paciente, profesionalUsuario, motivo);
+    const { paciente, profesionalUsuario } =
+      await this.obtenerContactosVisita(saved);
+    const motivo = await this.resolverMotivoCancelacion(
+      dto.motivoCancelacionId,
+      dto.observacionCancelacion,
+    );
+    await this.notificacionesService.notificarVisitaCancelada(
+      saved,
+      paciente,
+      profesionalUsuario,
+      motivo,
+    );
 
-    await this.registrarCancelacionTardiaSiCorresponde(saved, motivo, usuarioId);
+    await this.registrarCancelacionTardiaSiCorresponde(
+      saved,
+      motivo,
+      usuarioId,
+    );
 
     return saved;
   }
@@ -720,12 +1003,15 @@ export class VisitasService {
       if (Number.isNaN(horaProgramada.getTime())) return;
 
       const canceladaAt = visita.canceladaAt ?? new Date();
-      const minutosRestantes = Math.round((horaProgramada.getTime() - canceladaAt.getTime()) / 60_000);
+      const minutosRestantes = Math.round(
+        (horaProgramada.getTime() - canceladaAt.getTime()) / 60_000,
+      );
 
       // Solo es "tardía" si falta menos del umbral (incluye visitas ya vencidas).
       if (minutosRestantes >= CANCELACION_TARDIA_UMBRAL_MIN) return;
 
-      const severidad = minutosRestantes < CANCELACION_TARDIA_ALTA_MIN ? 'ALTA' : 'MEDIA';
+      const severidad =
+        minutosRestantes < CANCELACION_TARDIA_ALTA_MIN ? 'ALTA' : 'MEDIA';
       const detalleTiempo =
         minutosRestantes >= 0
           ? `faltando ${minutosRestantes} minutos para su hora programada`
@@ -758,20 +1044,30 @@ export class VisitasService {
 
   // Arma el texto del motivo para el correo: nombre del motivo catalogado (si se
   // envió uno) + observación libre, cuando existan. Ninguno es obligatorio.
-  private async resolverMotivoCancelacion(motivoCancelacionId?: string, observacion?: string): Promise<string | null> {
+  private async resolverMotivoCancelacion(
+    motivoCancelacionId?: string,
+    observacion?: string,
+  ): Promise<string | null> {
     const partes: string[] = [];
     if (motivoCancelacionId) {
-      const motivo = await this.motivosCancelacionRepository.findOne({ where: { id: motivoCancelacionId } });
+      const motivo = await this.motivosCancelacionRepository.findOne({
+        where: { id: motivoCancelacionId },
+      });
       if (motivo) partes.push(motivo.nombre);
     }
     if (observacion) partes.push(observacion);
     return partes.length > 0 ? partes.join(' — ') : null;
   }
 
-  private async resolverMotivoReprogramacion(motivoReprogramacionId?: string, observacion?: string): Promise<string | null> {
+  private async resolverMotivoReprogramacion(
+    motivoReprogramacionId?: string,
+    observacion?: string,
+  ): Promise<string | null> {
     const partes: string[] = [];
     if (motivoReprogramacionId) {
-      const motivo = await this.motivosReprogramacionRepository.findOne({ where: { id: motivoReprogramacionId } });
+      const motivo = await this.motivosReprogramacionRepository.findOne({
+        where: { id: motivoReprogramacionId },
+      });
       if (motivo) partes.push(motivo.nombre);
     }
     if (observacion) partes.push(observacion);
@@ -791,7 +1087,14 @@ export class VisitasService {
       detalle: 'Visita eliminada (soft delete)',
     });
 
-    await this.registrarEstadoHistorial(saved, saved.estado, saved.estado, usuarioId, 'ELIMINADA', 'Visita eliminada (soft delete)');
+    await this.registrarEstadoHistorial(
+      saved,
+      saved.estado,
+      saved.estado,
+      usuarioId,
+      'ELIMINADA',
+      'Visita eliminada (soft delete)',
+    );
     await this.googleCalendarSyncService.syncCanceledVisit(saved);
 
     return saved;
@@ -808,40 +1111,67 @@ export class VisitasService {
     };
   }
 
-  private isReprogramacion(previous: VisitaScheduleSnapshot, current: VisitaScheduleSnapshot): boolean {
+  private isReprogramacion(
+    previous: VisitaScheduleSnapshot,
+    current: VisitaScheduleSnapshot,
+  ): boolean {
     return (
       previous.profesionalSaludId !== current.profesionalSaludId ||
       previous.zonaId !== current.zonaId ||
-      previous.fechaProgramada !== normalizeVisitaDate(current.fechaProgramada) ||
+      previous.fechaProgramada !==
+        normalizeVisitaDate(current.fechaProgramada) ||
       previous.horaProgramada !== normalizeVisitaTime(current.horaProgramada) ||
-      Number(previous.duracionEstimadaMin) !== Number(current.duracionEstimadaMin ?? 60)
+      Number(previous.duracionEstimadaMin) !==
+        Number(current.duracionEstimadaMin ?? 60)
     );
   }
 
-  private async ensureAgendaDisponible(schedule: VisitaScheduleSnapshot, excludeVisitId?: string): Promise<void> {
-    if (schedule.estado && ESTADOS_SIN_CONFLICTO.includes(schedule.estado)) return;
+  private async ensureAgendaDisponible(
+    schedule: VisitaScheduleSnapshot,
+    excludeVisitId?: string,
+  ): Promise<void> {
+    if (schedule.estado && ESTADOS_SIN_CONFLICTO.includes(schedule.estado))
+      return;
 
     const fechaProgramada = normalizeVisitaDate(schedule.fechaProgramada);
     const horaProgramada = normalizeVisitaTime(schedule.horaProgramada);
     const duracionEstimadaMin = Number(schedule.duracionEstimadaMin ?? 60);
     const startAt = toSqlTimestamp(fechaProgramada, horaProgramada);
-    const end = addMinutesToDateTime(fechaProgramada, horaProgramada, duracionEstimadaMin);
+    const end = addMinutesToDateTime(
+      fechaProgramada,
+      horaProgramada,
+      duracionEstimadaMin,
+    );
     const endAt = toSqlTimestamp(end.date, end.time);
 
     const visitasQb = this.visitasRepository
       .createQueryBuilder('visita')
       .where('visita.deleted_at IS NULL')
-      .andWhere('visita.profesional_salud_id = :profesionalSaludId', { profesionalSaludId: schedule.profesionalSaludId })
-      .andWhere('visita.estado NOT IN (:...estadosSinConflicto)', { estadosSinConflicto: ESTADOS_SIN_CONFLICTO })
-      .andWhere('visita.fecha_programada = :fechaProgramada', { fechaProgramada })
-      .andWhere('(visita.fecha_programada + visita.hora_programada) < :endAt', { endAt })
-      .andWhere("((visita.fecha_programada + visita.hora_programada) + (COALESCE(visita.duracion_estimada_min, 60) * INTERVAL '1 minute')) > :startAt", { startAt });
+      .andWhere('visita.profesional_salud_id = :profesionalSaludId', {
+        profesionalSaludId: schedule.profesionalSaludId,
+      })
+      .andWhere('visita.estado NOT IN (:...estadosSinConflicto)', {
+        estadosSinConflicto: ESTADOS_SIN_CONFLICTO,
+      })
+      .andWhere('visita.fecha_programada = :fechaProgramada', {
+        fechaProgramada,
+      })
+      .andWhere('(visita.fecha_programada + visita.hora_programada) < :endAt', {
+        endAt,
+      })
+      .andWhere(
+        "((visita.fecha_programada + visita.hora_programada) + (COALESCE(visita.duracion_estimada_min, 60) * INTERVAL '1 minute')) > :startAt",
+        { startAt },
+      );
 
-    if (excludeVisitId) visitasQb.andWhere('visita.id <> :excludeVisitId', { excludeVisitId });
+    if (excludeVisitId)
+      visitasQb.andWhere('visita.id <> :excludeVisitId', { excludeVisitId });
 
     const visitaConflicto = await visitasQb.getOne();
     if (visitaConflicto) {
-      throw new BadRequestException('El profesional ya tiene una visita programada en ese horario.');
+      throw new BadRequestException(
+        'El profesional ya tiene una visita programada en ese horario.',
+      );
     }
 
     const bloqueosQb = this.bloqueosRepository
@@ -854,17 +1184,26 @@ export class VisitasService {
         schedule.zonaId
           ? '(bloqueo.profesional_salud_id = :profesionalSaludId OR bloqueo.zona_id = :zonaId OR (bloqueo.profesional_salud_id IS NULL AND bloqueo.zona_id IS NULL))'
           : '(bloqueo.profesional_salud_id = :profesionalSaludId OR (bloqueo.profesional_salud_id IS NULL AND bloqueo.zona_id IS NULL))',
-        { profesionalSaludId: schedule.profesionalSaludId, zonaId: schedule.zonaId },
+        {
+          profesionalSaludId: schedule.profesionalSaludId,
+          zonaId: schedule.zonaId,
+        },
       );
 
     const bloqueoConflicto = await bloqueosQb.getOne();
 
     if (bloqueoConflicto) {
-      throw new BadRequestException('El profesional tiene un bloqueo de agenda en ese horario.');
+      throw new BadRequestException(
+        'El profesional tiene un bloqueo de agenda en ese horario.',
+      );
     }
   }
 
-  private async registrarReprogramacion(visita: Visita, previous: VisitaScheduleSnapshot, usuarioId?: string): Promise<void> {
+  private async registrarReprogramacion(
+    visita: Visita,
+    previous: VisitaScheduleSnapshot,
+    usuarioId?: string,
+  ): Promise<void> {
     const reprogramadaPorUsuarioId = usuarioId ?? visita.creadaPorUsuarioId;
     if (!reprogramadaPorUsuarioId) return;
 
@@ -904,30 +1243,43 @@ export class VisitasService {
     );
   }
 
-  private async ensureReferences(dto: Partial<CreateVisitaDto & UpdateVisitaDto>) {
+  private async ensureReferences(
+    dto: Partial<CreateVisitaDto & UpdateVisitaDto>,
+  ) {
     if (dto.pacienteId) {
-      const exists = await this.pacientesRepository.exist({ where: { id: dto.pacienteId, deletedAt: IsNull() } });
+      const exists = await this.pacientesRepository.exist({
+        where: { id: dto.pacienteId, deletedAt: IsNull() },
+      });
       if (!exists) throw new NotFoundException('Paciente no encontrado');
     }
 
     if (dto.profesionalSaludId) {
-      const exists = await this.profesionalesRepository.exist({ where: { id: dto.profesionalSaludId, deletedAt: IsNull() } });
+      const exists = await this.profesionalesRepository.exist({
+        where: { id: dto.profesionalSaludId, deletedAt: IsNull() },
+      });
       if (!exists) throw new NotFoundException('Profesional no encontrado');
     }
 
     if (dto.zonaId) {
-      const exists = await this.zonasRepository.exist({ where: { id: dto.zonaId, deletedAt: IsNull() } });
+      const exists = await this.zonasRepository.exist({
+        where: { id: dto.zonaId, deletedAt: IsNull() },
+      });
       if (!exists) throw new NotFoundException('Zona no encontrada');
     }
 
     if (dto.planCuidadoId) {
-      const exists = await this.planesRepository.exist({ where: { id: dto.planCuidadoId, deletedAt: IsNull() } });
+      const exists = await this.planesRepository.exist({
+        where: { id: dto.planCuidadoId, deletedAt: IsNull() },
+      });
       if (!exists) throw new NotFoundException('Plan de cuidado no encontrado');
     }
 
     if (dto.direccionPacienteId) {
-      const exists = await this.direccionesRepository.exist({ where: { id: dto.direccionPacienteId, deletedAt: IsNull() } });
-      if (!exists) throw new NotFoundException('Dirección de paciente no encontrada');
+      const exists = await this.direccionesRepository.exist({
+        where: { id: dto.direccionPacienteId, deletedAt: IsNull() },
+      });
+      if (!exists)
+        throw new NotFoundException('Dirección de paciente no encontrada');
     }
   }
 
@@ -946,15 +1298,24 @@ export class VisitasService {
     });
 
     const activas = visitas.filter(
-      v => !ESTADOS_SIN_CONFLICTO.includes(v.estado) && v.estado !== 'REPROGRAMADA',
+      (v) =>
+        !ESTADOS_SIN_CONFLICTO.includes(v.estado) &&
+        v.estado !== 'REPROGRAMADA',
     );
 
     for (const visita of activas) {
-      const { paciente, profesionalUsuario } = await this.obtenerContactosVisita(visita);
-      await this.notificacionesService.notificarRecordatorioVisita(visita, paciente, profesionalUsuario);
+      const { paciente, profesionalUsuario } =
+        await this.obtenerContactosVisita(visita);
+      await this.notificacionesService.notificarRecordatorioVisita(
+        visita,
+        paciente,
+        profesionalUsuario,
+      );
     }
 
-    this.logger.log(`Recordatorios del día siguiente (${fecha}): ${activas.length} visita(s) notificadas.`);
+    this.logger.log(
+      `Recordatorios del día siguiente (${fecha}): ${activas.length} visita(s) notificadas.`,
+    );
   }
 }
 
@@ -967,10 +1328,16 @@ function normalizeVisitaDate(value: Date | string): string {
   return value;
 }
 
-function addMinutesToDateTime(date: string, time: string, minutes: number): { date: string; time: string } {
+function addMinutesToDateTime(
+  date: string,
+  time: string,
+  minutes: number,
+): { date: string; time: string } {
   const [year, month, day] = date.split('-').map(Number);
   const [hours, mins, seconds] = time.split(':').map(Number);
-  const start = new Date(Date.UTC(year, month - 1, day, hours, mins, seconds ?? 0));
+  const start = new Date(
+    Date.UTC(year, month - 1, day, hours, mins, seconds ?? 0),
+  );
   start.setUTCMinutes(start.getUTCMinutes() + minutes);
   return {
     date: start.toISOString().slice(0, 10),
@@ -982,9 +1349,15 @@ function toSqlTimestamp(date: string, time: string): string {
   return `${date} ${normalizeVisitaTime(time)}`;
 }
 
-function buildDateInTimeZone(date: string, time: string, timeZone: string): Date {
+function buildDateInTimeZone(
+  date: string,
+  time: string,
+  timeZone: string,
+): Date {
   const [year, month, day] = date.split('-').map(Number);
-  const [hours, minutes, seconds] = normalizeVisitaTime(time).split(':').map(Number);
+  const [hours, minutes, seconds] = normalizeVisitaTime(time)
+    .split(':')
+    .map(Number);
   const utcGuess = Date.UTC(year, month - 1, day, hours, minutes, seconds ?? 0);
   const offset = getTimeZoneOffsetMs(new Date(utcGuess), timeZone);
   const firstPass = utcGuess - offset;
@@ -1006,8 +1379,8 @@ function getTimeZoneOffsetMs(date: Date, timeZone: string): number {
 
   const values = Object.fromEntries(
     parts
-      .filter(part => part.type !== 'literal')
-      .map(part => [part.type, Number(part.value)]),
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, Number(part.value)]),
   );
 
   const asUtc = Date.UTC(

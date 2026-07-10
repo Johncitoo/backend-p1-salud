@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -18,15 +22,25 @@ export class DiagnosticosService {
 
   // Una visita puede tener múltiples diagnósticos a lo largo de varias fichas
   // clínicas (a diferencia de FichaClinica, que solo admite una por visita).
-  async findAll(filtros?: { visitaId?: string }, user?: UsuarioPerfil): Promise<Diagnostico[]> {
+  async findAll(
+    filtros?: { visitaId?: string },
+    user?: UsuarioPerfil,
+  ): Promise<Diagnostico[]> {
     if (user?.rol === 'PROFESIONAL') {
       if (!filtros?.visitaId) {
-        throw new ForbiddenException('Debes especificar una visita para consultar sus diagnósticos.');
+        throw new ForbiddenException(
+          'Debes especificar una visita para consultar sus diagnósticos.',
+        );
       }
-      await this.pacienteAccessService.assertAccesoVisita(user, filtros.visitaId);
+      await this.pacienteAccessService.assertAccesoVisita(
+        user,
+        filtros.visitaId,
+      );
     }
 
-    const qb = this.repository.createQueryBuilder('d').where('d.deleted_at IS NULL');
+    const qb = this.repository
+      .createQueryBuilder('d')
+      .where('d.deleted_at IS NULL');
 
     if (filtros?.visitaId)
       qb.andWhere('d.visita_id = :visitaId', { visitaId: filtros.visitaId });
@@ -39,11 +53,17 @@ export class DiagnosticosService {
     if (!diagnostico || diagnostico.deletedAt) {
       throw new NotFoundException('Diagnóstico no encontrado');
     }
-    await this.pacienteAccessService.assertAccesoVisita(user, diagnostico.visitaId);
+    await this.pacienteAccessService.assertAccesoVisita(
+      user,
+      diagnostico.visitaId,
+    );
     return diagnostico;
   }
 
-  async create(dto: CreateDiagnosticoDto, usuarioId?: string): Promise<Diagnostico> {
+  async create(
+    dto: CreateDiagnosticoDto,
+    usuarioId?: string,
+  ): Promise<Diagnostico> {
     const diagnostico = this.repository.create({
       ...dto,
       creadoPorUsuarioId: usuarioId,

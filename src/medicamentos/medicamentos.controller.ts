@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -16,7 +27,10 @@ export class MedicamentosController {
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
-  findAll(@Query('visitaId') visitaId?: string, @CurrentUser() user?: UsuarioPerfil) {
+  findAll(
+    @Query('visitaId') visitaId?: string,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     return this.medicamentosService.findAll({ visitaId }, user);
   }
 
@@ -30,7 +44,10 @@ export class MedicamentosController {
 
   @Post('catalogo')
   @Roles('ADMIN')
-  createCatalogo(@Body() dto: CreateMedicamentoCatalogoDto, @Request() req: any) {
+  createCatalogo(
+    @Body() dto: CreateMedicamentoCatalogoDto,
+    @Request() req: any,
+  ) {
     return this.medicamentosService.createCatalogo(dto, req.user?.id);
   }
 
@@ -58,7 +75,11 @@ export class MedicamentosController {
 
   @Delete(':id')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.medicamentosService.remove(id, req.user?.id);
+  remove(
+    @Param('id') id: string,
+    @Request() req: any,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
+    return this.medicamentosService.remove(id, req.user?.id, user);
   }
 }

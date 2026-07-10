@@ -1,4 +1,17 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
@@ -12,8 +25,10 @@ import { UploadDocumentoAdjuntoDto } from './dto/upload-documento-adjunto.dto';
 import type { UploadedClinicalFile } from './types/uploaded-file.type';
 
 const MAX_MULTIPART_BYTES = 15 * 1024 * 1024;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const uuidOrUndefined = (value?: string) => (value && UUID_RE.test(value) ? value : undefined);
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuidOrUndefined = (value?: string) =>
+  value && UUID_RE.test(value) ? value : undefined;
 
 @Controller('documentos-adjuntos')
 @UseGuards(DevAuthGuard, RolesGuard)
@@ -25,7 +40,9 @@ export class DocumentosAdjuntosController {
   // Límite propio, más estricto que el global: hasta 15MB por request, sin
   // esto un cliente podía mandar carga masiva de archivos sin ningún freno.
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_MULTIPART_BYTES } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_MULTIPART_BYTES } }),
+  )
   upload(
     @UploadedFile() file: UploadedClinicalFile,
     @Body() dto: UploadDocumentoAdjuntoDto,
@@ -36,7 +53,10 @@ export class DocumentosAdjuntosController {
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
-  findAll(@Query('fichaClinicaId') fichaClinicaId?: string, @CurrentUser() user?: UsuarioPerfil) {
+  findAll(
+    @Query('fichaClinicaId') fichaClinicaId?: string,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     return this.service.findAll({ fichaClinicaId }, user);
   }
 
@@ -47,16 +67,26 @@ export class DocumentosAdjuntosController {
     @CurrentUser() user: UsuarioPerfil | undefined,
     @Res() response: Response,
   ) {
-    const file = await this.service.download(id, uuidOrUndefined(user?.id), user);
+    const file = await this.service.download(
+      id,
+      uuidOrUndefined(user?.id),
+      user,
+    );
     response.setHeader('Content-Type', file.mimeType);
     response.setHeader('Content-Length', file.buffer.length);
-    response.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"`);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(file.fileName)}"`,
+    );
     response.send(file.buffer);
   }
 
   @Delete(':id')
   @Roles('ADMIN', 'COORDINADOR')
-  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     return this.service.remove(id, uuidOrUndefined(user?.id));
   }
 }

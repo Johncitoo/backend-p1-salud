@@ -69,7 +69,9 @@ export function normalizarRut(rut: string): string {
   if (!trimmed) return trimmed;
 
   if (!validarRut(trimmed)) {
-    throw new Error(`RUT "${rut}" no es válido (dígito verificador incorrecto)`);
+    throw new Error(
+      `RUT "${rut}" no es válido (dígito verificador incorrecto)`,
+    );
   }
 
   return formatearRut(trimmed);

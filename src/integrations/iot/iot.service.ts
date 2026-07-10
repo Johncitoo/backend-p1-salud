@@ -15,7 +15,11 @@ import { IncidentesSaludService } from '../../incidentes-salud/incidentes-salud.
 // =========================================================
 
 // Tipos de sensores que maneja el Grupo 8
-type SensorType = 'thermometer' | 'glucometer' | 'pulse_oximeter' | 'sphygmomanometer';
+type SensorType =
+  | 'thermometer'
+  | 'glucometer'
+  | 'pulse_oximeter'
+  | 'sphygmomanometer';
 
 // Lectura de telemetría del Grupo 8
 export type IoTTelemetryReading = {
@@ -107,10 +111,18 @@ export const CLINICAL_ALERT_TYPES = new Set<string>([
 // en ese momento (assetId+sensorId es único por diseño en PacienteSensor, así
 // que no puede estar asignado a varios pacientes a la vez — se reasigna en
 // cada visita, igual que un tensiómetro físico portátil que se comparte).
-export const PORTABLE_KIT_SENSORS: Array<{ sensorId: string; assetId: string; sensorType: SensorType }> = [
+export const PORTABLE_KIT_SENSORS: Array<{
+  sensorId: string;
+  assetId: string;
+  sensorType: SensorType;
+}> = [
   { sensorId: 'GLUCO-001', assetId: 'PATIENT-001', sensorType: 'glucometer' },
   { sensorId: 'OXI-001', assetId: 'PATIENT-001', sensorType: 'pulse_oximeter' },
-  { sensorId: 'BP-001', assetId: 'PATIENT-001', sensorType: 'sphygmomanometer' },
+  {
+    sensorId: 'BP-001',
+    assetId: 'PATIENT-001',
+    sensorType: 'sphygmomanometer',
+  },
 ];
 
 @Injectable()
@@ -152,7 +164,9 @@ export class IoTService {
     }
 
     if (!baseUrl) {
-      this.logger.warn(`IOT_ENABLED=true pero IOT_API_URL está vacío. Petición no realizada: GET ${path}`);
+      this.logger.warn(
+        `IOT_ENABLED=true pero IOT_API_URL está vacío. Petición no realizada: GET ${path}`,
+      );
       return null;
     }
 
@@ -165,11 +179,13 @@ export class IoTService {
       });
 
       if (!response.ok) {
-        this.logger.error(`IoT API respondió HTTP ${response.status} en GET ${path}`);
+        this.logger.error(
+          `IoT API respondió HTTP ${response.status} en GET ${path}`,
+        );
         return null;
       }
 
-      return await response.json() as T;
+      return (await response.json()) as T;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`No se pudo conectar con IoT API: ${message}`);
@@ -202,25 +218,37 @@ export class IoTService {
     return this.fetchFromIoT<IoTTelemetryReading>('/sensors/latest');
   }
 
-  async getReadingsBySensor(sensorId: string, limit?: number): Promise<IoTTelemetryReading[] | null> {
+  async getReadingsBySensor(
+    sensorId: string,
+    limit?: number,
+  ): Promise<IoTTelemetryReading[] | null> {
     const query = limit ? `?limit=${limit}` : '';
-    return this.fetchListFromIoT<IoTTelemetryReading>(`/sensors/sensor/${sensorId}${query}`);
+    return this.fetchListFromIoT<IoTTelemetryReading>(
+      `/sensors/sensor/${sensorId}${query}`,
+    );
   }
 
   async getAllAlerts(): Promise<IoTAlert[] | null> {
     return this.fetchListFromIoT<IoTAlert>('/alerts');
   }
 
-  async getAlertsBySensor(sensorId: string, limit?: number): Promise<IoTAlert[] | null> {
+  async getAlertsBySensor(
+    sensorId: string,
+    limit?: number,
+  ): Promise<IoTAlert[] | null> {
     const query = limit ? `?limit=${limit}` : '';
-    return this.fetchListFromIoT<IoTAlert>(`/alerts/sensor/${sensorId}${query}`);
+    return this.fetchListFromIoT<IoTAlert>(
+      `/alerts/sensor/${sensorId}${query}`,
+    );
   }
 
   // Catálogo de dispositivos disponibles para vincular a un paciente. A
   // diferencia de los otros métodos de lista, aquí devolvemos la respuesta
   // paginada completa (data + page/limit/total) porque el frontend necesita
   // esa metadata para paginar y buscar.
-  async getDeviceCatalog(params: IoTDeviceCatalogParams = {}): Promise<IoTDeviceCatalog | null> {
+  async getDeviceCatalog(
+    params: IoTDeviceCatalogParams = {},
+  ): Promise<IoTDeviceCatalog | null> {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.limit) query.set('limit', String(params.limit));
@@ -228,7 +256,9 @@ export class IoTService {
     if (params.search) query.set('search', params.search);
 
     const qs = query.toString();
-    return this.fetchFromIoT<IoTDeviceCatalog>(`/sensors/devices${qs ? `?${qs}` : ''}`);
+    return this.fetchFromIoT<IoTDeviceCatalog>(
+      `/sensors/devices${qs ? `?${qs}` : ''}`,
+    );
   }
 
   // =========================================================
@@ -238,7 +268,9 @@ export class IoTService {
   // guardar en mediciones_clinicas.
   // =========================================================
 
-  extractMediciones(reading: IoTTelemetryReading): Array<{ codigoVariable: string; valor: number }> {
+  extractMediciones(
+    reading: IoTTelemetryReading,
+  ): Array<{ codigoVariable: string; valor: number }> {
     const mediciones: Array<{ codigoVariable: string; valor: number }> = [];
 
     for (const [iotField, variableCodigo] of Object.entries(IOT_VARIABLE_MAP)) {
@@ -259,24 +291,32 @@ export class IoTService {
     try {
       const pacienteSensor = await this.pacienteSensorRepo.findOne({
         where: { assetId: reading.assetId, isActive: true },
-        relations: ['paciente']
+        relations: ['paciente'],
       });
 
       if (!pacienteSensor) {
-        this.logger.warn(`No se encontró paciente activo para assetId: ${reading.assetId}`);
+        this.logger.warn(
+          `No se encontró paciente activo para assetId: ${reading.assetId}`,
+        );
         return;
       }
 
       const mediciones = this.extractMediciones(reading);
 
       for (const med of mediciones) {
-        const variable = await this.variablesClinicasService.findByCodigo(med.codigoVariable);
+        const variable = await this.variablesClinicasService.findByCodigo(
+          med.codigoVariable,
+        );
         if (!variable) {
-          this.logger.warn(`Variable clínica no encontrada: ${med.codigoVariable}`);
+          this.logger.warn(
+            `Variable clínica no encontrada: ${med.codigoVariable}`,
+          );
           continue;
         }
 
-        const fechaMedicion = reading.createdAt ? new Date(reading.createdAt) : new Date();
+        const fechaMedicion = reading.createdAt
+          ? new Date(reading.createdAt)
+          : new Date();
 
         // Evitar duplicados revisando si ya existe un registro con la misma fecha
         if (reading.createdAt) {
@@ -285,7 +325,7 @@ export class IoTService {
             variableClinicaId: variable.id,
             origen: 'IOT',
             fechaDesde: fechaMedicion.toISOString(),
-            fechaHasta: fechaMedicion.toISOString()
+            fechaHasta: fechaMedicion.toISOString(),
           });
 
           if (existentes && existentes.length > 0) {
@@ -301,9 +341,13 @@ export class IoTService {
           fechaMedicion: fechaMedicion,
         });
       }
-      this.logger.log(`Procesadas ${mediciones.length} mediciones para assetId: ${reading.assetId}`);
+      this.logger.log(
+        `Procesadas ${mediciones.length} mediciones para assetId: ${reading.assetId}`,
+      );
     } catch (error) {
-      this.logger.error(`Error procesando telemetría: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `Error procesando telemetría: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -313,11 +357,13 @@ export class IoTService {
       // El equipo 8 dice que el sensorId es "OXI-001" pero también hay un assetId.
       // Si la alerta solo trae sensorId, buscamos por sensorId
       const pacienteSensor = await this.pacienteSensorRepo.findOne({
-        where: { sensorId: alert.sensorId, isActive: true }
+        where: { sensorId: alert.sensorId, isActive: true },
       });
 
       if (!pacienteSensor) {
-        this.logger.warn(`No se encontró paciente para alerta de sensorId: ${alert.sensorId}`);
+        this.logger.warn(
+          `No se encontró paciente para alerta de sensorId: ${alert.sensorId}`,
+        );
         return;
       }
 
@@ -356,10 +402,13 @@ export class IoTService {
       }
 
       // Deduplicación: evita re-crear la misma alerta/incidente en cada sync.
-      const existentes = await this.alertasService.findAll({ pacienteId: pacienteSensor.pacienteId });
-      const duplicate = existentes.find(a =>
-        a.mensaje === alert.message &&
-        a.tipo === `IOT_${alert.type.toUpperCase()}`
+      const existentes = await this.alertasService.findAll({
+        pacienteId: pacienteSensor.pacienteId,
+      });
+      const duplicate = existentes.find(
+        (a) =>
+          a.mensaje === alert.message &&
+          a.tipo === `IOT_${alert.type.toUpperCase()}`,
       );
       if (duplicate) {
         return; // Evitar duplicar alertas idénticas
@@ -371,7 +420,9 @@ export class IoTService {
         mensaje: alert.message,
         prioridad: nivel,
       });
-      this.logger.log(`Alerta IoT (${alert.type}, ${nivel}) creada para paciente ${pacienteSensor.pacienteId}`);
+      this.logger.log(
+        `Alerta IoT (${alert.type}, ${nivel}) creada para paciente ${pacienteSensor.pacienteId}`,
+      );
 
       // Toda alerta genera un incidente (clínico o técnico) para dejar registro
       // ordenado y escalarlo a Grupo 11 con la prioridad correspondiente. Guardamos
@@ -393,7 +444,9 @@ export class IoTService {
         },
       });
     } catch (error) {
-      this.logger.error(`Error procesando alerta: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `Error procesando alerta: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -404,7 +457,7 @@ export class IoTService {
   async getSensorsByPatient(pacienteId: string): Promise<PacienteSensor[]> {
     return this.pacienteSensorRepo.find({
       where: { pacienteId, isActive: true },
-      order: { createdAt: 'DESC' }
+      order: { createdAt: 'DESC' },
     });
   }
 
@@ -412,11 +465,11 @@ export class IoTService {
     pacienteId: string,
     assetId: string,
     sensorId: string,
-    sensorType: SensorType
+    sensorType: SensorType,
   ): Promise<PacienteSensor> {
     // Buscar si ya existe la vinculación exacta inactiva y reactivarla, o crear nueva
     let sensor = await this.pacienteSensorRepo.findOne({
-      where: { assetId, sensorId }
+      where: { assetId, sensorId },
     });
 
     if (sensor) {
@@ -446,7 +499,12 @@ export class IoTService {
   async claimPortableKit(pacienteId: string): Promise<PacienteSensor[]> {
     const asignados: PacienteSensor[] = [];
     for (const s of PORTABLE_KIT_SENSORS) {
-      const sensor = await this.assignSensorToPatient(pacienteId, s.assetId, s.sensorId, s.sensorType);
+      const sensor = await this.assignSensorToPatient(
+        pacienteId,
+        s.assetId,
+        s.sensorId,
+        s.sensorType,
+      );
       asignados.push(sensor);
     }
     return asignados;
@@ -461,7 +519,9 @@ export class IoTService {
   // solo trae las ~25 lecturas más recientes de toda la plataforma, y con
   // cientos de sensores simulados los del paciente podían no aparecer, dejando
   // los signos vitales vacíos.
-  async getLatestVitalsForPatient(pacienteId: string): Promise<Record<string, number>> {
+  async getLatestVitalsForPatient(
+    pacienteId: string,
+  ): Promise<Record<string, number>> {
     const sensoresPaciente = await this.getSensorsByPatient(pacienteId);
     if (sensoresPaciente.length === 0) return {};
 
@@ -470,7 +530,9 @@ export class IoTService {
       const lecturas = await this.getReadingsBySensor(sensor.sensorId, 1);
       const lectura = lecturas?.[0];
       if (!lectura) continue;
-      for (const [campoIot, valor] of Object.entries(this.extractMedicionesRaw(lectura))) {
+      for (const [campoIot, valor] of Object.entries(
+        this.extractMedicionesRaw(lectura),
+      )) {
         vitales[campoIot] = valor;
       }
     }
@@ -479,7 +541,9 @@ export class IoTService {
 
   // Igual que extractMediciones pero devuelve { codigoVariable: valor } en vez
   // de un array, para armar el objeto plano de getLatestVitalsForPatient.
-  private extractMedicionesRaw(reading: IoTTelemetryReading): Record<string, number> {
+  private extractMedicionesRaw(
+    reading: IoTTelemetryReading,
+  ): Record<string, number> {
     const out: Record<string, number> = {};
     for (const [iotField, variableCodigo] of Object.entries(IOT_VARIABLE_MAP)) {
       const value = reading[iotField as keyof IoTTelemetryReading];

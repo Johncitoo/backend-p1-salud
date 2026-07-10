@@ -46,14 +46,24 @@ describe('CrmService', () => {
 
   describe('debeEnviarTicket', () => {
     it('envía a CRM los incidentes manuales (origen WEB/APP)', () => {
-      expect(service.debeEnviarTicket({ origen: 'WEB' } as IncidenteSalud)).toBe(true);
-      expect(service.debeEnviarTicket({ origen: 'APP' } as IncidenteSalud)).toBe(true);
-      expect(service.debeEnviarTicket({ origen: 'web' } as IncidenteSalud)).toBe(true);
+      expect(
+        service.debeEnviarTicket({ origen: 'WEB' } as IncidenteSalud),
+      ).toBe(true);
+      expect(
+        service.debeEnviarTicket({ origen: 'APP' } as IncidenteSalud),
+      ).toBe(true);
+      expect(
+        service.debeEnviarTicket({ origen: 'web' } as IncidenteSalud),
+      ).toBe(true);
     });
 
     it('NO envía a CRM los incidentes automáticos del sistema ni de integración', () => {
-      expect(service.debeEnviarTicket({ origen: 'SISTEMA' } as IncidenteSalud)).toBe(false);
-      expect(service.debeEnviarTicket({ origen: 'INTEGRACION' } as IncidenteSalud)).toBe(false);
+      expect(
+        service.debeEnviarTicket({ origen: 'SISTEMA' } as IncidenteSalud),
+      ).toBe(false);
+      expect(
+        service.debeEnviarTicket({ origen: 'INTEGRACION' } as IncidenteSalud),
+      ).toBe(false);
       expect(service.debeEnviarTicket({} as IncidenteSalud)).toBe(false);
     });
   });
@@ -67,7 +77,7 @@ describe('CrmService', () => {
         sistema_id: 'P01' as any,
         cliente_nombre: 'John Doe',
       };
-      
+
       const responseData = { data: { ok: true, ticket: { id: '123' } } };
       mockHttpService.post.mockReturnValue(of(responseData));
 
@@ -94,8 +104,10 @@ describe('CrmService', () => {
         sistema_id: 'P01' as any,
         cliente_nombre: 'Jane Doe',
       };
-      
-      mockHttpService.post.mockReturnValue(throwError(() => new Error('API Error')));
+
+      mockHttpService.post.mockReturnValue(
+        throwError(() => new Error('API Error')),
+      );
 
       const result = await service.crearTicket(payload);
 
@@ -115,12 +127,16 @@ describe('CrmService', () => {
       };
       mockHttpService.get.mockReturnValue(of({ data: { ok: true, ticket } }));
       const result = await service.consultarEstadoTicket('t-123');
-      expect(mockHttpService.get).toHaveBeenCalledWith('http://mock-crm.url/api/t-123?api_key=mock-key');
+      expect(mockHttpService.get).toHaveBeenCalledWith(
+        'http://mock-crm.url/api/t-123?api_key=mock-key',
+      );
       expect(result).toEqual(ticket);
     });
 
     it('should return null when error occurs', async () => {
-      mockHttpService.get.mockReturnValue(throwError(() => new Error('API Error')));
+      mockHttpService.get.mockReturnValue(
+        throwError(() => new Error('API Error')),
+      );
       const estado = await service.consultarEstadoTicket('t-123');
       expect(estado).toBeNull();
     });
@@ -130,7 +146,9 @@ describe('CrmService', () => {
     it('should extract ticket id from common CRM response shapes', () => {
       expect(service.extractTicketId({ ticket: { id: 't-1' } })).toBe('t-1');
       expect(service.extractTicketId({ id: 't-2' })).toBe('t-2');
-      expect(service.extractTicketId({ data: { ticket: { id: 't-3' } } })).toBe('t-3');
+      expect(service.extractTicketId({ data: { ticket: { id: 't-3' } } })).toBe(
+        't-3',
+      );
       expect(service.extractTicketId({ ok: true })).toBeNull();
     });
   });
@@ -164,7 +182,10 @@ describe('CrmService', () => {
         cliente_email: 'juan@example.com',
         cliente_telefono: '+56912345678',
         salud_ref: 'inc-123',
-        contexto: JSON.stringify({ origen: 'SISTEMA', modulo: 'Incidentes Salud' }),
+        contexto: JSON.stringify({
+          origen: 'SISTEMA',
+          modulo: 'Incidentes Salud',
+        }),
       });
     });
 
@@ -187,7 +208,10 @@ describe('CrmService', () => {
         cliente_email: 'no-reply@salud.cl',
         cliente_telefono: undefined,
         salud_ref: 'inc-456',
-        contexto: JSON.stringify({ origen: 'SISTEMA', modulo: 'Incidentes Salud' }),
+        contexto: JSON.stringify({
+          origen: 'SISTEMA',
+          modulo: 'Incidentes Salud',
+        }),
       });
     });
   });

@@ -1,16 +1,19 @@
-import { Column, Entity, PrimaryGeneratedColumn, VersionColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, VersionColumn, Index } from 'typeorm';
 
 @Entity({ name: 'visitas' })
 export class Visita {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column({ name: 'paciente_id', type: 'uuid' })
   pacienteId: string;
 
+  @Index()
   @Column({ name: 'profesional_salud_id', type: 'uuid' })
   profesionalSaludId: string;
 
+  @Index()
   @Column({ name: 'zona_id', type: 'uuid', nullable: true })
   zonaId?: string | null;
 
@@ -62,31 +65,63 @@ export class Visita {
   @Column({ name: 'observacion_cancelacion', type: 'text', nullable: true })
   observacionCancelacion?: string | null;
 
-  @Column({ name: 'google_calendar_connection_id', type: 'uuid', nullable: true })
+  @Column({
+    name: 'google_calendar_connection_id',
+    type: 'uuid',
+    nullable: true,
+  })
   googleCalendarConnectionId?: string | null;
 
-  @Column({ name: 'google_calendar_id', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'google_calendar_id',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   googleCalendarId?: string | null;
 
-  @Column({ name: 'google_calendar_event_id', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'google_calendar_event_id',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   googleCalendarEventId?: string | null;
 
-  @Column({ name: 'google_calendar_event_etag', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'google_calendar_event_etag',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   googleCalendarEventEtag?: string | null;
 
   @Column({ name: 'google_calendar_html_link', type: 'text', nullable: true })
   googleCalendarHtmlLink?: string | null;
 
-  @Column({ name: 'google_calendar_sync_status', type: 'varchar', length: 30, default: 'PENDING' })
+  @Column({
+    name: 'google_calendar_sync_status',
+    type: 'varchar',
+    length: 30,
+    default: 'PENDING',
+  })
   googleCalendarSyncStatus: string;
 
-  @Column({ name: 'google_calendar_last_sync_at', type: 'timestamp', nullable: true })
+  @Column({
+    name: 'google_calendar_last_sync_at',
+    type: 'timestamp',
+    nullable: true,
+  })
   googleCalendarLastSyncAt?: Date | null;
 
   @Column({ name: 'google_calendar_last_error', type: 'text', nullable: true })
   googleCalendarLastError?: string | null;
 
-  @Column({ name: 'google_calendar_sync_attempts', type: 'integer', default: 0 })
+  @Column({
+    name: 'google_calendar_sync_attempts',
+    type: 'integer',
+    default: 0,
+  })
   googleCalendarSyncAttempts: number;
 
   @VersionColumn()

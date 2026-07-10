@@ -21,7 +21,12 @@ import { IncidenteSalud } from '../../incidentes-salud/entities/incidente-salud.
 
 type Prioridad = 'critica' | 'alta' | 'media' | 'baja';
 type Severity = 'low' | 'medium' | 'high' | 'critical';
-type EventStatus = 'pending' | 'in_progress' | 'resolved' | 'closed' | 'cancelled';
+type EventStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'resolved'
+  | 'closed'
+  | 'cancelled';
 
 export interface IncidenteOperacionalEvent {
   // --- Obligatorios del contrato oficial (Dashboard + SLA) ---
@@ -82,10 +87,14 @@ export class IncidentesService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.apiUrl = this.configService.get<string>('INCIDENTES_API_URL') || 'https://proyecto11-mochicode.onrender.com/api/v1/alertas';
-    this.apiKey = this.configService.get<string>('INCIDENTES_API_KEY') || 'auth_p01_secret';
+    this.apiUrl =
+      this.configService.get<string>('INCIDENTES_API_URL') ||
+      'https://proyecto11-mochicode.onrender.com/api/v1/alertas';
+    this.apiKey =
+      this.configService.get<string>('INCIDENTES_API_KEY') || 'auth_p01_secret';
     // Configurable: debe coincidir con la api-key o Grupo 11 responde 401.
-    this.sistemaId = this.configService.get<string>('INCIDENTES_SISTEMA_ID') || 'P1';
+    this.sistemaId =
+      this.configService.get<string>('INCIDENTES_SISTEMA_ID') || 'P1';
   }
 
   /**
@@ -118,7 +127,11 @@ export class IncidentesService {
       payload: evento,
     };
 
-    for (let attempt = 1; attempt <= IncidentesService.MAX_ATTEMPTS; attempt++) {
+    for (
+      let attempt = 1;
+      attempt <= IncidentesService.MAX_ATTEMPTS;
+      attempt++
+    ) {
       try {
         this.logger.log(
           `Enviando incidente operacional (Ref: ${incidente.id}, eventType: ${evento.eventType}) al Proyecto 11 (intento ${attempt}/${IncidentesService.MAX_ATTEMPTS})...`,
@@ -134,7 +147,9 @@ export class IncidentesService {
           }),
         );
 
-        this.logger.log(`Incidente operacional enviado exitosamente al Proyecto 11 (Ref: ${incidente.id})`);
+        this.logger.log(
+          `Incidente operacional enviado exitosamente al Proyecto 11 (Ref: ${incidente.id})`,
+        );
         return;
       } catch (error: any) {
         this.logger.error(
@@ -163,14 +178,16 @@ export class IncidentesService {
   ): IncidenteOperacionalEvent | null {
     const mapped = EVENT_TYPE_MAP[incidente.tipo];
     const eventType =
-      mapped ?? (opciones?.forzar ? IncidentesService.EVENT_TYPE_FALLBACK : undefined);
+      mapped ??
+      (opciones?.forzar ? IncidentesService.EVENT_TYPE_FALLBACK : undefined);
     if (!eventType) return null;
 
     const occurredAt = incidente.createdAt
       ? new Date(incidente.createdAt).toISOString()
       : new Date().toISOString();
 
-    const titulo = incidente.titulo || `Incidente operacional: ${incidente.tipo}`;
+    const titulo =
+      incidente.titulo || `Incidente operacional: ${incidente.tipo}`;
     const descripcion = incidente.descripcion || titulo;
 
     const evento: IncidenteOperacionalEvent = {
@@ -191,7 +208,8 @@ export class IncidentesService {
 
     // Campos opcionales: solo se incluyen si el incidente ya los trae (sin lookups).
     if (incidente.visitaId) evento.visitId = incidente.visitaId;
-    if (incidente.profesionalSaludId) evento.professionalId = incidente.profesionalSaludId;
+    if (incidente.profesionalSaludId)
+      evento.professionalId = incidente.profesionalSaludId;
 
     // Metadata: partimos de la del incidente. Si estamos forzando un tipo NO
     // mapeado (ticket manual de CRM), añadimos su tipo interno real para que

@@ -1,13 +1,15 @@
-import { Column, Entity, PrimaryGeneratedColumn, VersionColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, VersionColumn, Index } from 'typeorm';
 
 @Entity({ name: 'fichas_clinicas' })
 export class FichaClinica {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index()
   @Column({ name: 'visita_id', type: 'uuid' })
   visitaId: string;
 
+  @Index()
   @Column({ name: 'plantilla_ficha_id', type: 'uuid', nullable: true })
   plantillaFichaId?: string | null;
 
@@ -17,6 +19,7 @@ export class FichaClinica {
   @Column({ type: 'jsonb', default: {} })
   contenido: Record<string, unknown>;
 
+  @Index()
   @Column({ name: 'creada_por_usuario_id', type: 'uuid', nullable: true })
   creadaPorUsuarioId?: string | null;
 

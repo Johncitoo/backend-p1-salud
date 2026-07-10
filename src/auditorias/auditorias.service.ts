@@ -16,7 +16,10 @@ export interface RegistrarAuditoriaParams {
 
 @Injectable()
 export class AuditoriasService {
-  constructor(@InjectRepository(Auditoria) private readonly auditorias: Repository<Auditoria>) {}
+  constructor(
+    @InjectRepository(Auditoria)
+    private readonly auditorias: Repository<Auditoria>,
+  ) {}
 
   findAll() {
     return this.auditorias.find({ order: { fechaHora: 'DESC' }, take: 200 });
@@ -29,7 +32,9 @@ export class AuditoriasService {
   }
 
   create(dto: CreateAuditoriaDto) {
-    return this.auditorias.save(this.auditorias.create({ ...dto, origen: 'WEB' }));
+    return this.auditorias.save(
+      this.auditorias.create({ ...dto, origen: 'WEB' }),
+    );
   }
 
   /** Helper ligero para que otros servicios registren eventos sin armar el DTO completo */

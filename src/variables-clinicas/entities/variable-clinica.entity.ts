@@ -23,10 +23,22 @@ export class VariableClinica {
   @Column({ type: 'varchar', length: 30, nullable: true })
   unidad?: string | null;
 
-  @Column({ name: 'valor_minimo', type: 'numeric', precision: 12, scale: 4, nullable: true })
+  @Column({
+    name: 'valor_minimo',
+    type: 'numeric',
+    precision: 12,
+    scale: 4,
+    nullable: true,
+  })
   valorMinimo?: number | null;
 
-  @Column({ name: 'valor_maximo', type: 'numeric', precision: 12, scale: 4, nullable: true })
+  @Column({
+    name: 'valor_maximo',
+    type: 'numeric',
+    precision: 12,
+    scale: 4,
+    nullable: true,
+  })
   valorMaximo?: number | null;
 
   @Column({ type: 'text', array: true, nullable: true })

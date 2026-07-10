@@ -17,7 +17,9 @@ import { CreateVisitaCheckpointDto } from './dto/create-visita-checkpoint.dto';
 @Controller('visita-checkpoints')
 @UseGuards(DevAuthGuard, RolesGuard)
 export class VisitaCheckpointsController {
-  constructor(private readonly visitaCheckpointsService: VisitaCheckpointsService) {}
+  constructor(
+    private readonly visitaCheckpointsService: VisitaCheckpointsService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')

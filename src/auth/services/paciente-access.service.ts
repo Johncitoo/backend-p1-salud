@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Visita } from '../../pacientes/entities/visita.entity';
@@ -24,7 +28,9 @@ export class PacienteAccessService {
     private readonly profesionalesRepository: Repository<ProfesionalSalud>,
   ) {}
 
-  private async profesionalIdDeUsuario(usuarioId: string): Promise<string | null> {
+  private async profesionalIdDeUsuario(
+    usuarioId: string,
+  ): Promise<string | null> {
     const profesional = await this.profesionalesRepository.findOne({
       where: { usuarioId, deletedAt: IsNull() },
     });
@@ -32,25 +38,39 @@ export class PacienteAccessService {
   }
 
   /** Lanza ForbiddenException si un PROFESIONAL no tiene ninguna visita asignada con este paciente. */
-  async assertAccesoPaciente(user: UsuarioPerfil | undefined, pacienteId: string): Promise<void> {
+  async assertAccesoPaciente(
+    user: UsuarioPerfil | undefined,
+    pacienteId: string,
+  ): Promise<void> {
     if (!user || user.rol !== 'PROFESIONAL') return;
 
     const profesionalId = await this.profesionalIdDeUsuario(user.id);
     if (!profesionalId) {
-      throw new ForbiddenException('Tu cuenta no tiene un perfil de profesional de salud asociado.');
+      throw new ForbiddenException(
+        'Tu cuenta no tiene un perfil de profesional de salud asociado.',
+      );
     }
 
     const tieneAcceso = await this.visitasRepository.exist({
-      where: { pacienteId, profesionalSaludId: profesionalId, deletedAt: IsNull() },
+      where: {
+        pacienteId,
+        profesionalSaludId: profesionalId,
+        deletedAt: IsNull(),
+      },
     });
 
     if (!tieneAcceso) {
-      throw new ForbiddenException('No tienes acceso a los datos de este paciente.');
+      throw new ForbiddenException(
+        'No tienes acceso a los datos de este paciente.',
+      );
     }
   }
 
   /** Igual que assertAccesoPaciente, pero a partir de una visita (resuelve el paciente dueño). */
-  async assertAccesoVisita(user: UsuarioPerfil | undefined, visitaId: string): Promise<void> {
+  async assertAccesoVisita(
+    user: UsuarioPerfil | undefined,
+    visitaId: string,
+  ): Promise<void> {
     if (!user || user.rol !== 'PROFESIONAL') return;
 
     const visita = await this.visitasRepository.findOne({

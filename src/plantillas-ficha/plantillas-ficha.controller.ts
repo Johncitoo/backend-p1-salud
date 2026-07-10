@@ -1,9 +1,24 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { CreatePlantillaFichaDto, UpdatePlantillaFichaDto } from './dto/create-plantilla-ficha.dto';
-import { CreatePlantillaFichaCampoDto, UpdatePlantillaFichaCampoDto } from './dto/create-plantilla-ficha-campo.dto';
+import {
+  CreatePlantillaFichaDto,
+  UpdatePlantillaFichaDto,
+} from './dto/create-plantilla-ficha.dto';
+import {
+  CreatePlantillaFichaCampoDto,
+  UpdatePlantillaFichaCampoDto,
+} from './dto/create-plantilla-ficha-campo.dto';
 import { PlantillasFichaService } from './plantillas-ficha.service';
 
 @Controller('plantillas-ficha')
@@ -53,13 +68,19 @@ export class PlantillasFichaController {
 
   @Post(':id/campos')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
-  createCampo(@Param('id') id: string, @Body() dto: CreatePlantillaFichaCampoDto) {
+  createCampo(
+    @Param('id') id: string,
+    @Body() dto: CreatePlantillaFichaCampoDto,
+  ) {
     return this.service.createCampo({ ...dto, plantillaFichaId: id });
   }
 
   @Patch('campos/:id')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL')
-  updateCampo(@Param('id') id: string, @Body() dto: UpdatePlantillaFichaCampoDto) {
+  updateCampo(
+    @Param('id') id: string,
+    @Body() dto: UpdatePlantillaFichaCampoDto,
+  ) {
     return this.service.updateCampo(id, dto);
   }
 

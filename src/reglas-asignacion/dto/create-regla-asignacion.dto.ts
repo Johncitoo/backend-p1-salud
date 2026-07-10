@@ -1,4 +1,11 @@
-import { IsBoolean, IsInt, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateReglaAsignacionDto {
   @IsString()

@@ -6,7 +6,9 @@ import { MotivoReprogramacion } from './entities/motivo-reprogramacion.entity';
 import { MotivosReprogramacionService } from './motivos-reprogramacion.service';
 import { AuditoriasService } from '../auditorias/auditorias.service';
 
-type MockRepository<T extends { id: string }> = Partial<Record<keyof Repository<T>, jest.Mock>>;
+type MockRepository<T extends { id: string }> = Partial<
+  Record<keyof Repository<T>, jest.Mock>
+>;
 
 const createRepositoryMock = (): MockRepository<MotivoReprogramacion> => ({
   find: jest.fn(),
@@ -39,12 +41,17 @@ describe('MotivosReprogramacionService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MotivosReprogramacionService,
-        { provide: getRepositoryToken(MotivoReprogramacion), useValue: repository },
+        {
+          provide: getRepositoryToken(MotivoReprogramacion),
+          useValue: repository,
+        },
         { provide: AuditoriasService, useValue: auditoriasService },
       ],
     }).compile();
 
-    service = module.get<MotivosReprogramacionService>(MotivosReprogramacionService);
+    service = module.get<MotivosReprogramacionService>(
+      MotivosReprogramacionService,
+    );
   });
 
   it('findAll retorna motivos no eliminados ordenados por nombre', async () => {
@@ -66,12 +73,18 @@ describe('MotivosReprogramacionService', () => {
   it('findOne lanza NotFoundException si no existe', async () => {
     repository.findOne!.mockResolvedValue(null);
 
-    await expect(service.findOne('no-existe')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.findOne('no-existe')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('create guarda con valores por defecto', async () => {
     const dto = { codigo: 'NUEVO', nombre: 'Motivo nuevo' };
-    const created = { ...dto, requiereObservacion: false, activo: true } as MotivoReprogramacion;
+    const created = {
+      ...dto,
+      requiereObservacion: false,
+      activo: true,
+    } as MotivoReprogramacion;
     const saved = { ...motivo, ...created };
 
     repository.create!.mockReturnValue(created);

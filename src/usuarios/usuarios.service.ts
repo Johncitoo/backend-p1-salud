@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, QueryFailedError, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -119,7 +123,8 @@ export class UsuariosService {
     email: string,
     identityUserId: string,
   ): Promise<UsuarioPerfil | null> {
-    const existingIdentity = await this.findProfileByIdentityUserId(identityUserId);
+    const existingIdentity =
+      await this.findProfileByIdentityUserId(identityUserId);
     if (existingIdentity) return existingIdentity;
 
     const userByEmail = await this.usuariosRepository.findOne({
@@ -163,7 +168,10 @@ export class UsuariosService {
     // 2. Buscar por email y linkear
     if (data.email) {
       try {
-        const linked = await this.linkIdentityUserIdByEmail(data.email, data.sub);
+        const linked = await this.linkIdentityUserIdByEmail(
+          data.email,
+          data.sub,
+        );
         if (linked) return linked;
       } catch {
         // ConflictException si el email ya está vinculado a otra identidad
@@ -180,7 +188,9 @@ export class UsuariosService {
 
     if (!rol) return null;
 
-    const nombres = this.extractNombresFromUsername(data.preferredUsername ?? data.email);
+    const nombres = this.extractNombresFromUsername(
+      data.preferredUsername ?? data.email,
+    );
     const usuario = this.usuariosRepository.create({
       identityUserId: data.sub,
       rolId: rol.id,
@@ -221,11 +231,16 @@ export class UsuariosService {
     };
   }
 
-  private extractNombresFromUsername(username: string): { nombres: string; apellidos: string } {
+  private extractNombresFromUsername(username: string): {
+    nombres: string;
+    apellidos: string;
+  } {
     // p1.admin.01@test.local → "Admin 01"
     const localPart = username.split('@')[0] ?? username;
     const parts = localPart.replace(/^p1\./, '').split('.');
-    const nombres = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1) : 'Usuario';
+    const nombres = parts[0]
+      ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
+      : 'Usuario';
     const apellidos = parts.slice(1).join(' ') || 'Keycloak';
     return { nombres, apellidos };
   }
@@ -242,13 +257,18 @@ export class UsuariosService {
     try {
       saved = await this.usuariosRepository.save(usuario);
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         const detail = (error as any).detail ?? '';
         if (detail.includes('uq_usuarios_rut')) {
           throw new ConflictException(`El RUT ${dto.rut} ya está registrado.`);
         }
         if (detail.includes('uq_usuarios_email')) {
-          throw new ConflictException(`El email ${dto.email} ya está registrado.`);
+          throw new ConflictException(
+            `El email ${dto.email} ya está registrado.`,
+          );
         }
         throw new ConflictException('Ya existe un registro con esos datos.');
       }
@@ -273,20 +293,33 @@ export class UsuariosService {
     if (dto.rolId) await this.ensureRoleExists(dto.rolId);
 
     const usuario = await this.findUsuarioEntity(id);
-    const oldValues = { nombres: usuario.nombres, apellidos: usuario.apellidos, email: usuario.email, rolId: usuario.rolId, rut: usuario.rut };
+    const oldValues = {
+      nombres: usuario.nombres,
+      apellidos: usuario.apellidos,
+      email: usuario.email,
+      rolId: usuario.rolId,
+      rut: usuario.rut,
+    };
     Object.assign(usuario, dto);
 
     let saved: Usuario;
     try {
       saved = await this.usuariosRepository.save(usuario);
     } catch (error) {
-      if (error instanceof QueryFailedError && (error as any).code === '23505') {
+      if (
+        error instanceof QueryFailedError &&
+        (error as any).code === '23505'
+      ) {
         const detail = (error as any).detail ?? '';
         if (detail.includes('uq_usuarios_rut')) {
-          throw new ConflictException(`El RUT ${dto.rut} ya está registrado por otro usuario.`);
+          throw new ConflictException(
+            `El RUT ${dto.rut} ya está registrado por otro usuario.`,
+          );
         }
         if (detail.includes('uq_usuarios_email')) {
-          throw new ConflictException(`El email ${dto.email} ya está registrado por otro usuario.`);
+          throw new ConflictException(
+            `El email ${dto.email} ya está registrado por otro usuario.`,
+          );
         }
         throw new ConflictException('Ya existe un registro con esos datos.');
       }
@@ -301,7 +334,12 @@ export class UsuariosService {
       accion: 'ACTUALIZAR',
       detalle: `Usuario ${result.nombres} ${result.apellidos} actualizado`,
       oldValues,
-      newValues: { nombres: result.nombres, apellidos: result.apellidos, email: result.email, rolId: result.rolId },
+      newValues: {
+        nombres: result.nombres,
+        apellidos: result.apellidos,
+        email: result.email,
+        rolId: result.rolId,
+      },
     });
 
     await this.analyticsService.sendUsuarioUpsertEvent(result);
@@ -360,7 +398,11 @@ export class UsuariosService {
   private createUsuarioResponseQuery() {
     return this.usuariosRepository
       .createQueryBuilder('usuario')
-      .leftJoin('roles', 'rol', 'rol.id = usuario.rol_id AND rol.deleted_at IS NULL')
+      .leftJoin(
+        'roles',
+        'rol',
+        'rol.id = usuario.rol_id AND rol.deleted_at IS NULL',
+      )
       .select([
         'usuario.id AS "id"',
         'usuario.identity_user_id AS "identityUserId"',

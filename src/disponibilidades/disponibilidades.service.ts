@@ -14,34 +14,55 @@ export class DisponibilidadesService {
     private readonly auditoriasService: AuditoriasService,
   ) {}
 
-  async findAll(profesionalSaludId?: string): Promise<DisponibilidadProfesional[]> {
-    const qb = this.repository.createQueryBuilder('d').where('d.deleted_at IS NULL');
-    if (profesionalSaludId) qb.andWhere('d.profesional_salud_id = :profesionalSaludId', { profesionalSaludId });
-    return qb.orderBy('d.dia_semana', 'ASC').addOrderBy('d.hora_inicio', 'ASC').getMany();
+  async findAll(
+    profesionalSaludId?: string,
+  ): Promise<DisponibilidadProfesional[]> {
+    const qb = this.repository
+      .createQueryBuilder('d')
+      .where('d.deleted_at IS NULL');
+    if (profesionalSaludId)
+      qb.andWhere('d.profesional_salud_id = :profesionalSaludId', {
+        profesionalSaludId,
+      });
+    return qb
+      .orderBy('d.dia_semana', 'ASC')
+      .addOrderBy('d.hora_inicio', 'ASC')
+      .getMany();
   }
 
   async findOne(id: string): Promise<DisponibilidadProfesional> {
-    const item = await this.repository.findOne({ where: { id, deletedAt: IsNull() } });
+    const item = await this.repository.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!item) throw new NotFoundException('Disponibilidad no encontrada');
     return item;
   }
 
-  async create(dto: CreateDisponibilidadDto): Promise<DisponibilidadProfesional> {
+  async create(
+    dto: CreateDisponibilidadDto,
+  ): Promise<DisponibilidadProfesional> {
     const item = this.repository.create({ ...dto, activo: dto.activo ?? true });
     const saved = await this.repository.save(item);
     this.auditoriasService.registrar({
-      entidad: 'disponibilidades_profesionales', entidadId: saved.id, accion: 'CREAR',
+      entidad: 'disponibilidades_profesionales',
+      entidadId: saved.id,
+      accion: 'CREAR',
       detalle: `Disponibilidad día ${saved.diaSemana} ${saved.horaInicio}-${saved.horaFin} creada`,
     });
     return saved;
   }
 
-  async update(id: string, dto: UpdateDisponibilidadDto): Promise<DisponibilidadProfesional> {
+  async update(
+    id: string,
+    dto: UpdateDisponibilidadDto,
+  ): Promise<DisponibilidadProfesional> {
     const item = await this.findOne(id);
     Object.assign(item, dto);
     const saved = await this.repository.save(item);
     this.auditoriasService.registrar({
-      entidad: 'disponibilidades_profesionales', entidadId: saved.id, accion: 'ACTUALIZAR',
+      entidad: 'disponibilidades_profesionales',
+      entidadId: saved.id,
+      accion: 'ACTUALIZAR',
       detalle: `Disponibilidad actualizada`,
     });
     return saved;
@@ -52,7 +73,9 @@ export class DisponibilidadesService {
     item.deletedAt = new Date();
     const saved = await this.repository.save(item);
     this.auditoriasService.registrar({
-      entidad: 'disponibilidades_profesionales', entidadId: saved.id, accion: 'ELIMINAR',
+      entidad: 'disponibilidades_profesionales',
+      entidadId: saved.id,
+      accion: 'ELIMINAR',
       detalle: `Disponibilidad eliminada (soft delete)`,
     });
     return saved;

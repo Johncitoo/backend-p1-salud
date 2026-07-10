@@ -67,18 +67,28 @@ export class NotificacionesService {
   ): Promise<void> {
     if (!destinatario.email && !destinatario.telefono) return;
 
-    const enabled = this.configService.get<string>('NOTIFICATIONS_ENABLED') === 'true';
-    const baseUrl = (this.configService.get<string>('NOTIFICATIONS_URL') ?? '').trim();
-    const path = this.configService.get<string>('NOTIFICATIONS_PATH') ?? '/notifications/send';
-    const apiKey = this.configService.get<string>('NOTIFICATIONS_API_KEY') ?? '';
+    const enabled =
+      this.configService.get<string>('NOTIFICATIONS_ENABLED') === 'true';
+    const baseUrl = (
+      this.configService.get<string>('NOTIFICATIONS_URL') ?? ''
+    ).trim();
+    const path =
+      this.configService.get<string>('NOTIFICATIONS_PATH') ??
+      '/notifications/send';
+    const apiKey =
+      this.configService.get<string>('NOTIFICATIONS_API_KEY') ?? '';
 
     if (!enabled) {
-      this.logger.log(`[Notificaciones mock] ${evento} → ${destinatario.email ?? destinatario.telefono ?? 's/contacto'}:\n${JSON.stringify(solicitud, null, 2)}`);
+      this.logger.log(
+        `[Notificaciones mock] ${evento} → ${destinatario.email ?? destinatario.telefono ?? 's/contacto'}:\n${JSON.stringify(solicitud, null, 2)}`,
+      );
       return;
     }
 
     if (!baseUrl) {
-      this.logger.warn(`NOTIFICATIONS_ENABLED=true pero NOTIFICATIONS_URL está vacío. Solicitud no enviada:\n${JSON.stringify(solicitud, null, 2)}`);
+      this.logger.warn(
+        `NOTIFICATIONS_ENABLED=true pero NOTIFICATIONS_URL está vacío. Solicitud no enviada:\n${JSON.stringify(solicitud, null, 2)}`,
+      );
       return;
     }
 
@@ -95,11 +105,16 @@ export class NotificacionesService {
       });
 
       if (!response.ok) {
-        this.logger.error(`No se pudo enviar notificación ${evento} al Grupo 6: HTTP ${response.status}`);
+        this.logger.error(
+          `No se pudo enviar notificación ${evento} al Grupo 6: HTTP ${response.status}`,
+        );
         return;
       }
 
-      const data = (await response.json().catch(() => null)) as { notificationId?: string; jobId?: string } | null;
+      const data = (await response.json().catch(() => null)) as {
+        notificationId?: string;
+        jobId?: string;
+      } | null;
       if (data?.notificationId) {
         await this.enviadasRepo.save(
           this.enviadasRepo.create({
@@ -116,7 +131,9 @@ export class NotificacionesService {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`No se pudo enviar notificación ${evento} al Grupo 6: ${message}`);
+      this.logger.error(
+        `No se pudo enviar notificación ${evento} al Grupo 6: ${message}`,
+      );
     }
   }
 
@@ -191,7 +208,10 @@ export class NotificacionesService {
   }
 
   // Tarjeta destacada con fecha/hora — reutilizada en todos los eventos de visita.
-  private renderFechaHoraBox(fecha: string | null, hora: string | null): string {
+  private renderFechaHoraBox(
+    fecha: string | null,
+    hora: string | null,
+  ): string {
     if (!fecha && !hora) return '';
     return `<div style="background-color:#EEF3F2;border-left:4px solid #3C6E71;border-radius:6px;padding:12px 16px;margin:4px 0 16px;">
       <span style="color:#284B63;font-size:16px;font-weight:bold;">${fecha ?? ''}${fecha && hora ? ' · ' : ''}${hora ?? ''}</span>
@@ -241,11 +261,19 @@ export class NotificacionesService {
   // Notificaciones de visitas
   // =========================================================
 
-  async notificarVisitaAgendada(visita: Visita, paciente: Paciente | null, profesionalUsuario: ContactoUsuario | null): Promise<void> {
+  async notificarVisitaAgendada(
+    visita: Visita,
+    paciente: Paciente | null,
+    profesionalUsuario: ContactoUsuario | null,
+  ): Promise<void> {
     const fecha = this.formatDateOnly(visita.fechaProgramada);
     const hora = this.formatTimeOnly(visita.horaProgramada);
-    const nombrePaciente = paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : '';
-    const nombreProfesional = profesionalUsuario ? `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim() : '';
+    const nombrePaciente = paciente
+      ? `${paciente.nombres} ${paciente.apellidos}`.trim()
+      : '';
+    const nombreProfesional = profesionalUsuario
+      ? `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim()
+      : '';
 
     if (paciente) {
       await this.enviarEmail(
@@ -255,7 +283,7 @@ export class NotificacionesService {
         this.renderEmailTemplate(
           nombrePaciente,
           `<p style="margin:0 0 4px;">Se agendó tu atención domiciliaria${nombreProfesional ? ` con <b>${nombreProfesional}</b>` : ''}:</p>` +
-          this.renderFechaHoraBox(fecha, hora),
+            this.renderFechaHoraBox(fecha, hora),
         ),
         undefined,
         { visitaId: visita.id, pacienteId: paciente.id },
@@ -265,12 +293,15 @@ export class NotificacionesService {
     if (profesionalUsuario) {
       await this.enviarEmail(
         'visita_agendada',
-        { email: profesionalUsuario.email, telefono: profesionalUsuario.telefono },
+        {
+          email: profesionalUsuario.email,
+          telefono: profesionalUsuario.telefono,
+        },
         'Nueva visita agendada',
         this.renderEmailTemplate(
           nombreProfesional,
           `<p style="margin:0 0 4px;">Tienes una nueva visita agendada${nombrePaciente ? ` con el paciente <b>${nombrePaciente}</b>` : ''}:</p>` +
-          this.renderFechaHoraBox(fecha, hora),
+            this.renderFechaHoraBox(fecha, hora),
         ),
         undefined,
         { visitaId: visita.id },
@@ -297,8 +328,8 @@ export class NotificacionesService {
         this.renderEmailTemplate(
           nombre,
           `<p style="margin:0 0 4px;">Tu atención domiciliaria fue <b style="color:#B71C1C;">cancelada</b>:</p>` +
-          this.renderFechaHoraBox(fecha, hora) +
-          this.renderMotivoBox(motivo),
+            this.renderFechaHoraBox(fecha, hora) +
+            this.renderMotivoBox(motivo),
         ),
         `Tu atención del ${fecha} ${hora} fue cancelada.${motivoSms}`,
         { visitaId: visita.id, pacienteId: paciente.id },
@@ -306,16 +337,20 @@ export class NotificacionesService {
     }
 
     if (profesionalUsuario) {
-      const nombre = `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim();
+      const nombre =
+        `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim();
       await this.enviarEmail(
         'visita_cancelada',
-        { email: profesionalUsuario.email, telefono: profesionalUsuario.telefono },
+        {
+          email: profesionalUsuario.email,
+          telefono: profesionalUsuario.telefono,
+        },
         'Visita cancelada',
         this.renderEmailTemplate(
           nombre,
           `<p style="margin:0 0 4px;">La siguiente visita fue <b style="color:#B71C1C;">cancelada</b>:</p>` +
-          this.renderFechaHoraBox(fecha, hora) +
-          this.renderMotivoBox(motivo),
+            this.renderFechaHoraBox(fecha, hora) +
+            this.renderMotivoBox(motivo),
         ),
         undefined,
         { visitaId: visita.id },
@@ -342,8 +377,8 @@ export class NotificacionesService {
         this.renderEmailTemplate(
           nombre,
           `<p style="margin:0 0 4px;">Tu atención domiciliaria fue <b style="color:#F9A825;">reprogramada</b> para:</p>` +
-          this.renderFechaHoraBox(fecha, hora) +
-          this.renderMotivoBox(motivo),
+            this.renderFechaHoraBox(fecha, hora) +
+            this.renderMotivoBox(motivo),
         ),
         `Tu atención fue reprogramada para el ${fecha} ${hora}.${motivoSms}`,
         { visitaId: visita.id, pacienteId: paciente.id },
@@ -351,16 +386,20 @@ export class NotificacionesService {
     }
 
     if (profesionalUsuario) {
-      const nombre = `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim();
+      const nombre =
+        `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim();
       await this.enviarEmail(
         'visita_reprogramada',
-        { email: profesionalUsuario.email, telefono: profesionalUsuario.telefono },
+        {
+          email: profesionalUsuario.email,
+          telefono: profesionalUsuario.telefono,
+        },
         'Visita reprogramada',
         this.renderEmailTemplate(
           nombre,
           `<p style="margin:0 0 4px;">La siguiente visita fue <b style="color:#F9A825;">reprogramada</b> para:</p>` +
-          this.renderFechaHoraBox(fecha, hora) +
-          this.renderMotivoBox(motivo),
+            this.renderFechaHoraBox(fecha, hora) +
+            this.renderMotivoBox(motivo),
         ),
         undefined,
         { visitaId: visita.id },
@@ -371,11 +410,17 @@ export class NotificacionesService {
   // Se dispara cuando el profesional marca "en camino" (VisitasService.cambiarEstado
   // con estado EN_CAMINO). Solo se notifica al paciente: es quien necesita saber que
   // el profesional está en tránsito hacia su domicilio.
-  async notificarProfesionalEnCamino(visita: Visita, paciente: Paciente | null, profesionalUsuario: ContactoUsuario | null): Promise<void> {
+  async notificarProfesionalEnCamino(
+    visita: Visita,
+    paciente: Paciente | null,
+    profesionalUsuario: ContactoUsuario | null,
+  ): Promise<void> {
     if (!paciente) return;
 
     const nombrePaciente = `${paciente.nombres} ${paciente.apellidos}`.trim();
-    const nombreProfesional = profesionalUsuario ? `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim() : 'tu profesional';
+    const nombreProfesional = profesionalUsuario
+      ? `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim()
+      : 'tu profesional';
     const hora = this.formatTimeOnly(visita.horaProgramada);
 
     await this.enviarEmail(
@@ -385,7 +430,7 @@ export class NotificacionesService {
       this.renderEmailTemplate(
         nombrePaciente,
         `<p style="margin:0 0 4px;">🚗 <b>${nombreProfesional}</b> va en camino hacia tu domicilio para tu atención de las:</p>` +
-        this.renderFechaHoraBox(null, hora),
+          this.renderFechaHoraBox(null, hora),
       ),
       `${nombreProfesional} va en camino a tu domicilio.`,
       { visitaId: visita.id, pacienteId: paciente.id },
@@ -394,7 +439,11 @@ export class NotificacionesService {
 
   // Recordatorio "un día antes" de la cita (disparado por VisitasService vía @Cron
   // diario). Notifica a paciente y profesional.
-  async notificarRecordatorioVisita(visita: Visita, paciente: Paciente | null, profesionalUsuario: ContactoUsuario | null): Promise<void> {
+  async notificarRecordatorioVisita(
+    visita: Visita,
+    paciente: Paciente | null,
+    profesionalUsuario: ContactoUsuario | null,
+  ): Promise<void> {
     const fecha = this.formatDateOnly(visita.fechaProgramada);
     const hora = this.formatTimeOnly(visita.horaProgramada);
 
@@ -407,7 +456,7 @@ export class NotificacionesService {
         this.renderEmailTemplate(
           nombre,
           `<p style="margin:0 0 4px;">🔔 Te recordamos tu atención domiciliaria de mañana:</p>` +
-          this.renderFechaHoraBox(fecha, hora),
+            this.renderFechaHoraBox(fecha, hora),
         ),
         `Recordatorio: tu atención domiciliaria es mañana ${fecha} a las ${hora}.`,
         { visitaId: visita.id, pacienteId: paciente.id },
@@ -415,15 +464,19 @@ export class NotificacionesService {
     }
 
     if (profesionalUsuario) {
-      const nombre = `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim();
+      const nombre =
+        `${profesionalUsuario.nombres} ${profesionalUsuario.apellidos}`.trim();
       await this.enviarEmail(
         'recordatorio_visita',
-        { email: profesionalUsuario.email, telefono: profesionalUsuario.telefono },
+        {
+          email: profesionalUsuario.email,
+          telefono: profesionalUsuario.telefono,
+        },
         'Recordatorio: tienes una visita mañana',
         this.renderEmailTemplate(
           nombre,
           `<p style="margin:0 0 4px;">🔔 Tienes una visita domiciliaria agendada para mañana:</p>` +
-          this.renderFechaHoraBox(fecha, hora),
+            this.renderFechaHoraBox(fecha, hora),
         ),
         undefined,
         { visitaId: visita.id },
@@ -435,7 +488,10 @@ export class NotificacionesService {
   // Consulta de notificaciones enviadas / tracking (fase 2)
   // =========================================================
 
-  async findEnviadas(filtros: { visitaId?: string; pacienteId?: string }): Promise<NotificacionEnviada[]> {
+  async findEnviadas(filtros: {
+    visitaId?: string;
+    pacienteId?: string;
+  }): Promise<NotificacionEnviada[]> {
     const where: Record<string, unknown> = {};
     if (filtros.visitaId) where.visitaId = filtros.visitaId;
     if (filtros.pacienteId) where.pacienteId = filtros.pacienteId;
@@ -444,20 +500,30 @@ export class NotificacionesService {
   }
 
   // Refresca el estado local consultando GET /tracking/:notificationId del Grupo 6.
-  async refrescarTracking(id: string): Promise<NotificacionEnviada & { trackingRaw?: unknown }> {
+  async refrescarTracking(
+    id: string,
+  ): Promise<NotificacionEnviada & { trackingRaw?: unknown }> {
     const registro = await this.enviadasRepo.findOne({ where: { id } });
     if (!registro) throw new NotFoundException('Notificación no encontrada');
 
-    const baseUrl = (this.configService.get<string>('NOTIFICATIONS_URL') ?? '').trim();
-    const apiKey = this.configService.get<string>('NOTIFICATIONS_API_KEY') ?? '';
+    const baseUrl = (
+      this.configService.get<string>('NOTIFICATIONS_URL') ?? ''
+    ).trim();
+    const apiKey =
+      this.configService.get<string>('NOTIFICATIONS_API_KEY') ?? '';
     if (!baseUrl) return registro;
 
     try {
-      const response = await fetch(`${baseUrl}/tracking/${registro.notificationId}`, {
-        headers: { ...(apiKey ? { 'x-api-key': apiKey } : {}) },
-      });
+      const response = await fetch(
+        `${baseUrl}/tracking/${registro.notificationId}`,
+        {
+          headers: { ...(apiKey ? { 'x-api-key': apiKey } : {}) },
+        },
+      );
       if (!response.ok) {
-        this.logger.error(`No se pudo consultar tracking de ${registro.notificationId}: HTTP ${response.status}`);
+        this.logger.error(
+          `No se pudo consultar tracking de ${registro.notificationId}: HTTP ${response.status}`,
+        );
         return registro;
       }
 
@@ -470,7 +536,9 @@ export class NotificacionesService {
       return { ...registro, trackingRaw: data };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`No se pudo consultar tracking de ${registro.notificationId}: ${message}`);
+      this.logger.error(
+        `No se pudo consultar tracking de ${registro.notificationId}: ${message}`,
+      );
       return registro;
     }
   }
@@ -481,7 +549,10 @@ export class NotificacionesService {
 
   private formatDateOnly(value?: Date | string | null): string | null {
     if (!value) return null;
-    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+    if (value instanceof Date)
+      return Number.isNaN(value.getTime())
+        ? null
+        : value.toISOString().slice(0, 10);
 
     const trimmed = String(value).trim();
     const dateOnlyMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
@@ -501,8 +572,11 @@ export class NotificacionesService {
     }
 
     const trimmed = String(value).trim();
-    const timeMatch = trimmed.match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/);
-    if (timeMatch) return `${timeMatch[1]}:${timeMatch[2]}:${timeMatch[3] ?? '00'}`;
+    const timeMatch = trimmed.match(
+      /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/,
+    );
+    if (timeMatch)
+      return `${timeMatch[1]}:${timeMatch[2]}:${timeMatch[3] ?? '00'}`;
 
     return null;
   }

@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -14,7 +23,10 @@ export class DiagnosticosController {
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')
-  findAll(@Query('visitaId') visitaId?: string, @CurrentUser() user?: UsuarioPerfil) {
+  findAll(
+    @Query('visitaId') visitaId?: string,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     return this.diagnosticosService.findAll({ visitaId }, user);
   }
 

@@ -1,27 +1,33 @@
-import { IsBoolean, IsEmail, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class UpdateContactoDto {
-	@IsOptional()
-	@IsUUID()
-	pacienteId?: string;
+  @IsOptional()
+  @IsUUID()
+  pacienteId?: string;
 
-	@IsOptional()
-	@IsString()
-	nombre?: string;
+  @IsOptional()
+  @IsString()
+  nombre?: string;
 
-	@IsOptional()
-	@IsString()
-	telefono?: string;
+  @IsOptional()
+  @IsString()
+  telefono?: string;
 
-	@IsOptional()
-	@IsEmail()
-	email?: string;
+  @IsOptional()
+  @IsEmail()
+  email?: string;
 
-	@IsOptional()
-	@IsString()
-	relacion?: string;
+  @IsOptional()
+  @IsString()
+  relacion?: string;
 
-	@IsOptional()
-	@IsBoolean()
-	esEmergencia?: boolean;
+  @IsOptional()
+  @IsBoolean()
+  esEmergencia?: boolean;
 }

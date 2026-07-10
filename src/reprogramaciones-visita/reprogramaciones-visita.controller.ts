@@ -17,7 +17,9 @@ import { CreateReprogramacionVisitaDto } from './dto/create-reprogramacion-visit
 @Controller('reprogramaciones-visita')
 @UseGuards(DevAuthGuard, RolesGuard)
 export class ReprogramacionesVisitaController {
-  constructor(private readonly reprogramacionesVisitaService: ReprogramacionesVisitaService) {}
+  constructor(
+    private readonly reprogramacionesVisitaService: ReprogramacionesVisitaService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')

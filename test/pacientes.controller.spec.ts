@@ -37,7 +37,10 @@ describe('PacientesController (unit)', () => {
   });
 
   it('GET /pacientes/:id returns paciente', async () => {
-    await request(app.getHttpServer()).get('/pacientes/1').expect(200).expect({ id: '1', nombres: 'X' });
+    await request(app.getHttpServer())
+      .get('/pacientes/1')
+      .expect(200)
+      .expect({ id: '1', nombres: 'X' });
   });
 
   it('POST /pacientes delegates to service', async () => {

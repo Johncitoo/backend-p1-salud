@@ -1,8 +1,16 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
-import { UsuariosService, UsuarioPerfil } from '../../usuarios/usuarios.service';
+import {
+  UsuariosService,
+  UsuarioPerfil,
+} from '../../usuarios/usuarios.service';
 import type { AppRole } from '../decorators/roles.decorator';
 
 type RequestWithUser = Request & {
@@ -44,22 +52,38 @@ export class DevAuthGuard implements CanActivate {
     const mockRole = this.normalizeMockRole(request.header('x-mock-role'));
 
     if (identityUserId) {
-      const user = await this.usuariosService.findProfileByIdentityUserId(identityUserId);
+      const user =
+        await this.usuariosService.findProfileByIdentityUserId(identityUserId);
       if (user) return user;
     }
 
     if (!mockRole) {
-      throw new UnauthorizedException('Header x-identity-user-id o x-mock-role requerido');
+      throw new UnauthorizedException(
+        'Header x-identity-user-id o x-mock-role requerido',
+      );
     }
 
     const roleLabel = mockRole.toLowerCase();
+    const mockSub = identityUserId ?? `mock-${roleLabel}-id`;
+
+    try {
+      const created = await this.usuariosService.findOrCreateFromKeycloak({
+        sub: mockSub,
+        email: `${mockSub.toLowerCase()}@mock.local`,
+        preferredUsername: mockSub,
+        rol: mockRole,
+      });
+      if (created) return created;
+    } catch (e) {
+      // Silently fall back if DB is not initialized or seeding fails
+    }
 
     return {
       id: `mock-${roleLabel}`,
       identityUserId: identityUserId ?? `mock-${roleLabel}`,
       nombres: 'Usuario',
       apellidos: mockRole.charAt(0) + mockRole.slice(1).toLowerCase(),
-      email: `${roleLabel}@mock.local`,
+      email: `${mockSub.toLowerCase()}@mock.local`,
       rol: mockRole,
       activo: true,
     };
@@ -75,8 +99,10 @@ export class DevAuthGuard implements CanActivate {
 
     const jwtRole = this.extractAppRoleFromPayload(payload);
     const email = typeof payload.email === 'string' ? payload.email : null;
-    const preferredUsername = typeof payload.preferred_username === 'string'
-      ? payload.preferred_username : null;
+    const preferredUsername =
+      typeof payload.preferred_username === 'string'
+        ? payload.preferred_username
+        : null;
 
     const user = await this.usuariosService.findOrCreateFromKeycloak({
       sub: payload.sub,
@@ -121,15 +147,20 @@ export class DevAuthGuard implements CanActivate {
   // corresponda a un rol de la app, ignorando los roles técnicos de Keycloak
   // (default-roles-*, offline_access, uma_authorization, etc.).
   private extractAppRoleFromPayload(payload: JWTPayload): AppRole | null {
-    const clientId = this.configService.get<string>('KEYCLOAK_AUDIENCE') ?? 'p1';
+    const clientId =
+      this.configService.get<string>('KEYCLOAK_AUDIENCE') ?? 'p1';
     const resourceAccess = payload.resource_access as
       | Record<string, { roles?: string[] }>
       | undefined;
-    const realmAccess = payload.realm_access as { roles?: string[] } | undefined;
+    const realmAccess = payload.realm_access as
+      | { roles?: string[] }
+      | undefined;
 
     const candidateRoles: string[] = [
       ...(resourceAccess?.[clientId]?.roles ?? []),
-      ...Object.values(resourceAccess ?? {}).flatMap((entry) => entry?.roles ?? []),
+      ...Object.values(resourceAccess ?? {}).flatMap(
+        (entry) => entry?.roles ?? [],
+      ),
       ...(realmAccess?.roles ?? []),
     ];
 
@@ -160,7 +191,8 @@ export class DevAuthGuard implements CanActivate {
     // explícitamente con 'false'. El realm de Keycloak es compartido entre
     // ~10 proyectos del curso — sin esto, un token válido emitido para OTRO
     // proyecto del mismo realm también sería aceptado acá.
-    const validateAudience = this.configService.get<string>('KEYCLOAK_VALIDATE_AUDIENCE') !== 'false';
+    const validateAudience =
+      this.configService.get<string>('KEYCLOAK_VALIDATE_AUDIENCE') !== 'false';
 
     if (!issuer || !jwksUri) {
       throw new UnauthorizedException('Configuracion Keycloak incompleta');
@@ -184,8 +216,16 @@ export class DevAuthGuard implements CanActivate {
 
   private normalizeMockRole(role?: string): AppRole | null {
     const normalized = role?.trim().toUpperCase();
-    const allowedRoles: AppRole[] = ['ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO'];
+    const allowedRoles: AppRole[] = [
+      'ADMIN',
+      'COORDINADOR',
+      'PROFESIONAL',
+      'SUPERVISOR',
+      'TECNICO',
+    ];
 
-    return allowedRoles.includes(normalized as AppRole) ? (normalized as AppRole) : null;
+    return allowedRoles.includes(normalized as AppRole)
+      ? (normalized as AppRole)
+      : null;
   }
 }

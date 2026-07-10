@@ -1,4 +1,9 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
 import { AuditoriasService } from '../auditorias/auditorias.service';
@@ -24,15 +29,25 @@ export class MedicamentosService {
   // Lista de medicamentos activos (no eliminados) para una visita. Una visita
   // puede tener múltiples fichas y múltiples medicamentos: no hay límite de 1,
   // a diferencia de FichaClinica.
-  async findAll(filtros?: { visitaId?: string }, user?: UsuarioPerfil): Promise<Medicamento[]> {
+  async findAll(
+    filtros?: { visitaId?: string },
+    user?: UsuarioPerfil,
+  ): Promise<Medicamento[]> {
     if (user?.rol === 'PROFESIONAL') {
       if (!filtros?.visitaId) {
-        throw new ForbiddenException('Debes especificar una visita para consultar sus medicamentos.');
+        throw new ForbiddenException(
+          'Debes especificar una visita para consultar sus medicamentos.',
+        );
       }
-      await this.pacienteAccessService.assertAccesoVisita(user, filtros.visitaId);
+      await this.pacienteAccessService.assertAccesoVisita(
+        user,
+        filtros.visitaId,
+      );
     }
 
-    const qb = this.repository.createQueryBuilder('m').where('m.deleted_at IS NULL');
+    const qb = this.repository
+      .createQueryBuilder('m')
+      .where('m.deleted_at IS NULL');
 
     if (filtros?.visitaId)
       qb.andWhere('m.visita_id = :visitaId', { visitaId: filtros.visitaId });
@@ -45,7 +60,10 @@ export class MedicamentosService {
     if (!medicamento || medicamento.deletedAt) {
       throw new NotFoundException('Medicamento no encontrado');
     }
-    await this.pacienteAccessService.assertAccesoVisita(user, medicamento.visitaId);
+    await this.pacienteAccessService.assertAccesoVisita(
+      user,
+      medicamento.visitaId,
+    );
     return medicamento;
   }
 
@@ -53,8 +71,13 @@ export class MedicamentosService {
   // catálogo) para que listar los medicamentos de una visita no dependa de un
   // join, y para que el nombre quede fijo históricamente aunque el catálogo
   // cambie después.
-  async create(dto: CreateMedicamentoDto, usuarioId?: string): Promise<Medicamento> {
-    const catalogo = await this.catalogoRepository.findOne({ where: { id: dto.medicamentoCatalogoId } });
+  async create(
+    dto: CreateMedicamentoDto,
+    usuarioId?: string,
+  ): Promise<Medicamento> {
+    const catalogo = await this.catalogoRepository.findOne({
+      where: { id: dto.medicamentoCatalogoId },
+    });
     if (!catalogo) {
       throw new NotFoundException('Medicamento de catálogo no encontrado');
     }
@@ -81,8 +104,15 @@ export class MedicamentosService {
     return saved;
   }
 
-  async remove(id: string, usuarioId?: string): Promise<Medicamento> {
-    const medicamento = await this.findOne(id);
+  async remove(
+    id: string,
+    usuarioId?: string,
+    user?: UsuarioPerfil,
+  ): Promise<Medicamento> {
+    // findOne(id, user) es lo que aplica el chequeo de IDOR (assertAccesoVisita):
+    // sin pasar `user`, un PROFESIONAL podía borrar el medicamento de cualquier
+    // paciente, no solo los que tiene asignados.
+    const medicamento = await this.findOne(id, user);
     medicamento.deletedAt = new Date();
     const saved = await this.repository.save(medicamento);
 
@@ -108,7 +138,10 @@ export class MedicamentosService {
     });
   }
 
-  async createCatalogo(dto: CreateMedicamentoCatalogoDto, usuarioId?: string): Promise<MedicamentoCatalogo> {
+  async createCatalogo(
+    dto: CreateMedicamentoCatalogoDto,
+    usuarioId?: string,
+  ): Promise<MedicamentoCatalogo> {
     // El duplicado es por (nombre, presentacion), no solo por nombre: un mismo
     // medicamento en dosis distintas (ej. "Escitalopram 10 mg" vs "20 mg") son
     // ítems de catálogo válidos y distintos.
@@ -116,7 +149,9 @@ export class MedicamentosService {
       where: { nombre: dto.nombre, presentacion: dto.presentacion ?? IsNull() },
     });
     if (existente) {
-      throw new ConflictException('Ya existe un medicamento en el catálogo con ese nombre y presentación');
+      throw new ConflictException(
+        'Ya existe un medicamento en el catálogo con ese nombre y presentación',
+      );
     }
 
     const catalogo = this.catalogoRepository.create({
@@ -137,17 +172,33 @@ export class MedicamentosService {
     return saved;
   }
 
-  async updateCatalogo(id: string, dto: UpdateMedicamentoCatalogoDto, usuarioId?: string): Promise<MedicamentoCatalogo> {
+  async updateCatalogo(
+    id: string,
+    dto: UpdateMedicamentoCatalogoDto,
+    usuarioId?: string,
+  ): Promise<MedicamentoCatalogo> {
     const catalogo = await this.catalogoRepository.findOne({ where: { id } });
-    if (!catalogo) throw new NotFoundException('Medicamento de catálogo no encontrado');
+    if (!catalogo)
+      throw new NotFoundException('Medicamento de catálogo no encontrado');
 
     const nombreFinal = dto.nombre ?? catalogo.nombre;
-    const presentacionFinal = dto.presentacion !== undefined ? dto.presentacion : catalogo.presentacion;
-    if (nombreFinal !== catalogo.nombre || presentacionFinal !== catalogo.presentacion) {
+    const presentacionFinal =
+      dto.presentacion !== undefined ? dto.presentacion : catalogo.presentacion;
+    if (
+      nombreFinal !== catalogo.nombre ||
+      presentacionFinal !== catalogo.presentacion
+    ) {
       const existente = await this.catalogoRepository.findOne({
-        where: { nombre: nombreFinal, presentacion: presentacionFinal ?? IsNull(), id: Not(id) },
+        where: {
+          nombre: nombreFinal,
+          presentacion: presentacionFinal ?? IsNull(),
+          id: Not(id),
+        },
       });
-      if (existente) throw new ConflictException('Ya existe un medicamento en el catálogo con ese nombre y presentación');
+      if (existente)
+        throw new ConflictException(
+          'Ya existe un medicamento en el catálogo con ese nombre y presentación',
+        );
     }
 
     Object.assign(catalogo, dto);

@@ -40,7 +40,7 @@ export class ZonasService {
     });
 
     const saved = await this.zonasRepository.save(zona);
-    const result = Array.isArray(saved) ? (saved[0] as Zona) : (saved as Zona);
+    const result = Array.isArray(saved) ? (saved[0] as Zona) : saved;
 
     this.auditoriasService.registrar({
       entidad: 'zonas',
@@ -56,11 +56,16 @@ export class ZonasService {
 
   async update(id: string, dto: UpdateZonaDto): Promise<Zona> {
     const zona = await this.findOne(id);
-    const oldValues = { nombre: zona.nombre, comuna: zona.comuna, region: zona.region, activa: zona.activa };
+    const oldValues = {
+      nombre: zona.nombre,
+      comuna: zona.comuna,
+      region: zona.region,
+      activa: zona.activa,
+    };
     Object.assign(zona, dto);
 
     const saved = await this.zonasRepository.save(zona);
-    const result = Array.isArray(saved) ? (saved[0] as Zona) : (saved as Zona);
+    const result = Array.isArray(saved) ? (saved[0] as Zona) : saved;
 
     this.auditoriasService.registrar({
       entidad: 'zonas',
@@ -68,7 +73,12 @@ export class ZonasService {
       accion: 'ACTUALIZAR',
       detalle: `Zona ${result.nombre} actualizada`,
       oldValues,
-      newValues: { nombre: result.nombre, comuna: result.comuna, region: result.region, activa: result.activa },
+      newValues: {
+        nombre: result.nombre,
+        comuna: result.comuna,
+        region: result.region,
+        activa: result.activa,
+      },
     });
 
     await this.analyticsService.sendZonaUpsertEvent(result);
@@ -81,7 +91,7 @@ export class ZonasService {
     zona.deletedAt = new Date();
 
     const saved = await this.zonasRepository.save(zona);
-    const result = Array.isArray(saved) ? (saved[0] as Zona) : (saved as Zona);
+    const result = Array.isArray(saved) ? (saved[0] as Zona) : saved;
 
     this.auditoriasService.registrar({
       entidad: 'zonas',

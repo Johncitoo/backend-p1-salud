@@ -94,8 +94,14 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       `,
       [plantillaCodes],
     );
-    await dataSource.query('DELETE FROM plantillas_ficha WHERE codigo = ANY($1)', [plantillaCodes]);
-    await dataSource.query('DELETE FROM variables_clinicas WHERE codigo = ANY($1)', [variableCodes]);
+    await dataSource.query(
+      'DELETE FROM plantillas_ficha WHERE codigo = ANY($1)',
+      [plantillaCodes],
+    );
+    await dataSource.query(
+      'DELETE FROM variables_clinicas WHERE codigo = ANY($1)',
+      [variableCodes],
+    );
     await dataSource.query(
       `
       DELETE FROM visitas
@@ -105,7 +111,9 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       `,
       [PATIENT_RUT],
     );
-    await dataSource.query('DELETE FROM pacientes WHERE rut = $1', [PATIENT_RUT]);
+    await dataSource.query('DELETE FROM pacientes WHERE rut = $1', [
+      PATIENT_RUT,
+    ]);
   };
 
   const createDedicatedVisit = async () => {
@@ -122,7 +130,9 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
     );
 
     if (profesionales.length === 0) {
-      throw new Error('Setup E2E ficha-clinica: no existe un profesional activo para crear la visita dedicada.');
+      throw new Error(
+        'Setup E2E ficha-clinica: no existe un profesional activo para crear la visita dedicada.',
+      );
     }
 
     const pacientes = await dataSource.query(
@@ -173,7 +183,9 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
     visitaId = visitas[0]?.id;
 
     if (!pacienteId || !visitaId) {
-      throw new Error('Setup E2E ficha-clinica: no se pudo crear paciente/visita dedicada.');
+      throw new Error(
+        'Setup E2E ficha-clinica: no se pudo crear paciente/visita dedicada.',
+      );
     }
   };
 
@@ -183,7 +195,9 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
     dataSource = app.get(DataSource);
 
@@ -261,7 +275,9 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
         .set(AUTH)
         .expect(200);
 
-      expect(res.body.some((v: { codigo: string }) => v.codigo === PA_CODE)).toBe(true);
+      expect(
+        res.body.some((v: { codigo: string }) => v.codigo === PA_CODE),
+      ).toBe(true);
     });
 
     it('GET /variables-clinicas/:id retorna una especifica', async () => {
@@ -297,7 +313,11 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       const res = await request(app.getHttpServer())
         .post('/plantillas-ficha')
         .set(AUTH)
-        .send({ codigo: PLANTILLA_CODE, nombre: `Plantilla E2E ${RUN_ID}`, tipoAtencion: 'CONTROL' })
+        .send({
+          codigo: PLANTILLA_CODE,
+          nombre: `Plantilla E2E ${RUN_ID}`,
+          tipoAtencion: 'CONTROL',
+        })
         .expect(201);
 
       plantillaId = res.body.id;
@@ -308,7 +328,11 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       await request(app.getHttpServer())
         .post('/plantillas-ficha')
         .set(AUTH)
-        .send({ codigo: PLANTILLA_CODE, nombre: 'Plantilla duplicada E2E', tipoAtencion: 'CONTROL' })
+        .send({
+          codigo: PLANTILLA_CODE,
+          nombre: 'Plantilla duplicada E2E',
+          tipoAtencion: 'CONTROL',
+        })
         .expect(400);
     });
 
@@ -316,7 +340,13 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       await request(app.getHttpServer())
         .post(`/plantillas-ficha/${plantillaId}/campos`)
         .set(AUTH)
-        .send({ codigoCampo: 'motivo', etiqueta: 'Motivo de atencion', tipoCampo: 'TEXTO_LIBRE', orden: 1, obligatorio: true })
+        .send({
+          codigoCampo: 'motivo',
+          etiqueta: 'Motivo de atencion',
+          tipoCampo: 'TEXTO_LIBRE',
+          orden: 1,
+          obligatorio: true,
+        })
         .expect(201);
     });
 
@@ -324,7 +354,14 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       await request(app.getHttpServer())
         .post(`/plantillas-ficha/${plantillaId}/campos`)
         .set(AUTH)
-        .send({ codigoCampo: 'PA_SIST', etiqueta: 'PA sistolica', tipoCampo: 'VARIABLE_CLINICA', variableClinicaId: varPAId, orden: 2, obligatorio: true })
+        .send({
+          codigoCampo: 'PA_SIST',
+          etiqueta: 'PA sistolica',
+          tipoCampo: 'VARIABLE_CLINICA',
+          variableClinicaId: varPAId,
+          orden: 2,
+          obligatorio: true,
+        })
         .expect(201);
     });
 
@@ -332,7 +369,12 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       await request(app.getHttpServer())
         .post(`/plantillas-ficha/${plantillaId}/campos`)
         .set(AUTH)
-        .send({ codigoCampo: 'BAD', etiqueta: 'Bad', tipoCampo: 'VARIABLE_CLINICA', orden: 3 })
+        .send({
+          codigoCampo: 'BAD',
+          etiqueta: 'Bad',
+          tipoCampo: 'VARIABLE_CLINICA',
+          orden: 3,
+        })
         .expect(400);
     });
 
@@ -340,7 +382,12 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       await request(app.getHttpServer())
         .post(`/plantillas-ficha/${plantillaId}/campos`)
         .set(AUTH)
-        .send({ codigoCampo: 'PA_SIST', etiqueta: 'Duplicado', tipoCampo: 'TEXTO_LIBRE', orden: 4 })
+        .send({
+          codigoCampo: 'PA_SIST',
+          etiqueta: 'Duplicado',
+          tipoCampo: 'TEXTO_LIBRE',
+          orden: 4,
+        })
         .expect(400);
     });
 
@@ -397,7 +444,9 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
         .expect(200);
 
       expect(res.body.length).toBeGreaterThanOrEqual(1);
-      const pa = res.body.find((m: { variableClinicaId: string }) => m.variableClinicaId === varPAId);
+      const pa = res.body.find(
+        (m: { variableClinicaId: string }) => m.variableClinicaId === varPAId,
+      );
       expect(pa).toBeDefined();
       expect(Number(pa.valorNumero)).toBe(120);
     });
@@ -408,7 +457,9 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
         .set(AUTH)
         .expect(200);
 
-      const motivoMediciones = res.body.find((m: { variableClinicaId: string }) => m.variableClinicaId === 'motivo');
+      const motivoMediciones = res.body.find(
+        (m: { variableClinicaId: string }) => m.variableClinicaId === 'motivo',
+      );
       expect(motivoMediciones).toBeUndefined();
     });
 
@@ -425,8 +476,9 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
         .set(AUTH)
         .expect(200);
 
-      const activas = res.body.filter((m: { deletedAt: null | string; variableClinicaId: string }) =>
-        m.variableClinicaId === varPAId && m.deletedAt === null,
+      const activas = res.body.filter(
+        (m: { deletedAt: null | string; variableClinicaId: string }) =>
+          m.variableClinicaId === varPAId && m.deletedAt === null,
       );
       expect(activas.length).toBeGreaterThanOrEqual(1);
 
@@ -467,7 +519,13 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       const res = await request(app.getHttpServer())
         .post('/mediciones-clinicas')
         .set(AUTH)
-        .send({ pacienteId, variableClinicaId: varTempId, valorNumero: 36.5, origen: 'MANUAL', unidad: 'C' })
+        .send({
+          pacienteId,
+          variableClinicaId: varTempId,
+          valorNumero: 36.5,
+          origen: 'MANUAL',
+          unidad: 'C',
+        })
         .expect(201);
 
       expect(res.body.origen).toBe('MANUAL');
@@ -489,7 +547,11 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       const tempV = await request(app.getHttpServer())
         .post('/variables-clinicas')
         .set(AUTH)
-        .send({ codigo: DEL_CODE, nombre: `To delete E2E ${RUN_ID}`, tipoDato: 'TEXTO' })
+        .send({
+          codigo: DEL_CODE,
+          nombre: `To delete E2E ${RUN_ID}`,
+          tipoDato: 'TEXTO',
+        })
         .expect(201);
 
       const id = tempV.body.id;
@@ -507,7 +569,11 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
       const recreated = await request(app.getHttpServer())
         .post('/variables-clinicas')
         .set(AUTH)
-        .send({ codigo: DEL_CODE, nombre: `Recreated E2E ${RUN_ID}`, tipoDato: 'TEXTO' })
+        .send({
+          codigo: DEL_CODE,
+          nombre: `Recreated E2E ${RUN_ID}`,
+          tipoDato: 'TEXTO',
+        })
         .expect(201);
 
       expect(recreated.body.codigo).toBe(DEL_CODE);
@@ -523,9 +589,7 @@ describe('Ficha Clinica - E2E (modelo hibrido)', () => {
     });
 
     it('sin headers de auth da 401', async () => {
-      await request(app.getHttpServer())
-        .get('/variables-clinicas')
-        .expect(401);
+      await request(app.getHttpServer()).get('/variables-clinicas').expect(401);
     });
   });
 });

@@ -84,7 +84,10 @@ export class PacientesController {
 
   @Patch('direcciones/:id')
   @Roles('ADMIN', 'COORDINADOR')
-  updateDireccion(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateDireccionDto) {
+  updateDireccion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateDireccionDto,
+  ) {
     return this.pacientesService.updateDireccion(id, dto);
   }
 
@@ -103,14 +106,20 @@ export class PacientesController {
 
   @Post(':pacienteId/contactos')
   @Roles('ADMIN', 'COORDINADOR')
-  createContacto(@Param('pacienteId', ParseUUIDPipe) pacienteId: string, @Body() dto: CreateContactoDto) {
+  createContacto(
+    @Param('pacienteId', ParseUUIDPipe) pacienteId: string,
+    @Body() dto: CreateContactoDto,
+  ) {
     dto.pacienteId = pacienteId;
     return this.pacientesService.createContacto(dto);
   }
 
   @Patch('contactos/:id')
   @Roles('ADMIN', 'COORDINADOR')
-  updateContacto(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateContactoDto) {
+  updateContacto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateContactoDto,
+  ) {
     return this.pacientesService.updateContacto(id, dto);
   }
 
@@ -129,14 +138,20 @@ export class PacientesController {
 
   @Post(':pacienteId/planes')
   @Roles('ADMIN', 'COORDINADOR')
-  createPlan(@Param('pacienteId', ParseUUIDPipe) pacienteId: string, @Body() dto: CreatePlanDto) {
+  createPlan(
+    @Param('pacienteId', ParseUUIDPipe) pacienteId: string,
+    @Body() dto: CreatePlanDto,
+  ) {
     dto.pacienteId = pacienteId;
     return this.pacientesService.createPlan(dto);
   }
 
   @Patch('planes/:id')
   @Roles('ADMIN', 'COORDINADOR')
-  updatePlan(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePlanDto) {
+  updatePlan(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdatePlanDto,
+  ) {
     return this.pacientesService.updatePlan(id, dto);
   }
 
@@ -176,12 +191,18 @@ export class PacientesController {
 
   @Delete('visitas/:id')
   @Roles('ADMIN')
-  removeVisita(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
+  removeVisita(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     return this.visitasService.remove(id, toUuidOrUndefined(user?.id));
   }
 }
 
 const toUuidOrUndefined = (value?: string) =>
-  value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  value &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  )
     ? value
     : undefined;

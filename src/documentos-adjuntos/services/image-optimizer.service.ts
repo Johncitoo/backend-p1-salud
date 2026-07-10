@@ -1,13 +1,19 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import sharp from 'sharp';
-import type { ProcessedClinicalFile, ValidatedClinicalFile } from '../types/uploaded-file.type';
+import type {
+  ProcessedClinicalFile,
+  ValidatedClinicalFile,
+} from '../types/uploaded-file.type';
 
 const MAX_IMAGE_DIMENSION = 1600;
 const WEBP_QUALITY = 82;
 
 @Injectable()
 export class ImageOptimizerService {
-  async process(buffer: Buffer, validated: ValidatedClinicalFile): Promise<ProcessedClinicalFile> {
+  async process(
+    buffer: Buffer,
+    validated: ValidatedClinicalFile,
+  ): Promise<ProcessedClinicalFile> {
     if (validated.kind === 'PDF') {
       return {
         buffer,
@@ -42,7 +48,9 @@ export class ImageOptimizerService {
         storedHeight: storedMetadata.height ?? null,
       };
     } catch {
-      throw new BadRequestException('No fue posible procesar la imagen subida.');
+      throw new BadRequestException(
+        'No fue posible procesar la imagen subida.',
+      );
     }
   }
 }

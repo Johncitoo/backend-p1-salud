@@ -38,8 +38,15 @@ import { STORAGE_SERVICE } from './services/storage.interface';
       // STORAGE_PROVIDER=R2 para produccion (requiere credenciales reales de
       // Cloudflare R2 en .env); por defecto usa disco local, util para
       // desarrollo/pruebas sin depender de un bucket externo.
-      useFactory: (config: ConfigService, r2: R2StorageService, local: LocalStorageService) =>
-        (config.get<string>('STORAGE_PROVIDER') ?? 'LOCAL').toUpperCase() === 'R2' ? r2 : local,
+      useFactory: (
+        config: ConfigService,
+        r2: R2StorageService,
+        local: LocalStorageService,
+      ) =>
+        (config.get<string>('STORAGE_PROVIDER') ?? 'LOCAL').toUpperCase() ===
+        'R2'
+          ? r2
+          : local,
       inject: [ConfigService, R2StorageService, LocalStorageService],
     },
     DevAuthGuard,

@@ -45,8 +45,11 @@ export class CrmService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.apiUrl = this.configService.get<string>('CRM_API_URL') || 'https://pgti-proyecto-crm-backend.vercel.app/api/v1/tickets/externo';
-    this.apiKey = this.configService.get<string>('CRM_API_KEY') || 'salud_secret_p01';
+    this.apiUrl =
+      this.configService.get<string>('CRM_API_URL') ||
+      'https://pgti-proyecto-crm-backend.vercel.app/api/v1/tickets/externo';
+    this.apiKey =
+      this.configService.get<string>('CRM_API_KEY') || 'salud_secret_p01';
   }
 
   /**
@@ -60,7 +63,9 @@ export class CrmService {
   private static readonly ORIGENES_MANUALES = new Set(['WEB', 'APP']);
 
   debeEnviarTicket(incidente: IncidenteSalud): boolean {
-    return CrmService.ORIGENES_MANUALES.has((incidente.origen ?? '').toUpperCase());
+    return CrmService.ORIGENES_MANUALES.has(
+      (incidente.origen ?? '').toUpperCase(),
+    );
   }
 
   async crearTicket(payload: CreateCrmTicketPayload): Promise<any> {
@@ -73,7 +78,9 @@ export class CrmService {
           },
         }),
       );
-      this.logger.log(`Ticket de CRM creado exitosamente. Salud Ref: ${payload.salud_ref}`);
+      this.logger.log(
+        `Ticket de CRM creado exitosamente. Salud Ref: ${payload.salud_ref}`,
+      );
       return response.data;
     } catch (error: any) {
       this.logger.error(
@@ -97,7 +104,9 @@ export class CrmService {
     );
   }
 
-  async consultarEstadoTicket(ticketId: string): Promise<CrmTicketStatus | null> {
+  async consultarEstadoTicket(
+    ticketId: string,
+  ): Promise<CrmTicketStatus | null> {
     try {
       const query = new URLSearchParams({ api_key: this.apiKey });
       const url = `${this.apiUrl}/${ticketId}?${query.toString()}`;
@@ -111,16 +120,22 @@ export class CrmService {
     }
   }
 
-  buildPayloadFromIncidente(incidente: IncidenteSalud, paciente: Paciente | null): CreateCrmTicketPayload {
-    const prioridadMap: Record<string, 'baja' | 'media' | 'alta' | 'critica'> = {
-      'BAJA': 'baja',
-      'MEDIA': 'media',
-      'ALTA': 'alta',
-      'CRITICA': 'critica',
-    };
+  buildPayloadFromIncidente(
+    incidente: IncidenteSalud,
+    paciente: Paciente | null,
+  ): CreateCrmTicketPayload {
+    const prioridadMap: Record<string, 'baja' | 'media' | 'alta' | 'critica'> =
+      {
+        BAJA: 'baja',
+        MEDIA: 'media',
+        ALTA: 'alta',
+        CRITICA: 'critica',
+      };
 
     const prioridad = prioridadMap[incidente.severidad] || 'media';
-    const nombreCliente = paciente ? `${paciente.nombres} ${paciente.apellidos}`.trim() : 'Paciente Desconocido';
+    const nombreCliente = paciente
+      ? `${paciente.nombres} ${paciente.apellidos}`.trim()
+      : 'Paciente Desconocido';
     const emailCliente = paciente?.email || 'no-reply@salud.cl'; // Fallback ya que es obligatorio en CRM
 
     return {
@@ -133,7 +148,10 @@ export class CrmService {
       cliente_email: emailCliente,
       cliente_telefono: paciente?.telefono || undefined,
       salud_ref: incidente.id,
-      contexto: JSON.stringify({ origen: 'SISTEMA', modulo: 'Incidentes Salud' }),
+      contexto: JSON.stringify({
+        origen: 'SISTEMA',
+        modulo: 'Incidentes Salud',
+      }),
     };
   }
 }

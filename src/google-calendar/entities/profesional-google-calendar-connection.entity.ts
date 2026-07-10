@@ -11,13 +11,28 @@ export class ProfesionalGoogleCalendarConnection {
   @Column({ name: 'usuario_id', type: 'uuid' })
   usuarioId: string;
 
-  @Column({ name: 'google_account_id', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'google_account_id',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   googleAccountId?: string | null;
 
-  @Column({ name: 'google_account_email', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'google_account_email',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   googleAccountEmail?: string | null;
 
-  @Column({ name: 'calendar_id', type: 'varchar', length: 255, default: 'primary' })
+  @Column({
+    name: 'calendar_id',
+    type: 'varchar',
+    length: 255,
+    default: 'primary',
+  })
   calendarId: string;
 
   @Column({ name: 'access_token_ciphertext', type: 'text' })
@@ -26,7 +41,12 @@ export class ProfesionalGoogleCalendarConnection {
   @Column({ name: 'refresh_token_ciphertext', type: 'text', nullable: true })
   refreshTokenCiphertext?: string | null;
 
-  @Column({ name: 'token_encryption_alg', type: 'varchar', length: 30, default: 'AES-256-GCM' })
+  @Column({
+    name: 'token_encryption_alg',
+    type: 'varchar',
+    length: 30,
+    default: 'AES-256-GCM',
+  })
   tokenEncryptionAlg: string;
 
   @Column({ name: 'token_encryption_iv', type: 'varchar', length: 100 })
@@ -35,7 +55,12 @@ export class ProfesionalGoogleCalendarConnection {
   @Column({ name: 'token_encryption_tag', type: 'varchar', length: 100 })
   tokenEncryptionTag: string;
 
-  @Column({ name: 'token_encryption_key_id', type: 'varchar', length: 100, default: 'default' })
+  @Column({
+    name: 'token_encryption_key_id',
+    type: 'varchar',
+    length: 100,
+    default: 'default',
+  })
   tokenEncryptionKeyId: string;
 
   @Column({ type: 'text', nullable: true })

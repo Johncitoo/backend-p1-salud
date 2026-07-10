@@ -37,9 +37,11 @@ describe('DocumentosAdjuntosController (e2e)', () => {
     })
       .overrideGuard(DevAuthGuard)
       .useValue({
-        canActivate: context => {
+        canActivate: (context) => {
           const request = context.switchToHttp().getRequest();
-          const role = (request.header('x-mock-role') ?? 'ADMIN').toUpperCase() as AppRole;
+          const role = (
+            request.header('x-mock-role') ?? 'ADMIN'
+          ).toUpperCase() as AppRole;
           request.user = {
             id: randomUUID(),
             identityUserId: `mock-${role.toLowerCase()}`,
@@ -55,7 +57,9 @@ describe('DocumentosAdjuntosController (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
   });
 
@@ -74,8 +78,10 @@ describe('DocumentosAdjuntosController (e2e)', () => {
         contentType: 'application/pdf',
       })
       .expect(201)
-      .expect(response => {
-        expect(response.body).toEqual(expect.objectContaining({ id: documentoId, fichaClinicaId }));
+      .expect((response) => {
+        expect(response.body).toEqual(
+          expect.objectContaining({ id: documentoId, fichaClinicaId }),
+        );
       });
 
     expect(service.upload).toHaveBeenCalledWith(
@@ -93,7 +99,11 @@ describe('DocumentosAdjuntosController (e2e)', () => {
       .expect('Content-Type', /application\/pdf/)
       .expect('Content-Disposition', /test\.pdf/);
 
-    expect(service.download).toHaveBeenCalledWith(documentoId, expect.any(String));
+    expect(service.download).toHaveBeenCalledWith(
+      documentoId,
+      expect.any(String),
+      expect.any(Object),
+    );
   });
 
   it('blocks supervisor uploads', async () => {

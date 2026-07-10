@@ -23,9 +23,11 @@ describe('CreatePacienteDto', () => {
 
   it('rejects payload without rut, nombres or apellidos', async () => {
     const errors = await validateDto({});
-    const properties = errors.map(error => error.property);
+    const properties = errors.map((error) => error.property);
 
-    expect(properties).toEqual(expect.arrayContaining(['rut', 'nombres', 'apellidos']));
+    expect(properties).toEqual(
+      expect.arrayContaining(['rut', 'nombres', 'apellidos']),
+    );
   });
 
   it('rejects invalid email', async () => {
@@ -36,6 +38,6 @@ describe('CreatePacienteDto', () => {
       email: 'correo-invalido',
     });
 
-    expect(errors.some(error => error.property === 'email')).toBe(true);
+    expect(errors.some((error) => error.property === 'email')).toBe(true);
   });
 });

@@ -1,4 +1,11 @@
-import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+} from 'class-validator';
 
 export class CreateProfesionalDto {
   @IsUUID()

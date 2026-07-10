@@ -28,7 +28,10 @@ export class VisitaEstadoHistorialService {
     const registro = await this.repository.findOne({
       where: { id },
     });
-    if (!registro) throw new NotFoundException('Registro de historial de estado no encontrado');
+    if (!registro)
+      throw new NotFoundException(
+        'Registro de historial de estado no encontrado',
+      );
     return registro;
   }
 

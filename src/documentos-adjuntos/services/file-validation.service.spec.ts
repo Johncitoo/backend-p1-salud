@@ -2,7 +2,9 @@ import { BadRequestException } from '@nestjs/common';
 import { FileValidationService } from './file-validation.service';
 import type { UploadedClinicalFile } from '../types/uploaded-file.type';
 
-const makeFile = (overrides: Partial<UploadedClinicalFile>): UploadedClinicalFile => {
+const makeFile = (
+  overrides: Partial<UploadedClinicalFile>,
+): UploadedClinicalFile => {
   const buffer = overrides.buffer ?? Buffer.from('%PDF-1.4\n');
   return {
     buffer,
@@ -93,7 +95,8 @@ describe('FileValidationService', () => {
       service.validate(
         makeFile({
           originalname: 'planilla.xlsx',
-          mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          mimetype:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         }),
       ),
     ).toThrow(BadRequestException);

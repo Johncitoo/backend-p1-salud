@@ -9,7 +9,6 @@ import {
   Query,
   Request,
   UseGuards,
-
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
@@ -37,13 +36,16 @@ export class IncidentesSaludController {
   async findOneExterno(@Param('id') id: string) {
     const incidente = await this.incidentesSaludService.findOne(id);
     let paciente: Paciente | null = null;
-    
+
     if (incidente.pacienteId) {
-      paciente = await this.pacientesService.findOne(incidente.pacienteId).catch(() => null);
+      paciente = await this.pacientesService
+        .findOne(incidente.pacienteId)
+        .catch(() => null);
     }
-    
-    const { visita, profesional, profesionalUsuario } = await this.incidentesSaludService.getContextInfo(incidente);
-    
+
+    const { visita, profesional, profesionalUsuario } =
+      await this.incidentesSaludService.getContextInfo(incidente);
+
     return {
       id: incidente.id,
       titulo: incidente.titulo,
@@ -54,37 +56,43 @@ export class IncidentesSaludController {
       origen: incidente.origen,
       createdAt: incidente.createdAt,
       pacienteId: incidente.pacienteId,
-      paciente: paciente ? {
-        id: paciente.id,
-        rut: paciente.rut,
-        nombres: paciente.nombres,
-        apellidos: paciente.apellidos,
-        email: paciente.email,
-        telefono: paciente.telefono,
-        fechaNacimiento: paciente.fechaNacimiento,
-        sexo: paciente.sexo,
-        direccion: paciente.direccion,
-      } : null,
+      paciente: paciente
+        ? {
+            id: paciente.id,
+            rut: paciente.rut,
+            nombres: paciente.nombres,
+            apellidos: paciente.apellidos,
+            email: paciente.email,
+            telefono: paciente.telefono,
+            fechaNacimiento: paciente.fechaNacimiento,
+            sexo: paciente.sexo,
+            direccion: paciente.direccion,
+          }
+        : null,
       visitaId: incidente.visitaId,
-      visita: visita ? {
-        id: visita.id,
-        fechaProgramada: visita.fechaProgramada,
-        horaProgramada: visita.horaProgramada,
-        estado: visita.estado,
-        duracionEstimadaMin: visita.duracionEstimadaMin,
-        checkInAt: visita.checkInAt,
-        checkOutAt: visita.checkOutAt,
-        prioridad: visita.prioridad,
-      } : null,
+      visita: visita
+        ? {
+            id: visita.id,
+            fechaProgramada: visita.fechaProgramada,
+            horaProgramada: visita.horaProgramada,
+            estado: visita.estado,
+            duracionEstimadaMin: visita.duracionEstimadaMin,
+            checkInAt: visita.checkInAt,
+            checkOutAt: visita.checkOutAt,
+            prioridad: visita.prioridad,
+          }
+        : null,
       profesionalSaludId: incidente.profesionalSaludId,
-      profesionalSalud: profesional ? {
-        id: profesional.id,
-        profesion: profesional.profesion,
-        numeroRegistro: profesional.numeroRegistro,
-        nombres: profesionalUsuario?.nombres,
-        apellidos: profesionalUsuario?.apellidos,
-        email: profesionalUsuario?.email,
-      } : null,
+      profesionalSalud: profesional
+        ? {
+            id: profesional.id,
+            profesion: profesional.profesion,
+            numeroRegistro: profesional.numeroRegistro,
+            nombres: profesionalUsuario?.nombres,
+            apellidos: profesionalUsuario?.apellidos,
+            email: profesionalUsuario?.email,
+          }
+        : null,
     };
   }
 

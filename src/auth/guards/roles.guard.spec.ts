@@ -41,6 +41,8 @@ describe('RolesGuard', () => {
 
     const guard = new RolesGuard(reflector);
 
-    expect(() => guard.canActivate(createContext('PROFESIONAL'))).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(createContext('PROFESIONAL'))).toThrow(
+      ForbiddenException,
+    );
   });
 });

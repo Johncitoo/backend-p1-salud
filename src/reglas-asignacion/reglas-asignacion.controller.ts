@@ -20,7 +20,9 @@ import { UpdateReglaAsignacionDto } from './dto/update-regla-asignacion.dto';
 @Controller('reglas-asignacion')
 @UseGuards(DevAuthGuard, RolesGuard)
 export class ReglasAsignacionController {
-  constructor(private readonly reglasAsignacionService: ReglasAsignacionService) {}
+  constructor(
+    private readonly reglasAsignacionService: ReglasAsignacionService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')

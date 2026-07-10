@@ -162,17 +162,25 @@ export class AnalyticsService {
   private static readonly RETRY_BACKOFF_MS = [3_000, 8_000];
 
   private async sendEvent(event: AnalyticsEvent): Promise<void> {
-    const enabled = this.configService.get<string>('ANALYTICS_ENABLED') === 'true';
-    const baseUrl = (this.configService.get<string>('ANALYTICS_URL') ?? '').trim();
-    const eventsPath = this.configService.get<string>('ANALYTICS_EVENTS_PATH') ?? '/events';
+    const enabled =
+      this.configService.get<string>('ANALYTICS_ENABLED') === 'true';
+    const baseUrl = (
+      this.configService.get<string>('ANALYTICS_URL') ?? ''
+    ).trim();
+    const eventsPath =
+      this.configService.get<string>('ANALYTICS_EVENTS_PATH') ?? '/events';
 
     if (!enabled) {
-      this.logger.log(`[Analytics mock] Evento ${event.event_type}:\n${JSON.stringify(event, null, 2)}`);
+      this.logger.log(
+        `[Analytics mock] Evento ${event.event_type}:\n${JSON.stringify(event, null, 2)}`,
+      );
       return;
     }
 
     if (!baseUrl) {
-      this.logger.warn(`ANALYTICS_ENABLED=true pero ANALYTICS_URL está vacío. Evento no enviado:\n${JSON.stringify(event, null, 2)}`);
+      this.logger.warn(
+        `ANALYTICS_ENABLED=true pero ANALYTICS_URL está vacío. Evento no enviado:\n${JSON.stringify(event, null, 2)}`,
+      );
       return;
     }
 
@@ -197,9 +205,10 @@ export class AnalyticsService {
           signal: controller.signal,
         });
 
-        const responseText = typeof response.text === 'function'
-          ? await response.text().catch(() => '')
-          : '';
+        const responseText =
+          typeof response.text === 'function'
+            ? await response.text().catch(() => '')
+            : '';
         this.logger.log(
           `[Analytics response] Evento ${event.event_type} (intento ${attempt}/${AnalyticsService.MAX_ATTEMPTS}): HTTP ${response.status} - ${responseText}`,
         );
@@ -235,7 +244,10 @@ export class AnalyticsService {
   // Eventos públicos (uno por tipo que pide el Grupo 9)
   // =========================================================
 
-  async sendVisitUpsertEvent(visita: Visita, options: VisitAnalyticsOptions = {}): Promise<void> {
+  async sendVisitUpsertEvent(
+    visita: Visita,
+    options: VisitAnalyticsOptions = {},
+  ): Promise<void> {
     const estado = this.normalizeVisitaEstado(visita.estado);
     const payload: VisitaUpsertPayload = {
       visita_id: visita.id,
@@ -253,7 +265,11 @@ export class AnalyticsService {
       visit_type: options.visitType ?? 'General',
     };
 
-    await this.sendEvent({ source: 'salud', event_type: 'visita_upsert', payload });
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'visita_upsert',
+      payload,
+    });
   }
 
   async sendUsuarioUpsertEvent(usuario: UsuarioData): Promise<void> {
@@ -265,7 +281,11 @@ export class AnalyticsService {
       activo: usuario.activo,
     };
 
-    await this.sendEvent({ source: 'salud', event_type: 'usuario_upsert', payload });
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'usuario_upsert',
+      payload,
+    });
   }
 
   async sendPacienteUpsertEvent(paciente: Paciente): Promise<void> {
@@ -281,7 +301,11 @@ export class AnalyticsService {
       direccion: paciente.direccion ?? null,
     };
 
-    await this.sendEvent({ source: 'salud', event_type: 'paciente_upsert', payload });
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'paciente_upsert',
+      payload,
+    });
   }
 
   async sendProfesionalUpsertEvent(
@@ -297,7 +321,11 @@ export class AnalyticsService {
       activo: profesional.activo,
     };
 
-    await this.sendEvent({ source: 'salud', event_type: 'profesional_upsert', payload });
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'profesional_upsert',
+      payload,
+    });
   }
 
   async sendZonaUpsertEvent(zona: Zona): Promise<void> {
@@ -310,7 +338,11 @@ export class AnalyticsService {
       activa: zona.activa,
     };
 
-    await this.sendEvent({ source: 'salud', event_type: 'zona_upsert', payload });
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'zona_upsert',
+      payload,
+    });
   }
 
   async sendEspecialidadUpsertEvent(especialidad: Especialidad): Promise<void> {
@@ -320,7 +352,11 @@ export class AnalyticsService {
       descripcion: especialidad.descripcion ?? null,
     };
 
-    await this.sendEvent({ source: 'salud', event_type: 'especialidad_upsert', payload });
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'especialidad_upsert',
+      payload,
+    });
   }
 
   async sendVisitaInicioEvent(visita: Visita): Promise<void> {
@@ -332,10 +368,17 @@ export class AnalyticsService {
       fecha_inicio_real: fechaInicio,
     };
 
-    await this.sendEvent({ source: 'salud', event_type: 'visita_inicio', payload });
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'visita_inicio',
+      payload,
+    });
   }
 
-  async sendVisitaFinEvent(visita: Visita, options: VisitAnalyticsOptions = {}): Promise<void> {
+  async sendVisitaFinEvent(
+    visita: Visita,
+    options: VisitAnalyticsOptions = {},
+  ): Promise<void> {
     const fechaFin = this.formatDateTime(visita.fechaHoraFinReal);
     if (!fechaFin) return;
 
@@ -348,7 +391,11 @@ export class AnalyticsService {
       puntual: options.puntual === true ? 1 : 0,
     };
 
-    await this.sendEvent({ source: 'salud', event_type: 'visita_fin', payload });
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'visita_fin',
+      payload,
+    });
   }
 
   // Paso 9 del UAT (MaintenanceInspectionCompleted): el técnico terminó la
@@ -360,7 +407,8 @@ export class AnalyticsService {
   ): Promise<void> {
     const payload = {
       visita_id: visita.id,
-      fecha_inspeccion: this.formatDateTime(new Date()) ?? new Date().toISOString(),
+      fecha_inspeccion:
+        this.formatDateTime(new Date()) ?? new Date().toISOString(),
       repuestos_detectados: String(options.repuestosCount ?? 0),
     };
 
@@ -371,7 +419,10 @@ export class AnalyticsService {
     });
   }
 
-  async sendFichaUpsertEvent(ficha: FichaClinica, adjuntosCount: number): Promise<void> {
+  async sendFichaUpsertEvent(
+    ficha: FichaClinica,
+    adjuntosCount: number,
+  ): Promise<void> {
     const payload: FichaUpsertPayload = {
       ficha_id: ficha.id,
       visita_id: ficha.visitaId,
@@ -383,7 +434,11 @@ export class AnalyticsService {
       cantidad_adjuntos: String(adjuntosCount),
     };
 
-    await this.sendEvent({ source: 'salud', event_type: 'ficha_upsert', payload });
+    await this.sendEvent({
+      source: 'salud',
+      event_type: 'ficha_upsert',
+      payload,
+    });
   }
 
   async sendAlertaUpsertEvent(alerta: Alerta): Promise<void> {
@@ -414,12 +469,25 @@ export class AnalyticsService {
   // Helpers de normalización de estados
   // =========================================================
 
-  private normalizeVisitaEstado(estado?: string): VisitaUpsertPayload['estado'] {
+  private normalizeVisitaEstado(
+    estado?: string,
+  ): VisitaUpsertPayload['estado'] {
     const normalized = estado?.trim().toUpperCase().replace(/\s+/g, '_');
 
-    if (['REALIZADA', 'FINALIZADA', 'TERMINADA', 'COMPLETADA'].includes(normalized ?? '')) return 'completada';
-    if (['EN_ATENCION', 'EN_CAMINO', 'INICIADA', 'EN_CURSO'].includes(normalized ?? '')) return 'en_proceso';
-    if (['CANCELADA', 'NO_REALIZADA', 'ANULADA'].includes(normalized ?? '')) return 'cancelada';
+    if (
+      ['REALIZADA', 'FINALIZADA', 'TERMINADA', 'COMPLETADA'].includes(
+        normalized ?? '',
+      )
+    )
+      return 'completada';
+    if (
+      ['EN_ATENCION', 'EN_CAMINO', 'INICIADA', 'EN_CURSO'].includes(
+        normalized ?? '',
+      )
+    )
+      return 'en_proceso';
+    if (['CANCELADA', 'NO_REALIZADA', 'ANULADA'].includes(normalized ?? ''))
+      return 'cancelada';
 
     return 'programada';
   }
@@ -464,7 +532,10 @@ export class AnalyticsService {
 
   private formatDateOnly(value?: Date | string | null): string | null {
     if (!value) return null;
-    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+    if (value instanceof Date)
+      return Number.isNaN(value.getTime())
+        ? null
+        : value.toISOString().slice(0, 10);
 
     const trimmed = String(value).trim();
     const dateOnlyMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
@@ -484,8 +555,11 @@ export class AnalyticsService {
     }
 
     const trimmed = String(value).trim();
-    const timeMatch = trimmed.match(/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/);
-    if (timeMatch) return `${timeMatch[1]}:${timeMatch[2]}:${timeMatch[3] ?? '00'}`;
+    const timeMatch = trimmed.match(
+      /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?/,
+    );
+    if (timeMatch)
+      return `${timeMatch[1]}:${timeMatch[2]}:${timeMatch[3] ?? '00'}`;
 
     const date = new Date(trimmed);
     if (Number.isNaN(date.getTime())) return null;

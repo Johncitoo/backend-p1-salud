@@ -17,7 +17,9 @@ import { CreateVisitaEstadoHistorialDto } from './dto/create-visita-estado-histo
 @Controller('visita-estado-historial')
 @UseGuards(DevAuthGuard, RolesGuard)
 export class VisitaEstadoHistorialController {
-  constructor(private readonly visitaEstadoHistorialService: VisitaEstadoHistorialService) {}
+  constructor(
+    private readonly visitaEstadoHistorialService: VisitaEstadoHistorialService,
+  ) {}
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR')

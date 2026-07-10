@@ -6,5 +6,8 @@ import { timingSafeEqual } from 'crypto';
 export function safeEqual(value: string, expected: string): boolean {
   const valueBuffer = Buffer.from(value);
   const expectedBuffer = Buffer.from(expected);
-  return valueBuffer.length === expectedBuffer.length && timingSafeEqual(valueBuffer, expectedBuffer);
+  return (
+    valueBuffer.length === expectedBuffer.length &&
+    timingSafeEqual(valueBuffer, expectedBuffer)
+  );
 }

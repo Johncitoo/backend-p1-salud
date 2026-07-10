@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { DevAuthGuard } from '../auth/guards/dev-auth.guard';
@@ -16,7 +27,10 @@ import { FindVisitasQueryDto } from './dto/find-visitas-query.dto';
 import { VisitasService } from './visitas.service';
 
 const uuidOrUndefined = (value?: string) =>
-  value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  value &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  )
     ? value
     : undefined;
 
@@ -27,13 +41,19 @@ export class VisitasController {
 
   @Get()
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
-  findAll(@Query() query: FindVisitasQueryDto, @CurrentUser() user?: UsuarioPerfil) {
+  findAll(
+    @Query() query: FindVisitasQueryDto,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     return this.visitasService.findAllForUser(query, user);
   }
 
   @Get('calendario')
   @Roles('ADMIN', 'COORDINADOR', 'PROFESIONAL', 'SUPERVISOR', 'TECNICO')
-  calendario(@Query() query: FindCalendarioQueryDto, @CurrentUser() user?: UsuarioPerfil) {
+  calendario(
+    @Query() query: FindCalendarioQueryDto,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     return this.visitasService.findCalendarForUser(query, user);
   }
 
@@ -62,13 +82,21 @@ export class VisitasController {
   @Post('google-calendar/sync-pending')
   @Roles('COORDINADOR')
   retryPendingGoogleCalendarSync(@CurrentUser() user?: UsuarioPerfil) {
-    return this.visitasService.retryPendingGoogleCalendarSync(uuidOrUndefined(user?.id));
+    return this.visitasService.retryPendingGoogleCalendarSync(
+      uuidOrUndefined(user?.id),
+    );
   }
 
   @Post(':id/google-calendar/sync')
   @Roles('COORDINADOR')
-  resyncGoogleCalendar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
-    return this.visitasService.resyncGoogleCalendar(id, uuidOrUndefined(user?.id));
+  resyncGoogleCalendar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
+    return this.visitasService.resyncGoogleCalendar(
+      id,
+      uuidOrUndefined(user?.id),
+    );
   }
 
   @Get(':id/google-calendar/logs')
@@ -84,7 +112,11 @@ export class VisitasController {
     @Body() dto: CambiarEstadoVisitaDto,
     @CurrentUser() user?: UsuarioPerfil,
   ) {
-    return this.visitasService.cambiarEstado(id, dto, uuidOrUndefined(user?.id));
+    return this.visitasService.cambiarEstado(
+      id,
+      dto,
+      uuidOrUndefined(user?.id),
+    );
   }
 
   @Patch(':id/completar')
@@ -107,7 +139,11 @@ export class VisitasController {
     @Body() dto: InspeccionMantenimientoDto,
     @CurrentUser() user?: UsuarioPerfil,
   ) {
-    return this.visitasService.registrarInspeccionMantenimiento(id, dto, uuidOrUndefined(user?.id));
+    return this.visitasService.registrarInspeccionMantenimiento(
+      id,
+      dto,
+      uuidOrUndefined(user?.id),
+    );
   }
 
   @Patch(':id/reprogramar')
@@ -132,7 +168,10 @@ export class VisitasController {
 
   @Delete(':id')
   @Roles('ADMIN', 'COORDINADOR')
-  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user?: UsuarioPerfil) {
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user?: UsuarioPerfil,
+  ) {
     return this.visitasService.remove(id, uuidOrUndefined(user?.id));
   }
 }

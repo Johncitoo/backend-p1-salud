@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { basename, extname, parse, win32 } from 'path';
-import type { UploadedClinicalFile, ValidatedClinicalFile } from '../types/uploaded-file.type';
+import type {
+  UploadedClinicalFile,
+  ValidatedClinicalFile,
+} from '../types/uploaded-file.type';
 
 const MB = 1024 * 1024;
 const MAX_IMAGE_BYTES = 10 * MB;
@@ -26,15 +29,21 @@ export class FileValidationService {
     const expectedMime = EXTENSION_MIME[extension];
 
     if (!expectedMime) {
-      throw new BadRequestException('Tipo de archivo no permitido. Solo JPG, PNG, WebP o PDF.');
+      throw new BadRequestException(
+        'Tipo de archivo no permitido. Solo JPG, PNG, WebP o PDF.',
+      );
     }
 
     if (file.mimetype !== expectedMime) {
-      throw new BadRequestException('El MIME declarado no coincide con la extension permitida.');
+      throw new BadRequestException(
+        'El MIME declarado no coincide con la extension permitida.',
+      );
     }
 
     if (!this.matchesMagicBytes(file.buffer, extension)) {
-      throw new BadRequestException('El contenido del archivo no coincide con su extension.');
+      throw new BadRequestException(
+        'El contenido del archivo no coincide con su extension.',
+      );
     }
 
     const kind = expectedMime === 'application/pdf' ? 'PDF' : 'IMAGE';
@@ -74,11 +83,12 @@ export class FileValidationService {
   }
 
   private safeBaseName(fileName: string): string {
-    return parse(fileName)
-      .name
-      .replace(/[^a-zA-Z0-9._-]+/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .slice(0, 100) || 'archivo';
+    return (
+      parse(fileName)
+        .name.replace(/[^a-zA-Z0-9._-]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 100) || 'archivo'
+    );
   }
 
   private getExtension(fileName: string): string {
@@ -87,11 +97,18 @@ export class FileValidationService {
 
   private matchesMagicBytes(buffer: Buffer, extension: string): boolean {
     if (extension === 'jpg' || extension === 'jpeg') {
-      return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+      return (
+        buffer.length >= 3 &&
+        buffer[0] === 0xff &&
+        buffer[1] === 0xd8 &&
+        buffer[2] === 0xff
+      );
     }
 
     if (extension === 'png') {
-      return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+      return buffer
+        .subarray(0, 8)
+        .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
     }
 
     if (extension === 'webp') {

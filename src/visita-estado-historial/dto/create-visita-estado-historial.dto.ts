@@ -8,7 +8,15 @@ export class CreateVisitaEstadoHistorialDto {
   @IsString()
   estadoAnterior?: string;
 
-  @IsIn(['PROGRAMADA', 'EN_CAMINO', 'EN_ATENCION', 'REALIZADA', 'CANCELADA', 'REPROGRAMADA', 'NO_REALIZADA'])
+  @IsIn([
+    'PROGRAMADA',
+    'EN_CAMINO',
+    'EN_ATENCION',
+    'REALIZADA',
+    'CANCELADA',
+    'REPROGRAMADA',
+    'NO_REALIZADA',
+  ])
   estadoNuevo: string;
 
   @IsOptional()

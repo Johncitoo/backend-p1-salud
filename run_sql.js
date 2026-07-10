@@ -24,16 +24,18 @@ async function run(connectionString, sqlPath) {
   }
 }
 
-const prodString = 'postgresql://postgres:pgoJHeyVwYiHnjTAjaDANlgZlKOhhTPA@reseau.proxy.rlwy.net:23242/railway';
-const localString = 'postgres://admin:admin123@127.0.0.1:5433/salud_db';
-const sqlFile = '../BD/migraciones/2026-07-05_add_paciente_sensores.sql';
+const connectionString = process.env.DATABASE_URL || process.argv[2];
+const sqlFile = process.env.DATABASE_URL ? process.argv[2] : process.argv[3];
 
-async function executeAll() {
-  console.log('=== APLICANDO A PRODUCCIÓN ===');
-  await run(prodString, sqlFile);
-  
-  console.log('\n=== APLICANDO A LOCAL (DOCKER) ===');
-  await run(localString, sqlFile);
+if (!connectionString || !sqlFile) {
+  console.log("Usage: node run_sql.js <connectionString> <sqlFilePath>");
+  console.log("Or set DATABASE_URL and run: node run_sql.js <sqlFilePath>");
+  process.exit(1);
 }
 
-executeAll();
+async function execute() {
+  console.log('=== APLICANDO MIGRACIÓN ===');
+  await run(connectionString, sqlFile);
+}
+
+execute();

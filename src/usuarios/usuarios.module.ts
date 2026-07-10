@@ -10,7 +10,11 @@ import { UsuariosController } from './usuarios.controller';
 import { UsuariosService } from './usuarios.service';
 
 @Module({
-  imports: [forwardRef(() => AuditoriasModule), AnalyticsModule, TypeOrmModule.forFeature([Usuario, Rol])],
+  imports: [
+    forwardRef(() => AuditoriasModule),
+    AnalyticsModule,
+    TypeOrmModule.forFeature([Usuario, Rol]),
+  ],
   controllers: [UsuariosController],
   providers: [UsuariosService, DevAuthGuard, RolesGuard],
   exports: [UsuariosService],

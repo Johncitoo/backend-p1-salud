@@ -30,7 +30,10 @@ export class IncidenteEstadoHistorialService {
     const registro = await this.repository.findOne({
       where: { id },
     });
-    if (!registro) throw new NotFoundException('Registro de historial de estado de incidente no encontrado');
+    if (!registro)
+      throw new NotFoundException(
+        'Registro de historial de estado de incidente no encontrado',
+      );
     return registro;
   }
 
